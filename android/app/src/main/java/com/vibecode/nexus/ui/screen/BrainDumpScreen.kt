@@ -236,6 +236,7 @@ fun BrainDumpScreen(
                                 result.onSuccess { response ->
                                     lastResult = response
                                     editableText = ""
+                                    speechManager.clearText()
                                 }.onFailure { e ->
                                     snackbarHostState.showSnackbar(
                                         "Senden fehlgeschlagen: ${e.message}"

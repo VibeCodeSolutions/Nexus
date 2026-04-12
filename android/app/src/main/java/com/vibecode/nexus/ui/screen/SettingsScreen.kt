@@ -1,7 +1,9 @@
 package com.vibecode.nexus.ui.screen
 
+import android.Manifest
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,6 +82,25 @@ fun SettingsScreen(
                 scope.launch {
                     snackbarHostState.showSnackbar("Ungültiger QR-Code. Erwarte {\"url\":..., \"token\":...}")
                 }
+            }
+        }
+    }
+
+    // Camera permission for QR scanner
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val options = ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("NEXUS Core QR-Code scannen")
+                setBeepEnabled(false)
+                setOrientationLocked(true)
+            }
+            qrLauncher.launch(options)
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar("Kamera-Berechtigung wird für QR-Scan benötigt")
             }
         }
     }
@@ -163,13 +184,7 @@ fun SettingsScreen(
             // QR Scan button
             Button(
                 onClick = {
-                    val options = ScanOptions().apply {
-                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                        setPrompt("NEXUS Core QR-Code scannen")
-                        setBeepEnabled(false)
-                        setOrientationLocked(true)
-                    }
-                    qrLauncher.launch(options)
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

@@ -39,7 +39,10 @@ class MainActivity : ComponentActivity() {
 
                 DisposableEffect(Unit) {
                     speechManager.initialize()
-                    onDispose { speechManager.destroy() }
+                    onDispose {
+                        speechManager.destroy()
+                        apiClient.close()
+                    }
                 }
 
                 var hasAudioPermission by remember {

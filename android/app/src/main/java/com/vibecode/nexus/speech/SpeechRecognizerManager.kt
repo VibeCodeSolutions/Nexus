@@ -68,6 +68,10 @@ class SpeechRecognizerManager(private val context: Context) {
         recognizer?.stopListening()
     }
 
+    fun clearText() {
+        _state.value = _state.value.copy(finalText = "", partialText = "")
+    }
+
     fun destroy() {
         recognizer?.destroy()
         recognizer = null

@@ -1,36 +1,60 @@
+mod cli;
+mod config;
 mod db;
+mod keystore;
+mod llm;
 mod models;
 mod repo;
 
 use axum::{routing::get, Json, Router};
+use clap::Parser;
 use serde_json::{json, Value};
 use tracing_subscriber::EnvFilter;
 
+use cli::{Cli, Command};
+use config::Config;
+
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive("nexus_core=info".parse().unwrap()))
-        .init();
+    let cli = Cli::parse();
 
-    tracing::info!("NEXUS Core startet...");
+    match cli.command.unwrap_or(Command::Serve) {
+        Command::SetKey { provider, value } => {
+            match keystore::set_key(&provider, &value) {
+                Ok(()) => println!("API-Key für '{provider}' gespeichert."),
+                Err(e) => eprintln!("Fehler: {e}"),
+            }
+        }
+        Command::Serve => {
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    EnvFilter::from_default_env()
+                        .add_directive("nexus_core=info".parse().unwrap()),
+                )
+                .init();
 
-    let pool = db::init_pool("sqlite:nexus.db")
-        .await
-        .expect("Datenbank konnte nicht initialisiert werden");
+            let config = Config::load();
+            tracing::info!("NEXUS Core startet... (Provider: {})", config.default_provider);
 
-    let app = Router::new()
-        .route("/health", get(health_check))
-        .with_state(pool);
+            let pool = db::init_pool(&config.db_url)
+                .await
+                .expect("Datenbank konnte nicht initialisiert werden");
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:7777")
-        .await
-        .expect("Port 7777 konnte nicht gebunden werden");
+            let app = Router::new()
+                .route("/health", get(health_check))
+                .with_state(pool);
 
-    tracing::info!("NEXUS Core läuft auf http://127.0.0.1:7777");
+            let listener = tokio::net::TcpListener::bind(&config.bind_addr)
+                .await
+                .expect("Port konnte nicht gebunden werden");
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server-Fehler");
+            tracing::info!("NEXUS Core läuft auf http://{}", config.bind_addr);
+
+            axum::serve(listener, app)
+                .await
+                .expect("Server-Fehler");
+        }
+    }
 }
 
 async fn health_check() -> Json<Value> {

@@ -1,7 +1,7 @@
 # NEXUS — Current State
 
 **Stand:** 2026-04-12
-**Aktuelle Phase:** 1 — Core: DB + Migrationen
+**Aktuelle Phase:** 2 — Core: Secrets + LLM-Router
 **Phase-Status:** Abgeschlossen
 
 ---
@@ -18,21 +18,28 @@
 - sqlx + SQLite integriert, DB wird beim Start erstellt
 - Migration `20260412_001_braindump.sql` → `braindumps`-Tabelle
 - `BrainDumpEntry` Model + Repository (insert, list, get_by_id)
-- 2 Unit-Tests bestanden (insert+retrieve, list)
-- Modulstruktur: `db.rs`, `models.rs`, `repo.rs`
+- 2 Unit-Tests bestanden
+
+### Phase 2 — Core: Secrets + LLM-Router ✅
+- `keyring-rs` speichert/liest API-Keys (`nexus set-key claude <wert>`)
+- CLI via clap: `serve` (default) und `set-key` Subcommands
+- Trait `LlmProvider` mit `categorize_and_summarize(text) -> Classification`
+- Claude-Implementierung (Messages-API, claude-sonnet-4)
+- Gemini-Implementierung (generateContent, gemini-2.0-flash)
+- Config: `NEXUS_DEFAULT_PROVIDER` env var (default: claude)
+- Shared System-Prompt für konsistente Kategorisierung
+- Integrationstests vorbereitet (`cargo test -- --ignored`)
 
 ---
 
-## Nächste Phase: Phase 2 — Core: Secrets + LLM-Router
+## Nächste Phase: Phase 3 — Core: BrainDump-Endpoint
 
-**DoD:**
-- `keyring-rs` speichert/liest API-Keys unter `nexus/claude` und `nexus/gemini`
-- CLI-Subcommand `nexus set-key claude <wert>`
-- Trait `LlmProvider` mit `categorize_and_summarize(text) -> Classification`
-- Claude-Implementierung (Messages-API)
-- Gemini-Implementierung
-- Config `default_provider`
-- Integrationstest (manuell triggerbar)
+**DoD (aus Masterplan):**
+- `POST /braindump` nimmt Text entgegen
+- Text wird per LLM kategorisiert (Idea, Task, Worry, Question, Random)
+- Ergebnis wird in SQLite persistiert
+- `GET /braindump` liefert Liste (sortiert nach Zeit/Kategorie)
+- End-to-end Flow: Text → LLM → kategorisiertes DB-Entry
 
 ---
 
@@ -40,14 +47,17 @@
 
 | Pfad | Beschreibung |
 |---|---|
-| `NEXUS_Masterplan.md` | Gesamtplan, Phasen, DoD |
-| `CURRENT_STATE.md` | Diese Datei — aktueller Stand |
-| `core/src/main.rs` | Einstiegspunkt, Router + DB-Init |
+| `core/src/main.rs` | CLI-Dispatch + Server |
+| `core/src/cli.rs` | Clap CLI Definition |
+| `core/src/config.rs` | Config (Provider, DB-URL, Bind-Addr) |
+| `core/src/keystore.rs` | OS-Keychain Zugriff |
+| `core/src/llm/mod.rs` | LlmProvider Trait + Classification + create_provider |
+| `core/src/llm/claude.rs` | Claude Messages-API Implementierung |
+| `core/src/llm/gemini.rs` | Gemini API Implementierung |
 | `core/src/db.rs` | DB-Pool + Migration |
-| `core/src/models.rs` | BrainDumpEntry Struct |
-| `core/src/repo.rs` | Repository (insert, list, get_by_id) + Tests |
-| `core/migrations/` | SQLite-Migrationen |
-| `android/` | Android-App (Compose) — verwaltet via Android Studio CLI |
+| `core/src/models.rs` | BrainDumpEntry |
+| `core/src/repo.rs` | Repository + Tests |
+| `android/` | Android-App — verwaltet via Android Studio CLI |
 
 ---
 
@@ -56,3 +66,4 @@
 | Risiko | Mitigation |
 |---|---|
 | JDK 25 inkompatibel mit Gradle 8.9 | JDK 21 verwenden |
+| LLM-Antwort nicht immer valides JSON | Fehlerbehandlung + Retry in Phase 3 |

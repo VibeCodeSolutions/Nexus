@@ -1,18 +1,29 @@
 mod cli;
 mod config;
 mod db;
+mod handlers;
 mod keystore;
 mod llm;
 mod models;
 mod repo;
 
-use axum::{routing::get, Json, Router};
+use axum::routing::{get, post};
+use axum::{Json, Router};
 use clap::Parser;
 use serde_json::{json, Value};
+use sqlx::SqlitePool;
+use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
 use cli::{Cli, Command};
 use config::Config;
+use llm::LlmProvider;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: SqlitePool,
+    pub llm: Arc<dyn LlmProvider>,
+}
 
 #[tokio::main]
 async fn main() {
@@ -40,9 +51,27 @@ async fn main() {
                 .await
                 .expect("Datenbank konnte nicht initialisiert werden");
 
+            let llm_provider: Arc<dyn LlmProvider> = match llm::create_provider(&config.default_provider) {
+                Ok(provider) => Arc::from(provider),
+                Err(e) => {
+                    tracing::warn!("LLM-Provider nicht verfügbar: {e}");
+                    tracing::warn!("Server startet ohne LLM. Keys setzen mit: nexus set-key claude <key>");
+                    Arc::new(llm::NoOpProvider)
+                }
+            };
+
+            let state = AppState {
+                pool,
+                llm: llm_provider,
+            };
+
             let app = Router::new()
+                .route("/", get(handlers::dashboard))
                 .route("/health", get(health_check))
-                .with_state(pool);
+                .route("/braindump", post(handlers::post_braindump))
+                .route("/braindump", get(handlers::list_braindumps))
+                .route("/braindump/{id}", get(handlers::get_braindump))
+                .with_state(state);
 
             let listener = tokio::net::TcpListener::bind(&config.bind_addr)
                 .await

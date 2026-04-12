@@ -27,6 +27,15 @@ Analysiere den folgenden Text und antworte AUSSCHLIESSLICH mit validem JSON in d
 }
 Keine zusätzliche Erklärung, nur das JSON."#;
 
+pub struct NoOpProvider;
+
+#[async_trait]
+impl LlmProvider for NoOpProvider {
+    async fn categorize_and_summarize(&self, _text: &str) -> Result<Classification, String> {
+        Err("Kein LLM-Provider konfiguriert. Nutze: nexus set-key claude <key>".to_string())
+    }
+}
+
 pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, String> {
     let api_key = keystore::get_key(provider_name)?;
 

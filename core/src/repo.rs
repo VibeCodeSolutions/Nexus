@@ -1,18 +1,6 @@
 use crate::models::BrainDumpEntry;
-use sqlx::{Row, SqlitePool};
+use sqlx::SqlitePool;
 use uuid::Uuid;
-
-fn row_to_entry(row: sqlx::sqlite::SqliteRow) -> BrainDumpEntry {
-    BrainDumpEntry {
-        id: row.get("id"),
-        created_at: row.get("created_at"),
-        raw_text: row.get("raw_text"),
-        transcript: row.get("transcript"),
-        category: row.get("category"),
-        summary: row.get("summary"),
-        tags_json: row.get("tags_json"),
-    }
-}
 
 pub async fn insert(pool: &SqlitePool, raw_text: &str) -> Result<BrainDumpEntry, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
@@ -27,20 +15,16 @@ pub async fn insert(pool: &SqlitePool, raw_text: &str) -> Result<BrainDumpEntry,
 }
 
 pub async fn get_by_id(pool: &SqlitePool, id: &str) -> Result<BrainDumpEntry, sqlx::Error> {
-    let row = sqlx::query("SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps WHERE id = ?")
+    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps WHERE id = ?")
         .bind(id)
         .fetch_one(pool)
-        .await?;
-
-    Ok(row_to_entry(row))
+        .await
 }
 
 pub async fn list(pool: &SqlitePool) -> Result<Vec<BrainDumpEntry>, sqlx::Error> {
-    let rows = sqlx::query("SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps ORDER BY created_at DESC")
+    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps ORDER BY created_at DESC")
         .fetch_all(pool)
-        .await?;
-
-    Ok(rows.into_iter().map(row_to_entry).collect())
+        .await
 }
 
 #[cfg(test)]

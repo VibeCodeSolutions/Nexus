@@ -20,3 +20,14 @@ pub struct Project {
     pub created_at: String,
     pub status: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Task {
+    pub id: String,
+    pub title: String,
+    pub project_id: Option<String>,
+    pub priority: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}

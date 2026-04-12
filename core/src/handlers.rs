@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, Json};
 use serde::Deserialize;
@@ -162,6 +162,88 @@ pub async fn get_project_braindumps(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
     Ok(Json(json!(entries)))
+}
+
+#[derive(Deserialize)]
+pub struct CreateTaskRequest {
+    pub title: String,
+    pub project_id: Option<String>,
+    pub priority: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateTaskRequest {
+    pub status: Option<String>,
+    pub title: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct TaskListQuery {
+    pub project_id: Option<String>,
+    pub status: Option<String>,
+}
+
+pub async fn create_task(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateTaskRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if payload.title.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Titel darf nicht leer sein"}))));
+    }
+
+    let task = repo::create_task(
+        &state.pool,
+        &payload.title,
+        payload.project_id.as_deref(),
+        payload.priority.as_deref(),
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!(task)))
+}
+
+pub async fn list_tasks(
+    State(state): State<AppState>,
+    Query(params): Query<TaskListQuery>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let tasks = repo::list_tasks(
+        &state.pool,
+        params.project_id.as_deref(),
+        params.status.as_deref(),
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!(tasks)))
+}
+
+pub async fn update_task(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateTaskRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let task = repo::update_task(
+        &state.pool,
+        &id,
+        payload.status.as_deref(),
+        payload.title.as_deref(),
+    )
+    .await
+    .map_err(|e| (StatusCode::NOT_FOUND, Json(json!({"error": format!("Task nicht gefunden: {e}")}))))?;
+
+    Ok(Json(json!(task)))
+}
+
+pub async fn delete_task(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    repo::delete_task(&state.pool, &id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!({"deleted": id})))
 }
 
 pub async fn dashboard(

@@ -9,7 +9,7 @@ mod models;
 mod repo;
 
 use axum::middleware;
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use clap::Parser;
 use serde_json::{json, Value};
@@ -103,6 +103,10 @@ async fn main() {
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))
                 .route("/projects/{id}/braindumps", get(handlers::get_project_braindumps))
+                .route("/tasks", post(handlers::create_task))
+                .route("/tasks", get(handlers::list_tasks))
+                .route("/tasks/{id}", put(handlers::update_task))
+                .route("/tasks/{id}", delete(handlers::delete_task))
                 .layer(middleware::from_fn(auth::require_token))
                 .with_state(state);
 

@@ -1,8 +1,8 @@
 # NEXUS — Current State
 
 **Stand:** 2026-04-12
-**Aktuelle Phase:** 5+6 — Pairing + Token-Auth
-**Phase-Status:** Core-Anteil abgeschlossen
+**Aktuelle Phase:** 12 — Linux-Support
+**Phase-Status:** Abgeschlossen (Phasen 0-12 komplett)
 
 ---
 
@@ -13,44 +13,56 @@
 ### Phase 2 — Core: Secrets + LLM-Router ✅
 ### Phase 3 — Core: BrainDump-Endpoint ✅
 ### Phase 4 — Android: Voice-Recorder ✅
-
-### Phase 5+6 — Pairing + Token-Auth (Core-Anteil) ✅
-- `nexus pair` zeigt QR-Code mit `{url, token}` im Terminal
-- Token wird file-basiert gespeichert (`~/.nexus_token`)
-- Bearer-Token-Middleware schützt API-Endpoints
-- Health (`/health`) und Dashboard (`/`) bleiben public
-- LAN-IP wird automatisch erkannt für Android-Pairing
-
----
-
-## Nächste Schritte
-
-### Phase 5 — Android: Pairing + HTTP-Senden (AS-CLI)
-- Settings-Screen mit QR-Scan
-- EncryptedSharedPreferences für URL + Token
-- Ktor-Client sendet `POST /braindump` mit Bearer-Token
-- Response zeigt Kategorie + Summary
-
-### Phase 7 — MVP-Härtung & Dogfooding
+### Phase 5+6 — Pairing + Token-Auth ✅
+### Phase 7 — MVP-Härtung ✅
+### Phase 8 — Projekt-Bildung aus BrainDumps ✅
+### Phase 9 — Desktop-UI mit Tauri ✅
+### Phase 10 — Tasks & Projekt-Management ✅
+### Phase 11 — ProgressGlow ✅
+### Phase 12 — Linux-Support ✅
 
 ---
 
-## Relevante Dateipfade
+## Builds
 
-| Pfad | Beschreibung |
+| Artifact | Pfad | Größe |
+|---|---|---|
+| Rust Core (Linux x86-64) | `core/target/release/nexus-core` | 14 MB |
+| Tauri Desktop (Linux x86-64) | `desktop/src-tauri/target/release/nexus-desktop` | 9.1 MB |
+| Android Debug APK | `android/app/build/outputs/apk/debug/app-debug.apk` | 61 MB |
+
+## API-Endpoints
+
+| Method | Path | Auth | Beschreibung |
+|---|---|---|---|
+| GET | `/health` | Public | Health-Check |
+| GET | `/` | Public | Dashboard (HTML) |
+| POST | `/braindump` | Bearer | BrainDump erstellen |
+| GET | `/braindump` | Bearer | Alle BrainDumps |
+| GET | `/braindump/{id}` | Bearer | Einzelner BrainDump |
+| POST | `/projects/suggest` | Bearer | LLM-basierte Projekt-Vorschläge |
+| POST | `/projects` | Bearer | Projekt erstellen |
+| GET | `/projects` | Bearer | Alle Projekte |
+| GET | `/projects/{id}/braindumps` | Bearer | BrainDumps eines Projekts |
+| GET | `/projects/{id}/progress` | Bearer | Fortschritt (Tasks done/total) |
+| POST | `/tasks` | Bearer | Task erstellen |
+| GET | `/tasks` | Bearer | Tasks (Filter: project_id, status) |
+| PUT | `/tasks/{id}` | Bearer | Task updaten |
+| DELETE | `/tasks/{id}` | Bearer | Task löschen |
+
+## CLI-Commands
+
+```
+nexus-core serve      # Server starten (default)
+nexus-core set-key    # API-Key im Keychain speichern
+nexus-core pair       # QR-Code für Android-Pairing
+```
+
+## Nächste Phasen (Post-Phase-12)
+
+| Phase | Was |
 |---|---|
-| `core/src/main.rs` | CLI-Dispatch, Server, Auth-Middleware |
-| `core/src/auth.rs` | Token-Management, QR-Code, Middleware |
-| `core/src/handlers.rs` | POST/GET /braindump, Dashboard |
-| `core/src/llm/` | Claude + Gemini Provider |
-| `core/src/cli.rs` | serve, set-key, pair Commands |
-| `android/` | Android-App — verwaltet via Android Studio CLI |
-
----
-
-## Bekannte Risiken
-
-| Risiko | Mitigation |
-|---|---|
-| JDK 25 inkompatibel mit Gradle 8.9 | JDK 21 verwenden |
-| Keyring funktioniert nicht auf Fedora ohne Secret Service | Token file-basiert (`~/.nexus_token`) |
+| 13 | Gamification — QuestLog, XP, Streaks |
+| 14 | Fokus-Module — FocusPact, HyperfokusWächter |
+| 15 | Wellbeing — ReizRunter, Abend-Ritual |
+| 16 | Remote-Sync — Tailscale |

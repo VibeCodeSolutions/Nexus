@@ -7,6 +7,15 @@ use serde_json::{json, Value};
 use crate::repo;
 use crate::AppState;
 
+const MAX_TEXT_LENGTH: usize = 10_000;
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 #[derive(Deserialize)]
 pub struct BrainDumpRequest {
     pub text: String,
@@ -16,6 +25,13 @@ pub async fn post_braindump(
     State(state): State<AppState>,
     Json(payload): Json<BrainDumpRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if payload.text.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Text darf nicht leer sein"}))));
+    }
+    if payload.text.len() > MAX_TEXT_LENGTH {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": format!("Text zu lang (max {} Zeichen)", MAX_TEXT_LENGTH)}))));
+    }
+
     let entry = repo::insert(&state.pool, &payload.text)
         .await
         .map_err(|e| {
@@ -91,14 +107,14 @@ pub async fn dashboard(
 
     let rows: Vec<String> = entries.iter().map(|e| {
         let tags: Vec<String> = serde_json::from_str(&e.tags_json).unwrap_or_default();
-        let tags_display = tags.join(", ");
-        let summary = e.summary.as_deref().unwrap_or("-");
+        let tags_display = escape_html(&tags.join(", "));
+        let summary = escape_html(e.summary.as_deref().unwrap_or("-"));
         format!(
             "<tr><td>{}</td><td><span class=\"cat cat-{}\">{}</span></td><td>{}</td><td>{}</td><td>{}</td></tr>",
-            e.created_at,
-            e.category.to_lowercase(),
-            e.category,
-            e.raw_text,
+            escape_html(&e.created_at),
+            escape_html(&e.category.to_lowercase()),
+            escape_html(&e.category),
+            escape_html(&e.raw_text),
             summary,
             tags_display,
         )

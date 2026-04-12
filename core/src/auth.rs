@@ -3,18 +3,16 @@ use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::Response;
 use std::fs;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 
+use crate::config::home_dir;
+
 fn token_path() -> PathBuf {
-    let dir = dirs_next().unwrap_or_else(|| PathBuf::from("."));
-    dir.join(".nexus_token")
+    home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".nexus_token")
 }
 
-fn dirs_next() -> Option<PathBuf> {
-    std::env::var("HOME").ok().map(PathBuf::from)
-}
-
-/// Generate a random pairing token and store it.
+/// Generate a random pairing token and store it with restrictive permissions.
 pub fn generate_token() -> Result<String, String> {
     use base64::Engine;
     use rand::Rng;
@@ -23,7 +21,15 @@ pub fn generate_token() -> Result<String, String> {
     rand::rng().fill(&mut bytes);
     let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
 
-    fs::write(token_path(), &token)
+    let path = token_path();
+    // Write with 0600 permissions (owner-only read/write)
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&path)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, token.as_bytes()))
         .map_err(|e| format!("Token konnte nicht gespeichert werden: {e}"))?;
 
     Ok(token)
@@ -65,6 +71,17 @@ pub fn print_qr(data: &str) {
     println!("\nPairing-Daten: {data}\n");
 }
 
+/// Constant-time string comparison to prevent timing attacks.
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.bytes()
+        .zip(b.bytes())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
+}
+
 /// Axum middleware: verify Bearer token on API routes.
 pub async fn require_token(req: Request, next: Next) -> Result<Response, StatusCode> {
     // Health and dashboard are always public
@@ -73,9 +90,13 @@ pub async fn require_token(req: Request, next: Next) -> Result<Response, StatusC
         return Ok(next.run(req).await);
     }
 
+    // Token MUST exist for protected endpoints — if missing, deny access
     let token = match fs::read_to_string(token_path()) {
         Ok(t) if !t.trim().is_empty() => t.trim().to_string(),
-        _ => return Ok(next.run(req).await), // No token file = no auth required
+        _ => {
+            tracing::error!("Kein Pairing-Token gefunden — alle API-Zugriffe blockiert");
+            return Err(StatusCode::UNAUTHORIZED);
+        }
     };
 
     let auth_header = req
@@ -86,7 +107,7 @@ pub async fn require_token(req: Request, next: Next) -> Result<Response, StatusC
     match auth_header {
         Some(header) if header.starts_with("Bearer ") => {
             let provided = &header[7..];
-            if provided == token {
+            if constant_time_eq(provided, &token) {
                 Ok(next.run(req).await)
             } else {
                 Err(StatusCode::UNAUTHORIZED)

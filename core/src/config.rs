@@ -13,7 +13,7 @@ impl Config {
         let log_dir = env::var("NEXUS_LOG_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
-                dirs_home().unwrap_or_else(|| PathBuf::from(".")).join(".nexus").join("logs")
+                home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".nexus").join("logs")
             });
 
         Self {
@@ -28,6 +28,6 @@ impl Config {
     }
 }
 
-fn dirs_home() -> Option<PathBuf> {
+pub fn home_dir() -> Option<PathBuf> {
     env::var("HOME").ok().map(PathBuf::from)
 }

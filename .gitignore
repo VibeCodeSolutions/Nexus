@@ -2,6 +2,7 @@
 /core/target/
 **/*.rs.bk
 *.pdb
+*.db
 
 # === Android ===
 /android/.gradle/

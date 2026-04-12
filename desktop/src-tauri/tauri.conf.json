@@ -1,0 +1,25 @@
+{
+  "productName": "nexus-desktop",
+  "version": "0.1.0",
+  "identifier": "com.nexus.desktop",
+  "build": {
+    "frontendDist": "../src",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "NEXUS Dashboard",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:7777 http://localhost:7777 http://192.168.0.0/16:7777"
+    }
+  }
+}

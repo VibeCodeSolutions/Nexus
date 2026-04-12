@@ -35,3 +35,4 @@ credentials.json
 # === Logs ===
 *.log
 logs/
+desktop/src-tauri/target/

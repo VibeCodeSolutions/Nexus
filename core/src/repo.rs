@@ -132,6 +132,17 @@ pub async fn update_task(pool: &SqlitePool, id: &str, status: Option<&str>, titl
         .await
 }
 
+pub async fn get_project_progress(pool: &SqlitePool, project_id: &str) -> Result<(i64, i64), sqlx::Error> {
+    let row = sqlx::query("SELECT COUNT(*) as total, SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done FROM tasks WHERE project_id = ?")
+        .bind(project_id)
+        .fetch_one(pool)
+        .await?;
+    use sqlx::Row;
+    let total: i64 = row.get("total");
+    let done: i64 = row.get("done");
+    Ok((total, done))
+}
+
 pub async fn delete_task(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM tasks WHERE id = ?")
         .bind(id)

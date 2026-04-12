@@ -103,6 +103,7 @@ async fn main() {
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))
                 .route("/projects/{id}/braindumps", get(handlers::get_project_braindumps))
+                .route("/projects/{id}/progress", get(handlers::get_project_progress))
                 .route("/tasks", post(handlers::create_task))
                 .route("/tasks", get(handlers::list_tasks))
                 .route("/tasks/{id}", put(handlers::update_task))

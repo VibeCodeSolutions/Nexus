@@ -164,6 +164,24 @@ pub async fn get_project_braindumps(
     Ok(Json(json!(entries)))
 }
 
+pub async fn get_project_progress(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let (total, done) = repo::get_project_progress(&state.pool, &id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    let percent = if total > 0 { (done * 100) / total } else { 0 };
+
+    Ok(Json(json!({
+        "project_id": id,
+        "total_tasks": total,
+        "done_tasks": done,
+        "progress_percent": percent
+    })))
+}
+
 #[derive(Deserialize)]
 pub struct CreateTaskRequest {
     pub title: String,

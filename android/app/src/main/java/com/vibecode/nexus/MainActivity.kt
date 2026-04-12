@@ -1,22 +1,21 @@
 package com.vibecode.nexus
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
+import com.vibecode.nexus.speech.SpeechRecognizerManager
+import com.vibecode.nexus.ui.screen.BrainDumpScreen
 import com.vibecode.nexus.ui.theme.NexusTheme
 
 class MainActivity : ComponentActivity() {
@@ -25,42 +24,35 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             NexusTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    NexusHomeScreen(modifier = Modifier.padding(innerPadding))
+                val speechManager = remember { SpeechRecognizerManager(this) }
+
+                DisposableEffect(Unit) {
+                    speechManager.initialize()
+                    onDispose { speechManager.destroy() }
                 }
+
+                var hasPermission by remember {
+                    mutableStateOf(
+                        ContextCompat.checkSelfPermission(
+                            this, Manifest.permission.RECORD_AUDIO
+                        ) == PermissionChecker.PERMISSION_GRANTED
+                    )
+                }
+
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    hasPermission = granted
+                }
+
+                BrainDumpScreen(
+                    speechManager = speechManager,
+                    hasPermission = hasPermission,
+                    onRequestPermission = {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                )
             }
         }
-    }
-}
-
-@Composable
-fun NexusHomeScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "NEXUS",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Personal ADHS-OS",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun NexusHomeScreenPreview() {
-    NexusTheme {
-        NexusHomeScreen()
     }
 }

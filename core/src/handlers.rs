@@ -4,6 +4,7 @@ use axum::response::{Html, Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use crate::llm::ProjectSuggestion;
 use crate::repo;
 use crate::AppState;
 
@@ -96,6 +97,73 @@ pub async fn get_braindump(
     Ok(Json(json!(entry)))
 }
 
+#[derive(Deserialize)]
+pub struct CreateProjectRequest {
+    pub name: String,
+    pub description: String,
+    pub braindump_ids: Vec<String>,
+}
+
+pub async fn suggest_projects(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let entries = repo::list(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    if entries.is_empty() {
+        return Ok(Json(json!([])));
+    }
+
+    let suggestions: Vec<ProjectSuggestion> = state.llm.suggest_projects(&entries)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!(suggestions)))
+}
+
+pub async fn create_project(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateProjectRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if payload.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Projektname darf nicht leer sein"}))));
+    }
+
+    let project = repo::create_project(&state.pool, &payload.name, &payload.description)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    for bid in &payload.braindump_ids {
+        repo::assign_braindump_to_project(&state.pool, bid, &project.id)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    }
+
+    Ok(Json(json!(project)))
+}
+
+pub async fn list_projects(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let projects = repo::list_projects(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!(projects)))
+}
+
+pub async fn get_project_braindumps(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let entries = repo::get_project_braindumps(&state.pool, &id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!(entries)))
+}
+
 pub async fn dashboard(
     State(state): State<AppState>,
 ) -> Result<Html<String>, (StatusCode, Json<Value>)> {
@@ -104,6 +172,29 @@ pub async fn dashboard(
         .map_err(|e| {
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
         })?;
+
+    let projects = repo::list_projects(&state.pool)
+        .await
+        .map_err(|e| {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        })?;
+
+    let project_rows: Vec<String> = projects.iter().map(|p| {
+        format!(
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td><span class=\"cat cat-{}\">{}</span></td></tr>",
+            escape_html(&p.created_at),
+            escape_html(&p.name),
+            escape_html(&p.description),
+            escape_html(&p.status),
+            escape_html(&p.status),
+        )
+    }).collect();
+
+    let projects_html = if projects.is_empty() {
+        "<p class=\"empty\">Noch keine Projekte. Nutze /projects/suggest um Vorschlaege zu erhalten.</p>".to_string()
+    } else {
+        format!("<table><thead><tr><th>Erstellt</th><th>Name</th><th>Beschreibung</th><th>Status</th></tr></thead><tbody>{}</tbody></table>", project_rows.join(""))
+    };
 
     let rows: Vec<String> = entries.iter().map(|e| {
         let tags: Vec<String> = serde_json::from_str(&e.tags_json).unwrap_or_default();
@@ -144,10 +235,16 @@ pub async fn dashboard(
 </head>
 <body>
 <h1>NEXUS Dashboard</h1>
+<h2>Projekte</h2>
+<p>{} Projekte</p>
+{}
+<h2>BrainDumps</h2>
 <p>{} BrainDumps</p>
 {}
 </body>
 </html>"#,
+        projects.len(),
+        projects_html,
         entries.len(),
         if entries.is_empty() {
             "<p class=\"empty\">Noch keine BrainDumps. Sprich deinen ersten Gedanken ein!</p>".to_string()

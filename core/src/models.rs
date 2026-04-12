@@ -11,3 +11,12 @@ pub struct BrainDumpEntry {
     pub summary: Option<String>,
     pub tags_json: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub created_at: String,
+    pub status: String,
+}

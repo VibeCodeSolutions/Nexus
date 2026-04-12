@@ -99,6 +99,10 @@ async fn main() {
                 .route("/braindump", post(handlers::post_braindump))
                 .route("/braindump", get(handlers::list_braindumps))
                 .route("/braindump/{id}", get(handlers::get_braindump))
+                .route("/projects/suggest", post(handlers::suggest_projects))
+                .route("/projects", post(handlers::create_project))
+                .route("/projects", get(handlers::list_projects))
+                .route("/projects/{id}/braindumps", get(handlers::get_project_braindumps))
                 .layer(middleware::from_fn(auth::require_token))
                 .with_state(state);
 

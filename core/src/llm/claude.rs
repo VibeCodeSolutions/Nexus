@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use super::{Classification, LlmProvider, SYSTEM_PROMPT};
+use crate::models::BrainDumpEntry;
+use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
 
 pub struct ClaudeProvider {
     api_key: String,
@@ -52,6 +53,49 @@ impl LlmProvider for ClaudeProvider {
             messages: vec![Message {
                 role: "user".to_string(),
                 content: text.to_string(),
+            }],
+        };
+
+        let response = self.client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| format!("Claude API Fehler: {e}"))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("Claude API {status}: {body}"));
+        }
+
+        let claude_resp: ClaudeResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Claude Response-Parse Fehler: {e}"))?;
+
+        let raw_text = claude_resp.content.first()
+            .ok_or("Keine Antwort von Claude")?
+            .text.clone();
+
+        serde_json::from_str(&raw_text)
+            .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw_text}"))
+    }
+
+    async fn suggest_projects(&self, entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String> {
+        let entries_text: Vec<String> = entries.iter().map(|e| {
+            format!("ID: {}\nText: {}\nKategorie: {}\nSummary: {}", e.id, e.raw_text, e.category, e.summary.as_deref().unwrap_or("-"))
+        }).collect();
+
+        let request = ClaudeRequest {
+            model: "claude-sonnet-4-20250514".to_string(),
+            max_tokens: 1024,
+            system: PROJECT_SUGGEST_PROMPT.to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: entries_text.join("\n\n---\n\n"),
             }],
         };
 

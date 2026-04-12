@@ -1,3 +1,4 @@
+mod auth;
 mod cli;
 mod config;
 mod db;
@@ -7,6 +8,7 @@ mod llm;
 mod models;
 mod repo;
 
+use axum::middleware;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use clap::Parser;
@@ -36,6 +38,13 @@ async fn main() {
                 Err(e) => eprintln!("Fehler: {e}"),
             }
         }
+        Command::Pair => {
+            let config = Config::load();
+            match auth::pairing_json(&config.bind_addr) {
+                Ok(data) => auth::print_qr(&data),
+                Err(e) => eprintln!("Fehler: {e}"),
+            }
+        }
         Command::Serve => {
             tracing_subscriber::fmt()
                 .with_env_filter(
@@ -46,6 +55,12 @@ async fn main() {
 
             let config = Config::load();
             tracing::info!("NEXUS Core startet... (Provider: {})", config.default_provider);
+
+            // Ensure pairing token exists
+            match auth::get_or_create_token() {
+                Ok(_) => tracing::info!("Pairing-Token bereit. QR-Code anzeigen mit: nexus pair"),
+                Err(e) => tracing::warn!("Token konnte nicht erstellt werden: {e}"),
+            }
 
             let pool = db::init_pool(&config.db_url)
                 .await
@@ -71,6 +86,7 @@ async fn main() {
                 .route("/braindump", post(handlers::post_braindump))
                 .route("/braindump", get(handlers::list_braindumps))
                 .route("/braindump/{id}", get(handlers::get_braindump))
+                .layer(middleware::from_fn(auth::require_token))
                 .with_state(state);
 
             let listener = tokio::net::TcpListener::bind(&config.bind_addr)

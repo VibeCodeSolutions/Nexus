@@ -18,4 +18,6 @@ pub enum Command {
         /// The API key value
         value: String,
     },
+    /// Show QR code for Android pairing
+    Pair,
 }

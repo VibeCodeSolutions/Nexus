@@ -17,5 +17,9 @@ keyring = "3"
 clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 async-trait = "0.1"
+rand = "0.9"
+base64 = "0.22"
+qrcode = { version = "0.14", default-features = false }
+local-ip-address = "0.6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

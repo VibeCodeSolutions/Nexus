@@ -1,4 +1,4 @@
-use crate::models::{BrainDumpEntry, Project, Task};
+use crate::models::{BrainDumpEntry, Project, Task, UserStats};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -151,6 +151,193 @@ pub async fn delete_task(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error>
     Ok(())
 }
 
+// --- Gamification ---
+
+const XP_BRAINDUMP: i64 = 10;
+const XP_TASK_DONE: i64 = 25;
+const XP_PROJECT_CREATED: i64 = 50;
+const XP_STREAK_BONUS: i64 = 15;
+
+/// XP needed for a given level: 100 * level^1.5
+fn xp_for_level(level: i64) -> i64 {
+    (100.0 * (level as f64).powf(1.5)) as i64
+}
+
+fn level_from_xp(total_xp: i64) -> i64 {
+    let mut lvl = 1i64;
+    while xp_for_level(lvl + 1) <= total_xp {
+        lvl += 1;
+    }
+    lvl
+}
+
+pub async fn award_xp(pool: &SqlitePool, action: &str, xp: i64, reference_id: Option<&str>) -> Result<UserStats, sqlx::Error> {
+    let id = Uuid::new_v4().to_string();
+
+    sqlx::query("INSERT INTO xp_events (id, action, xp_amount, reference_id) VALUES (?, ?, ?, ?)")
+        .bind(&id)
+        .bind(action)
+        .bind(xp)
+        .bind(reference_id)
+        .execute(pool)
+        .await?;
+
+    // Update total XP
+    sqlx::query("UPDATE user_stats SET total_xp = total_xp + ?, updated_at = datetime('now') WHERE id = 1")
+        .bind(xp)
+        .execute(pool)
+        .await?;
+
+    // Recalc level
+    let stats = get_user_stats(pool).await?;
+    let new_level = level_from_xp(stats.total_xp);
+    if new_level != stats.level {
+        sqlx::query("UPDATE user_stats SET level = ?, updated_at = datetime('now') WHERE id = 1")
+            .bind(new_level)
+            .execute(pool)
+            .await?;
+    }
+
+    get_user_stats(pool).await
+}
+
+pub async fn update_streak(pool: &SqlitePool) -> Result<UserStats, sqlx::Error> {
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let stats = get_user_stats(pool).await?;
+
+    if stats.last_active_date.as_deref() == Some(&today) {
+        return Ok(stats); // Already active today
+    }
+
+    let yesterday = (chrono::Utc::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+    let new_streak = if stats.last_active_date.as_deref() == Some(yesterday.as_str()) {
+        stats.current_streak + 1
+    } else {
+        1
+    };
+    let longest = std::cmp::max(stats.longest_streak, new_streak);
+
+    sqlx::query("UPDATE user_stats SET current_streak = ?, longest_streak = ?, last_active_date = ?, updated_at = datetime('now') WHERE id = 1")
+        .bind(new_streak)
+        .bind(longest)
+        .bind(&today)
+        .execute(pool)
+        .await?;
+
+    // Streak bonus XP for streaks >= 2
+    if new_streak >= 2 {
+        award_xp(pool, "streak_bonus", XP_STREAK_BONUS, None).await?;
+    }
+
+    get_user_stats(pool).await
+}
+
+pub async fn get_user_stats(pool: &SqlitePool) -> Result<crate::models::UserStats, sqlx::Error> {
+    sqlx::query_as::<_, crate::models::UserStats>(
+        "SELECT id, total_xp, level, current_streak, longest_streak, last_active_date, updated_at FROM user_stats WHERE id = 1"
+    )
+    .fetch_one(pool)
+    .await
+}
+
+pub async fn get_xp_history(pool: &SqlitePool, limit: i64) -> Result<Vec<crate::models::XpEvent>, sqlx::Error> {
+    sqlx::query_as::<_, crate::models::XpEvent>(
+        "SELECT id, action, xp_amount, reference_id, created_at FROM xp_events ORDER BY created_at DESC LIMIT ?"
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_achievements(pool: &SqlitePool) -> Result<Vec<crate::models::Achievement>, sqlx::Error> {
+    sqlx::query_as::<_, crate::models::Achievement>(
+        "SELECT id, name, description, icon, unlocked_at FROM achievements ORDER BY unlocked_at DESC NULLS LAST, name ASC"
+    )
+    .fetch_all(pool)
+    .await
+}
+
+async fn unlock_achievement(pool: &SqlitePool, achievement_id: &str) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("UPDATE achievements SET unlocked_at = datetime('now') WHERE id = ? AND unlocked_at IS NULL")
+        .bind(achievement_id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Check and unlock achievements based on current state. Returns newly unlocked IDs.
+pub async fn check_achievements(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
+    use sqlx::Row;
+    let mut unlocked = Vec::new();
+
+    // Count braindumps
+    let bd_count: i64 = sqlx::query("SELECT COUNT(*) as c FROM braindumps")
+        .fetch_one(pool).await?.get("c");
+
+    // Count done tasks
+    let tasks_done: i64 = sqlx::query("SELECT COUNT(*) as c FROM tasks WHERE status = 'done'")
+        .fetch_one(pool).await?.get("c");
+
+    // Count projects
+    let proj_count: i64 = sqlx::query("SELECT COUNT(*) as c FROM projects")
+        .fetch_one(pool).await?.get("c");
+
+    let stats = get_user_stats(pool).await?;
+
+    let checks: Vec<(&str, bool)> = vec![
+        ("first_braindump", bd_count >= 1),
+        ("braindump_10", bd_count >= 10),
+        ("braindump_50", bd_count >= 50),
+        ("first_task_done", tasks_done >= 1),
+        ("tasks_done_10", tasks_done >= 10),
+        ("tasks_done_50", tasks_done >= 50),
+        ("first_project", proj_count >= 1),
+        ("projects_5", proj_count >= 5),
+        ("streak_3", stats.longest_streak >= 3),
+        ("streak_7", stats.longest_streak >= 7),
+        ("streak_30", stats.longest_streak >= 30),
+        ("level_5", stats.level >= 5),
+        ("level_10", stats.level >= 10),
+        ("xp_1000", stats.total_xp >= 1000),
+    ];
+
+    for (id, condition) in checks {
+        if condition {
+            if unlock_achievement(pool, id).await? {
+                unlocked.push(id.to_string());
+            }
+        }
+    }
+
+    Ok(unlocked)
+}
+
+/// Convenience: award XP for a braindump, update streak, check achievements
+pub async fn on_braindump_created(pool: &SqlitePool, braindump_id: &str) -> Result<Vec<String>, sqlx::Error> {
+    update_streak(pool).await?;
+    award_xp(pool, "braindump", XP_BRAINDUMP, Some(braindump_id)).await?;
+    check_achievements(pool).await
+}
+
+/// Convenience: award XP for task completion
+pub async fn on_task_completed(pool: &SqlitePool, task_id: &str) -> Result<Vec<String>, sqlx::Error> {
+    update_streak(pool).await?;
+    award_xp(pool, "task_done", XP_TASK_DONE, Some(task_id)).await?;
+    check_achievements(pool).await
+}
+
+/// Convenience: award XP for project creation
+pub async fn on_project_created(pool: &SqlitePool, project_id: &str) -> Result<Vec<String>, sqlx::Error> {
+    update_streak(pool).await?;
+    award_xp(pool, "project_created", XP_PROJECT_CREATED, Some(project_id)).await?;
+    check_achievements(pool).await
+}
+
+/// XP needed to reach next level
+pub fn xp_to_next_level(stats: &crate::models::UserStats) -> i64 {
+    xp_for_level(stats.level + 1) - stats.total_xp
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,6 +365,40 @@ mod tests {
 
         let entries = list(&pool).await.unwrap();
         assert_eq!(entries.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_gamification_xp_and_achievements() {
+        let pool = db::init_pool("sqlite::memory:").await.unwrap();
+
+        // Initial stats
+        let stats = get_user_stats(&pool).await.unwrap();
+        assert_eq!(stats.total_xp, 0);
+        assert_eq!(stats.level, 1);
+        assert_eq!(stats.current_streak, 0);
+
+        // Create a braindump and trigger gamification
+        let entry = insert(&pool, "Test Gedanke").await.unwrap();
+        let unlocked = on_braindump_created(&pool, &entry.id).await.unwrap();
+        assert!(unlocked.contains(&"first_braindump".to_string()));
+
+        let stats = get_user_stats(&pool).await.unwrap();
+        assert_eq!(stats.total_xp, 10); // XP_BRAINDUMP
+        assert_eq!(stats.current_streak, 1);
+
+        // Create a task, complete it
+        let task = create_task(&pool, "Test task", None, None).await.unwrap();
+        update_task(&pool, &task.id, Some("done"), None).await.unwrap();
+        let unlocked = on_task_completed(&pool, &task.id).await.unwrap();
+        assert!(unlocked.contains(&"first_task_done".to_string()));
+
+        let stats = get_user_stats(&pool).await.unwrap();
+        assert_eq!(stats.total_xp, 35); // 10 + 25
+
+        // Level calc
+        assert_eq!(super::level_from_xp(0), 1);
+        assert_eq!(super::level_from_xp(281), 1); // xp_for_level(2) = 282
+        assert_eq!(super::level_from_xp(282), 2);
     }
 
     #[tokio::test]

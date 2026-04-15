@@ -18,7 +18,7 @@ impl Config {
 
         Self {
             default_provider: env::var("NEXUS_DEFAULT_PROVIDER")
-                .unwrap_or_else(|_| "claude".to_string()),
+                .unwrap_or_else(|_| "zai".to_string()),
             db_url: env::var("NEXUS_DB_URL")
                 .unwrap_or_else(|_| "sqlite:nexus.db".to_string()),
             bind_addr: env::var("NEXUS_BIND_ADDR")

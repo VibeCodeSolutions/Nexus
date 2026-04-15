@@ -1,5 +1,6 @@
 pub mod claude;
 pub mod gemini;
+pub mod zai;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -63,11 +64,23 @@ impl LlmProvider for NoOpProvider {
 }
 
 pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, String> {
-    let api_key = keystore::get_key(provider_name)?;
-
     match provider_name {
-        "claude" => Ok(Box::new(claude::ClaudeProvider::new(api_key))),
-        "gemini" => Ok(Box::new(gemini::GeminiProvider::new(api_key))),
+        "claude" => {
+            // OAuth zuerst, dann API-Key als Fallback
+            if let Ok(tokens) = keystore::get_oauth("claude") {
+                return Ok(Box::new(claude::ClaudeProvider::with_oauth(tokens)));
+            }
+            let api_key = keystore::get_key("claude")?;
+            Ok(Box::new(claude::ClaudeProvider::with_api_key(api_key)))
+        }
+        "gemini" => {
+            let api_key = keystore::get_key("gemini")?;
+            Ok(Box::new(gemini::GeminiProvider::new(api_key)))
+        }
+        "zai" => {
+            let api_key = keystore::get_key("zai")?;
+            Ok(Box::new(zai::ZaiProvider::new(api_key)))
+        }
         _ => Err(format!("Unbekannter Provider: {provider_name}")),
     }
 }

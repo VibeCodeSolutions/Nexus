@@ -69,7 +69,20 @@ pub async fn post_braindump(
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
         })?;
 
-    Ok(Json(json!(updated)))
+    // Gamification: XP + Achievements
+    let new_achievements = repo::on_braindump_created(&state.pool, &updated.id).await.unwrap_or_default();
+    let stats = repo::get_user_stats(&state.pool).await.ok();
+
+    let mut response = json!(updated);
+    if let Some(obj) = response.as_object_mut() {
+        obj.insert("xp_gained".to_string(), json!(10));
+        obj.insert("new_achievements".to_string(), json!(new_achievements));
+        if let Some(s) = stats {
+            obj.insert("stats".to_string(), json!({"total_xp": s.total_xp, "level": s.level, "streak": s.current_streak}));
+        }
+    }
+
+    Ok(Json(response))
 }
 
 pub async fn list_braindumps(
@@ -140,7 +153,20 @@ pub async fn create_project(
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     }
 
-    Ok(Json(json!(project)))
+    // Gamification: XP für Projekterstellung
+    let new_achievements = repo::on_project_created(&state.pool, &project.id).await.unwrap_or_default();
+    let stats = repo::get_user_stats(&state.pool).await.ok();
+
+    let mut response = json!(project);
+    if let Some(obj) = response.as_object_mut() {
+        obj.insert("xp_gained".to_string(), json!(50));
+        obj.insert("new_achievements".to_string(), json!(new_achievements));
+        if let Some(s) = stats {
+            obj.insert("stats".to_string(), json!({"total_xp": s.total_xp, "level": s.level, "streak": s.current_streak}));
+        }
+    }
+
+    Ok(Json(response))
 }
 
 pub async fn list_projects(
@@ -250,7 +276,21 @@ pub async fn update_task(
     .await
     .map_err(|e| (StatusCode::NOT_FOUND, Json(json!({"error": format!("Task nicht gefunden: {e}")}))))?;
 
-    Ok(Json(json!(task)))
+    // Gamification: XP bei Task-Abschluss
+    let mut response = json!(task);
+    if payload.status.as_deref() == Some("done") {
+        let new_achievements = repo::on_task_completed(&state.pool, &id).await.unwrap_or_default();
+        let stats = repo::get_user_stats(&state.pool).await.ok();
+        if let Some(obj) = response.as_object_mut() {
+            obj.insert("xp_gained".to_string(), json!(25));
+            obj.insert("new_achievements".to_string(), json!(new_achievements));
+            if let Some(s) = stats {
+                obj.insert("stats".to_string(), json!({"total_xp": s.total_xp, "level": s.level, "streak": s.current_streak}));
+            }
+        }
+    }
+
+    Ok(Json(response))
 }
 
 pub async fn delete_task(
@@ -262,6 +302,54 @@ pub async fn delete_task(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
     Ok(Json(json!({"deleted": id})))
+}
+
+// --- Gamification Endpoints ---
+
+pub async fn get_stats(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let stats = repo::get_user_stats(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    let xp_to_next = repo::xp_to_next_level(&stats);
+
+    Ok(Json(json!({
+        "total_xp": stats.total_xp,
+        "level": stats.level,
+        "xp_to_next_level": xp_to_next,
+        "current_streak": stats.current_streak,
+        "longest_streak": stats.longest_streak,
+        "last_active_date": stats.last_active_date
+    })))
+}
+
+pub async fn get_achievements(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let achievements = repo::get_achievements(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!(achievements)))
+}
+
+#[derive(Deserialize)]
+pub struct XpHistoryQuery {
+    pub limit: Option<i64>,
+}
+
+pub async fn get_xp_history(
+    State(state): State<AppState>,
+    Query(params): Query<XpHistoryQuery>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let limit = params.limit.unwrap_or(50);
+    let events = repo::get_xp_history(&state.pool, limit)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!(events)))
 }
 
 pub async fn dashboard(
@@ -278,6 +366,9 @@ pub async fn dashboard(
         .map_err(|e| {
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
         })?;
+
+    let stats = repo::get_user_stats(&state.pool).await.ok();
+    let achievements = repo::get_achievements(&state.pool).await.unwrap_or_default();
 
     let project_rows: Vec<String> = projects.iter().map(|p| {
         format!(
@@ -311,6 +402,46 @@ pub async fn dashboard(
         )
     }).collect();
 
+    // Gamification HTML
+    let stats_html = if let Some(ref s) = stats {
+        let xp_next = repo::xp_to_next_level(s);
+        let xp_for_next = xp_next + s.total_xp;
+        let xp_in_level = s.total_xp - (100.0 * (s.level as f64).powf(1.5)) as i64;
+        let xp_level_range = xp_for_next - (100.0 * (s.level as f64).powf(1.5)) as i64;
+        let progress_pct = if xp_level_range > 0 { (xp_in_level * 100) / xp_level_range } else { 0 };
+        format!(
+            r#"<div class="stats-grid">
+  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Level</div></div>
+  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Total XP</div></div>
+  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Streak</div></div>
+  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Longest Streak</div></div>
+</div>
+<div class="xp-bar-container">
+  <div class="xp-bar" style="width: {}%"></div>
+  <span class="xp-bar-text">{} XP bis Level {}</span>
+</div>"#,
+            s.level, s.total_xp, s.current_streak, s.longest_streak,
+            progress_pct.max(2), xp_next, s.level + 1
+        )
+    } else {
+        String::new()
+    };
+
+    let unlocked: Vec<&crate::models::Achievement> = achievements.iter().filter(|a| a.unlocked_at.is_some()).collect();
+    let locked: Vec<&crate::models::Achievement> = achievements.iter().filter(|a| a.unlocked_at.is_none()).collect();
+
+    let achievements_html = {
+        let unlocked_html: String = unlocked.iter().map(|a| {
+            format!(r#"<div class="achievement unlocked"><div class="ach-icon">{}</div><div><strong>{}</strong><br><small>{}</small></div></div>"#,
+                escape_html(&a.icon), escape_html(&a.name), escape_html(&a.description))
+        }).collect::<Vec<_>>().join("");
+        let locked_html: String = locked.iter().map(|a| {
+            format!(r#"<div class="achievement locked"><div class="ach-icon">?</div><div><strong>{}</strong><br><small>{}</small></div></div>"#,
+                escape_html(&a.name), escape_html(&a.description))
+        }).collect::<Vec<_>>().join("");
+        format!("{}{}", unlocked_html, locked_html)
+    };
+
     let html = format!(r#"<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -331,10 +462,26 @@ pub async fn dashboard(
   .cat-random {{ background: #2a2a2a; color: #a0a0a0; }}
   .cat-unsorted {{ background: #2a2a2a; color: #808080; }}
   .empty {{ color: #606080; font-style: italic; margin-top: 2rem; }}
+  .stats-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0; }}
+  .stat-card {{ background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 1.2rem; text-align: center; }}
+  .stat-value {{ font-size: 2rem; font-weight: 700; color: #7c5cbf; }}
+  .stat-label {{ color: #9090b0; font-size: 0.85em; margin-top: 0.3rem; }}
+  .xp-bar-container {{ background: #1a1a2e; border-radius: 8px; height: 28px; position: relative; margin: 1rem 0 2rem; overflow: hidden; border: 1px solid #2a2a4a; }}
+  .xp-bar {{ background: linear-gradient(90deg, #7c5cbf, #a07ce0); height: 100%; border-radius: 8px; transition: width 0.5s; }}
+  .xp-bar-text {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.8em; font-weight: 600; }}
+  .achievements-grid {{ display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 1rem 0; }}
+  .achievement {{ display: flex; align-items: center; gap: 0.6rem; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; padding: 0.8rem 1rem; min-width: 220px; }}
+  .achievement.unlocked {{ border-color: #7c5cbf; }}
+  .achievement.locked {{ opacity: 0.5; }}
+  .ach-icon {{ font-size: 1.5rem; }}
 </style>
 </head>
 <body>
 <h1>NEXUS Dashboard</h1>
+<h2>Stats</h2>
+{}
+<h2>Achievements</h2>
+<div class="achievements-grid">{}</div>
 <h2>Projekte</h2>
 <p>{} Projekte</p>
 {}
@@ -343,6 +490,8 @@ pub async fn dashboard(
 {}
 </body>
 </html>"#,
+        stats_html,
+        achievements_html,
         projects.len(),
         projects_html,
         entries.len(),

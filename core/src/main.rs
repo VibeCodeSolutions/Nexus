@@ -6,6 +6,7 @@ mod handlers;
 mod keystore;
 mod llm;
 mod models;
+mod oauth;
 mod repo;
 
 use axum::middleware;
@@ -38,6 +39,41 @@ async fn main() {
             match keystore::set_key(&provider, &value) {
                 Ok(()) => println!("API-Key für '{provider}' gespeichert."),
                 Err(e) => eprintln!("Fehler: {e}"),
+            }
+        }
+        Command::Onboard => {
+            if let Err(e) = run_onboard().await {
+                eprintln!("Onboarding-Fehler: {e}");
+            }
+        }
+        Command::Login { provider } => {
+            if let Err(e) = run_oauth_login(&provider).await {
+                eprintln!("Login-Fehler: {e}");
+            }
+        }
+        Command::Logout { provider } => {
+            let mut removed = false;
+            if keystore::delete_oauth(&provider).is_ok() {
+                println!("OAuth-Token für '{provider}' gelöscht.");
+                removed = true;
+            }
+            if keystore::delete_key(&provider).is_ok() {
+                println!("API-Key für '{provider}' gelöscht.");
+                removed = true;
+            }
+            if !removed {
+                println!("Nichts gefunden für '{provider}'.");
+            }
+        }
+        Command::Status => {
+            print_status();
+        }
+        Command::TestLlm { provider, text } => {
+            let cfg = Config::load();
+            let p = provider.unwrap_or(cfg.default_provider);
+            if let Err(e) = run_test_llm(&p, &text).await {
+                eprintln!("❌ Test fehlgeschlagen: {e}");
+                std::process::exit(1);
             }
         }
         Command::Pair => {
@@ -83,7 +119,7 @@ async fn main() {
                 Ok(provider) => Arc::from(provider),
                 Err(e) => {
                     tracing::warn!("LLM-Provider nicht verfügbar: {e}");
-                    tracing::warn!("Server startet ohne LLM. Keys setzen mit: nexus set-key claude <key>");
+                    tracing::warn!("Server startet ohne LLM. Erstanmeldung: `nexus onboard` (Wizard) oder `nexus login claude` (OAuth).");
                     Arc::new(llm::NoOpProvider)
                 }
             };
@@ -108,6 +144,9 @@ async fn main() {
                 .route("/tasks", get(handlers::list_tasks))
                 .route("/tasks/{id}", put(handlers::update_task))
                 .route("/tasks/{id}", delete(handlers::delete_task))
+                .route("/stats", get(handlers::get_stats))
+                .route("/achievements", get(handlers::get_achievements))
+                .route("/xp/history", get(handlers::get_xp_history))
                 .layer(middleware::from_fn(auth::require_token))
                 .with_state(state);
 
@@ -126,4 +165,148 @@ async fn main() {
 
 async fn health_check() -> Json<Value> {
     Json(json!({"status": "ok"}))
+}
+
+async fn run_onboard() -> Result<(), String> {
+    use dialoguer::{theme::ColorfulTheme, Input, Select};
+
+    println!("\n🚀 NEXUS Onboarding\n");
+
+    let providers = vec!["Claude (Anthropic)", "Gemini (Google)", "z.ai (GLM)"];
+    let provider_idx = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Welchen LLM-Provider möchtest du nutzen?")
+        .items(&providers)
+        .default(2)
+        .interact()
+        .map_err(|e| e.to_string())?;
+
+    let provider = match provider_idx { 0 => "claude", 1 => "gemini", _ => "zai" };
+
+    if provider == "claude" {
+        let methods = vec![
+            "OAuth (Claude Pro/Max Subscription) — empfohlen",
+            "API-Key (Anthropic Console)",
+        ];
+        let method = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Anmeldeverfahren")
+            .items(&methods)
+            .default(0)
+            .interact()
+            .map_err(|e| e.to_string())?;
+
+        if method == 0 {
+            run_oauth_login("claude").await?;
+        } else {
+            let key: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Anthropic API-Key (sk-ant-...)")
+                .interact_text()
+                .map_err(|e| e.to_string())?;
+            keystore::set_key("claude", key.trim())?;
+            println!("✅ Claude API-Key gespeichert.");
+        }
+    } else if provider == "gemini" {
+        println!("ℹ️  Gemini unterstützt nur API-Key (kein Consumer-OAuth).");
+        let key: String = Input::with_theme(&ColorfulTheme::default())
+            .with_prompt("Google AI Studio API-Key")
+            .interact_text()
+            .map_err(|e| e.to_string())?;
+        keystore::set_key("gemini", key.trim())?;
+        println!("✅ Gemini API-Key gespeichert.");
+    } else {
+        let key: String = Input::with_theme(&ColorfulTheme::default())
+            .with_prompt("z.ai API-Key")
+            .interact_text()
+            .map_err(|e| e.to_string())?;
+        keystore::set_key("zai", key.trim())?;
+        println!("✅ z.ai API-Key gespeichert.");
+    }
+
+    println!("\nFertig! Starte den Server mit: nexus serve");
+    Ok(())
+}
+
+fn print_status() {
+    let cfg = Config::load();
+    println!("\n📊 NEXUS Status\n");
+    println!("Default-Provider: {}", cfg.default_provider);
+    println!("Bind:             {}", cfg.bind_addr);
+    println!("DB:               {}", cfg.db_url);
+    println!("Logs:             {}\n", cfg.log_dir.display());
+
+    println!("Auth-Status:");
+    for provider in &["claude", "gemini", "zai"] {
+        let oauth = keystore::get_oauth(provider).ok();
+        let api_key = keystore::get_key(provider).ok();
+
+        let active = if oauth.is_some() {
+            "OAuth ✅"
+        } else if api_key.is_some() {
+            "API-Key ✅"
+        } else {
+            "— nicht konfiguriert"
+        };
+        println!("  {provider:8} → aktiv: {active}");
+
+        if let Some(t) = oauth {
+            let now = chrono::Utc::now().timestamp();
+            let secs = t.expires_at - now;
+            let state = if secs <= 0 {
+                "abgelaufen (wird beim nächsten Call refresht)".to_string()
+            } else if secs < 60 {
+                format!("läuft in {secs}s ab")
+            } else {
+                format!("gültig für {}min", secs / 60)
+            };
+            println!("           OAuth-Token: {state}");
+        }
+        if api_key.is_some() {
+            println!("           API-Key: gespeichert");
+        }
+    }
+    println!("\nTest: `nexus test-llm`  •  Wizard: `nexus onboard`\n");
+}
+
+async fn run_test_llm(provider: &str, text: &str) -> Result<(), String> {
+    println!("🧪 Test-Call gegen Provider: {provider}");
+    println!("   Input: {text:?}\n");
+
+    let p = llm::create_provider(provider)?;
+    let start = std::time::Instant::now();
+    let result = p.categorize_and_summarize(text).await?;
+    let ms = start.elapsed().as_millis();
+
+    println!("✅ Antwort in {ms}ms:");
+    println!("   Kategorie: {}", result.category);
+    println!("   Summary:   {}", result.summary);
+    println!("   Tags:      {:?}", result.tags);
+    Ok(())
+}
+
+async fn run_oauth_login(provider: &str) -> Result<(), String> {
+    use dialoguer::{theme::ColorfulTheme, Input};
+
+    if provider != "claude" {
+        return Err(format!("OAuth nicht verfügbar für '{provider}' — nur Claude."));
+    }
+
+    let pkce = oauth::generate_pkce();
+    let state = oauth::random_state();
+    let url = oauth::build_authorize_url(&pkce, &state);
+
+    println!("\n🔐 Öffne Browser für Anthropic-Login...");
+    if webbrowser::open(&url).is_err() {
+        println!("Konnte Browser nicht öffnen. Öffne diese URL manuell:\n{url}\n");
+    } else {
+        println!("Falls der Browser nicht öffnet, nutze:\n{url}\n");
+    }
+
+    let code: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Code aus dem Browser hier einfügen")
+        .interact_text()
+        .map_err(|e| e.to_string())?;
+
+    let tokens = oauth::exchange_code(code.trim(), &pkce.verifier, &state).await?;
+    keystore::set_oauth("claude", &tokens)?;
+    println!("✅ Claude OAuth erfolgreich. Token gespeichert.");
+    Ok(())
 }

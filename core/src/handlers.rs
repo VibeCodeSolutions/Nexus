@@ -117,6 +117,16 @@ pub struct CreateProjectRequest {
     pub braindump_ids: Vec<String>,
 }
 
+pub async fn delete_braindump(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<Value>)> {
+    repo::delete_braindump(&state.pool, &id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub async fn suggest_projects(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -503,4 +513,54 @@ pub async fn dashboard(
     );
 
     Ok(Html(html))
+}
+
+pub async fn recategorize_unsorted(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let entries = sqlx::query_as::<_, crate::models::BrainDumpEntry>(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps WHERE category = 'Unsorted' OR category IS NULL"
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    let total = entries.len();
+    let mut updated = 0;
+    let mut failed = 0;
+
+    for entry in entries {
+        match state.llm.categorize_and_summarize(&entry.raw_text).await {
+            Ok(classification) => {
+                let tags = serde_json::to_string(&classification.tags).unwrap_or_else(|_| "[]".to_string());
+                let result = sqlx::query(
+                    "UPDATE braindumps SET category = ?, summary = ?, tags_json = ? WHERE id = ?"
+                )
+                .bind(&classification.category)
+                .bind(&classification.summary)
+                .bind(&tags)
+                .bind(&entry.id)
+                .execute(&state.pool)
+                .await;
+
+                match result {
+                    Ok(_) => updated += 1,
+                    Err(e) => {
+                        tracing::warn!("DB-Update fehlgeschlagen für {}: {e}", entry.id);
+                        failed += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("LLM fehlgeschlagen für {}: {e}", entry.id);
+                failed += 1;
+            }
+        }
+    }
+
+    Ok(Json(json!({
+        "total": total,
+        "updated": updated,
+        "failed": failed
+    })))
 }

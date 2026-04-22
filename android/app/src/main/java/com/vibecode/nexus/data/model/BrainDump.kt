@@ -9,10 +9,10 @@ data class BrainDumpRequest(
 
 @Serializable
 data class BrainDumpResponse(
-    val id: Long,
+    val id: String,
     val raw_text: String,
-    val category: String,
-    val summary: String,
+    val category: String? = null,
+    val summary: String? = null,
     val tags: List<String> = emptyList(),
     val created_at: String
 )

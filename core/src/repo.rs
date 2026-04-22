@@ -151,6 +151,14 @@ pub async fn delete_task(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error>
     Ok(())
 }
 
+pub async fn delete_braindump(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM braindumps WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 // --- Gamification ---
 
 const XP_BRAINDUMP: i64 = 10;

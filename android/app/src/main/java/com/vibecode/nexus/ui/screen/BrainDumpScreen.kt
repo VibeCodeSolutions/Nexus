@@ -290,10 +290,10 @@ private fun ResultCard(result: BrainDumpResponse) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CategoryBadge(result.category)
+                CategoryBadge(result.category ?: "")
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = result.category,
+                    text = result.category ?: "",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -301,7 +301,7 @@ private fun ResultCard(result: BrainDumpResponse) {
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = result.summary,
+                text = result.summary ?: "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )

@@ -54,7 +54,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.security.crypto)
-    implementation(libs.zxing.embedded)
+    implementation(libs.play.services.code.scanner)
 
     // Ktor
     implementation(libs.ktor.client.core)

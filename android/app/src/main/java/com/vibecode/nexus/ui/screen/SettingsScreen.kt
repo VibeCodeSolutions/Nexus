@@ -1,9 +1,5 @@
 package com.vibecode.nexus.ui.screen
 
-import android.Manifest
-import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -45,9 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import com.vibecode.nexus.data.ConnectionSettings
 import com.vibecode.nexus.data.NexusApiClient
 import kotlinx.coroutines.launch
@@ -62,45 +61,32 @@ fun SettingsScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var isPaired by remember { mutableStateOf(connectionSettings.isPaired) }
     var coreUrl by remember { mutableStateOf(connectionSettings.coreUrl ?: "") }
     var isConnected by remember { mutableStateOf<Boolean?>(null) }
+    var manualPairInput by remember { mutableStateOf("") }
 
-    // QR scanner launcher
-    val qrLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        val contents = result.contents
-        if (contents != null) {
-            val success = connectionSettings.saveFromQr(contents)
-            if (success) {
-                isPaired = true
-                coreUrl = connectionSettings.coreUrl ?: ""
-                scope.launch {
-                    isConnected = apiClient.checkHealth()
-                    snackbarHostState.showSnackbar("Erfolgreich gekoppelt!")
-                }
-            } else {
-                scope.launch {
-                    snackbarHostState.showSnackbar("Ungültiger QR-Code. Erwarte {\"url\":..., \"token\":...}")
-                }
-            }
-        }
+    // Google ML Kit Code Scanner (Play Services component, keine Kamera-Permission nötig)
+    val codeScanner = remember {
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+        GmsBarcodeScanning.getClient(context, options)
     }
 
-    // Camera permission for QR scanner
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            val options = ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt("NEXUS Core QR-Code scannen")
-                setBeepEnabled(false)
-                setOrientationLocked(true)
+    fun applyPairing(raw: String, successMsg: String, failureMsg: String) {
+        val ok = connectionSettings.saveFromQr(raw)
+        if (ok) {
+            isPaired = true
+            coreUrl = connectionSettings.coreUrl ?: ""
+            scope.launch {
+                isConnected = apiClient.checkHealth()
+                snackbarHostState.showSnackbar(successMsg)
             }
-            qrLauncher.launch(options)
         } else {
             scope.launch {
-                snackbarHostState.showSnackbar("Kamera-Berechtigung wird für QR-Scan benötigt")
+                snackbarHostState.showSnackbar(failureMsg)
             }
         }
     }
@@ -171,6 +157,27 @@ fun SettingsScreen(
                                 null -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
+                        if (isConnected == false) {
+                            apiClient.lastHealthError?.let { err ->
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = err,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        isConnected = null
+                                        isConnected = apiClient.checkHealth()
+                                    }
+                                }
+                            ) {
+                                Text("Erneut testen")
+                            }
+                        }
                     } else {
                         Text(
                             text = "Noch nicht gekoppelt",
@@ -181,10 +188,28 @@ fun SettingsScreen(
                 }
             }
 
-            // QR Scan button
+            // QR Scan button — ML Kit Code Scanner (Play Services)
             Button(
                 onClick = {
-                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    codeScanner.startScan()
+                        .addOnSuccessListener { barcode ->
+                            val raw = barcode.rawValue.orEmpty()
+                            if (raw.isEmpty()) {
+                                scope.launch { snackbarHostState.showSnackbar("Leerer Code") }
+                                return@addOnSuccessListener
+                            }
+                            applyPairing(raw, "Gepaart", "QR-Code hat kein gültiges Pairing-Format")
+                        }
+                        .addOnCanceledListener {
+                            // User brach den Scan ab — stumm ignorieren
+                        }
+                        .addOnFailureListener { e ->
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    "Scanner-Fehler: ${e.message ?: e::class.java.simpleName}"
+                                )
+                            }
+                        }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -194,6 +219,31 @@ fun SettingsScreen(
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 Text(if (isPaired) "Erneut koppeln" else "QR-Code scannen")
+            }
+
+            // Manual paste fallback — akzeptiert Deep-Link-URI und Legacy-JSON
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = manualPairInput,
+                    onValueChange = { manualPairInput = it },
+                    label = { Text("Pairing-Daten manuell einfügen") },
+                    singleLine = false,
+                    minLines = 2,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = {
+                        val raw = manualPairInput
+                        applyPairing(raw, "Gepaart", "Ungültige Pairing-Daten")
+                        if (connectionSettings.isPaired) manualPairInput = ""
+                    }
+                ) {
+                    Text("Anwenden")
+                }
             }
 
             // Unpair button

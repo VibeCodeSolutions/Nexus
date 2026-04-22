@@ -43,8 +43,8 @@ pub fn get_or_create_token() -> Result<String, String> {
     }
 }
 
-/// Get pairing info as JSON string for QR code.
-pub fn pairing_json(bind_addr: &str) -> Result<String, String> {
+/// Get pairing info as a `nexus://pair` deep-link URI for QR code.
+pub fn pairing_uri(bind_addr: &str) -> Result<String, String> {
     let token = get_or_create_token()?;
 
     let port = bind_addr.split(':').last().unwrap_or("7777");
@@ -53,21 +53,61 @@ pub fn pairing_json(bind_addr: &str) -> Result<String, String> {
         Err(_) => format!("http://127.0.0.1:{}", port),
     };
 
-    Ok(format!(r#"{{"url":"{}","token":"{}"}}"#, url, token))
+    let url_enc = urlencoding::encode(&url);
+    let token_enc = urlencoding::encode(&token);
+    Ok(format!("nexus://pair?url={}&token={}", url_enc, token_enc))
 }
 
-/// Print QR code to terminal.
+/// Print QR code to terminal AND write a crisp SVG to /tmp for browser-scanning.
 pub fn print_qr(data: &str) {
     use qrcode::QrCode;
+    use qrcode::render::svg;
+    use std::fs;
 
     let code = QrCode::new(data.as_bytes()).expect("QR-Code Generierung fehlgeschlagen");
-    let string = code
-        .render::<char>()
-        .quiet_zone(true)
-        .module_dimensions(2, 1)
-        .build();
 
-    println!("\n{string}");
+    let svg_string = code.render::<svg::Color>()
+        .min_dimensions(400, 400)
+        .dark_color(svg::Color("#000000"))
+        .light_color(svg::Color("#ffffff"))
+        .build();
+    let svg_path = "/tmp/nexus-pair.svg";
+    if fs::write(svg_path, &svg_string).is_ok() {
+        let _ = webbrowser::open(svg_path);
+        println!("📱 QR-Code im Browser geöffnet: {svg_path}");
+    }
+
+    let colors = code.to_colors();
+    let width = (colors.len() as f64).sqrt() as usize;
+    let quiet = 2usize;
+
+    let is_dark = |x: i32, y: i32| -> bool {
+        if x < 0 || y < 0 || (x as usize) >= width || (y as usize) >= width {
+            return false;
+        }
+        colors[(y as usize) * width + (x as usize)] == qrcode::Color::Dark
+    };
+
+    let mut out = String::from("\n");
+    let total = width as i32 + 2 * quiet as i32;
+    let mut y = -(quiet as i32);
+    while y < width as i32 + quiet as i32 {
+        for x in -(quiet as i32)..(width as i32 + quiet as i32) {
+            let top = is_dark(x, y);
+            let bot = is_dark(x, y + 1);
+            out.push(match (top, bot) {
+                (true, true) => '█',
+                (true, false) => '▀',
+                (false, true) => '▄',
+                (false, false) => ' ',
+            });
+        }
+        out.push('\n');
+        y += 2;
+    }
+    let _ = total;
+
+    println!("{out}");
     println!("\nPairing-Daten: {data}\n");
 }
 

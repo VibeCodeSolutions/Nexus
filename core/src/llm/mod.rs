@@ -1,5 +1,6 @@
 pub mod claude;
 pub mod gemini;
+pub mod ollama;
 pub mod zai;
 
 use async_trait::async_trait;
@@ -80,6 +81,10 @@ pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, Stri
         "zai" => {
             let api_key = keystore::get_key("zai")?;
             Ok(Box::new(zai::ZaiProvider::new(api_key)))
+        }
+        "ollama" => {
+            let model = keystore::get_key("ollama").unwrap_or_else(|_| "qwen2.5:3b".to_string());
+            Ok(Box::new(ollama::OllamaProvider::new(model)))
         }
         _ => Err(format!("Unbekannter Provider: {provider_name}")),
     }

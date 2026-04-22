@@ -37,7 +37,7 @@ pub fn random_state() -> String {
 
 pub fn build_authorize_url(pkce: &PkcePair, state: &str) -> String {
     format!(
-        "{AUTHORIZE_URL}?code=true&client_id={cid}&response_type=code&redirect_uri={ru}&scope={sc}&code_challenge={cc}&code_challenge_method=S256&state={st}",
+        "{AUTHORIZE_URL}?client_id={cid}&response_type=code&redirect_uri={ru}&scope={sc}&code_challenge={cc}&code_challenge_method=S256&state={st}",
         cid = urlencoding::encode(CLIENT_ID),
         ru = urlencoding::encode(REDIRECT_URI),
         sc = urlencoding::encode(SCOPES),
@@ -71,18 +71,17 @@ pub async fn exchange_code(
     }
 
     let client = reqwest::Client::new();
-    let body = serde_json::json!({
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": REDIRECT_URI,
-        "client_id": CLIENT_ID,
-        "code_verifier": verifier,
-        "state": state,
-    });
+    let params = [
+        ("grant_type", "authorization_code"),
+        ("code", code.as_str()),
+        ("redirect_uri", REDIRECT_URI),
+        ("client_id", CLIENT_ID),
+        ("code_verifier", verifier),
+    ];
 
     let resp = client
         .post(TOKEN_URL)
-        .json(&body)
+        .form(&params)
         .send()
         .await
         .map_err(|e| format!("Token-Exchange Netzwerkfehler: {e}"))?;
@@ -105,15 +104,15 @@ pub async fn exchange_code(
 
 pub async fn refresh(refresh_token: &str) -> Result<OAuthTokens, String> {
     let client = reqwest::Client::new();
-    let body = serde_json::json!({
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": CLIENT_ID,
-    });
+    let params = [
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh_token),
+        ("client_id", CLIENT_ID),
+    ];
 
     let resp = client
         .post(TOKEN_URL)
-        .json(&body)
+        .form(&params)
         .send()
         .await
         .map_err(|e| format!("Refresh Netzwerkfehler: {e}"))?;

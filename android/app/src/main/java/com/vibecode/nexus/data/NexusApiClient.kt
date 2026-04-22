@@ -32,8 +32,8 @@ class NexusApiClient(private val settings: ConnectionSettings) {
             json(Json { ignoreUnknownKeys = true })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 10_000
-            connectTimeoutMillis = 5_000
+            requestTimeoutMillis = 60_000
+            connectTimeoutMillis = 10_000
         }
     }
 
@@ -44,13 +44,26 @@ class NexusApiClient(private val settings: ConnectionSettings) {
     private val baseUrl get() = settings.coreUrl
     private val token get() = settings.token
 
+    // last health-check error, exposed to UI for debugging
+    @Volatile var lastHealthError: String? = null
+        private set
+
     // Health
 
     suspend fun checkHealth(): Boolean {
+        val url = baseUrl
+        if (url == null) {
+            lastHealthError = "Keine Core-URL gespeichert"
+            return false
+        }
         return try {
-            val response: HealthResponse = client.get("${baseUrl ?: return false}/health").body()
-            response.status == "ok"
-        } catch (_: Exception) {
+            val response: HealthResponse = client.get("$url/health").body()
+            val ok = response.status == "ok"
+            lastHealthError = if (ok) null else "status=${response.status}"
+            ok
+        } catch (e: Exception) {
+            android.util.Log.w("NexusApiClient", "checkHealth failed for $url", e)
+            lastHealthError = "${e::class.java.simpleName}: ${e.message}"
             false
         }
     }
@@ -62,6 +75,18 @@ class NexusApiClient(private val settings: ConnectionSettings) {
             contentType(ContentType.Application.Json)
             bearerAuth(token!!)
             setBody(BrainDumpRequest(text))
+        }.body()
+    }
+
+    suspend fun getBrainDumps(): Result<List<BrainDumpResponse>> = authedRequest {
+        client.get("$baseUrl/braindump") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun deleteBrainDump(id: String): Result<Unit> = authedRequest {
+        client.delete("$baseUrl/braindump/$id") {
+            bearerAuth(token!!)
         }.body()
     }
 

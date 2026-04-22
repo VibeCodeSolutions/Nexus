@@ -1,69 +1,90 @@
-use keyring::Entry;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 
-const SERVICE: &str = "nexus";
-const VALID_PROVIDERS: &[&str] = &["claude", "gemini", "zai"];
+const VALID_PROVIDERS: &[&str] = &["claude", "gemini", "zai", "ollama"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthTokens {
     pub access_token: String,
     pub refresh_token: String,
-    /// Unix-Sekunden, wann access_token abläuft
     pub expires_at: i64,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct Store {
+    keys: HashMap<String, String>,
+    oauth: HashMap<String, OAuthTokens>,
+}
+
+fn store_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home).join(".nexus").join("keys.json")
+}
+
+fn load() -> Store {
+    let path = store_path();
+    if !path.exists() {
+        return Store::default();
+    }
+    let data = fs::read_to_string(&path).unwrap_or_default();
+    serde_json::from_str(&data).unwrap_or_default()
+}
+
+fn save(store: &Store) -> Result<(), String> {
+    let path = store_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Verzeichnis konnte nicht erstellt werden: {e}"))?;
+    }
+    let data = serde_json::to_string_pretty(store)
+        .map_err(|e| format!("Serialisierung fehlgeschlagen: {e}"))?;
+    fs::write(&path, &data).map_err(|e| format!("Speichern fehlgeschlagen: {e}"))?;
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+        .map_err(|e| format!("Permissions konnten nicht gesetzt werden: {e}"))?;
+    Ok(())
 }
 
 pub fn set_key(provider: &str, value: &str) -> Result<(), String> {
     if !VALID_PROVIDERS.contains(&provider) {
-        return Err(format!("Unbekannter Provider: {provider}. Erlaubt: claude, gemini"));
+        return Err(format!("Unbekannter Provider: {provider}. Erlaubt: claude, gemini, zai"));
     }
-
-    let entry = Entry::new(SERVICE, provider)
-        .map_err(|e| format!("Keyring-Fehler: {e}"))?;
-    entry.set_password(value)
-        .map_err(|e| format!("Key konnte nicht gespeichert werden: {e}"))?;
-
-    Ok(())
+    let mut store = load();
+    store.keys.insert(provider.to_string(), value.to_string());
+    save(&store)
 }
 
 pub fn get_key(provider: &str) -> Result<String, String> {
-    let entry = Entry::new(SERVICE, provider)
-        .map_err(|e| format!("Keyring-Fehler: {e}"))?;
-    entry.get_password()
-        .map_err(|e| format!("Key für '{provider}' nicht gefunden: {e}"))
+    load()
+        .keys
+        .get(provider)
+        .cloned()
+        .ok_or_else(|| format!("Key für '{provider}' nicht gefunden: No matching entry found in secure storage"))
 }
 
 pub fn delete_key(provider: &str) -> Result<(), String> {
-    let entry = Entry::new(SERVICE, provider)
-        .map_err(|e| format!("Keyring-Fehler: {e}"))?;
-    entry.delete_credential()
-        .map_err(|e| format!("Key konnte nicht gelöscht werden: {e}"))
-}
-
-fn oauth_account(provider: &str) -> String {
-    format!("{provider}_oauth")
+    let mut store = load();
+    store.keys.remove(provider);
+    save(&store)
 }
 
 pub fn set_oauth(provider: &str, tokens: &OAuthTokens) -> Result<(), String> {
-    let json = serde_json::to_string(tokens)
-        .map_err(|e| format!("Serialisierung fehlgeschlagen: {e}"))?;
-    let entry = Entry::new(SERVICE, &oauth_account(provider))
-        .map_err(|e| format!("Keyring-Fehler: {e}"))?;
-    entry.set_password(&json)
-        .map_err(|e| format!("OAuth-Token konnte nicht gespeichert werden: {e}"))
+    let mut store = load();
+    store.oauth.insert(provider.to_string(), tokens.clone());
+    save(&store)
 }
 
 pub fn get_oauth(provider: &str) -> Result<OAuthTokens, String> {
-    let entry = Entry::new(SERVICE, &oauth_account(provider))
-        .map_err(|e| format!("Keyring-Fehler: {e}"))?;
-    let json = entry.get_password()
-        .map_err(|e| format!("OAuth-Token für '{provider}' nicht gefunden: {e}"))?;
-    serde_json::from_str(&json)
-        .map_err(|e| format!("OAuth-Token-Parse Fehler: {e}"))
+    load()
+        .oauth
+        .get(provider)
+        .cloned()
+        .ok_or_else(|| format!("OAuth-Token für '{provider}' nicht gefunden"))
 }
 
 pub fn delete_oauth(provider: &str) -> Result<(), String> {
-    let entry = Entry::new(SERVICE, &oauth_account(provider))
-        .map_err(|e| format!("Keyring-Fehler: {e}"))?;
-    entry.delete_credential()
-        .map_err(|e| format!("OAuth-Token konnte nicht gelöscht werden: {e}"))
+    let mut store = load();
+    store.oauth.remove(provider);
+    save(&store)
 }

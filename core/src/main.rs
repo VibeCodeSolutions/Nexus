@@ -78,7 +78,7 @@ async fn main() {
         }
         Command::Pair => {
             let config = Config::load();
-            match auth::pairing_json(&config.bind_addr) {
+            match auth::pairing_uri(&config.bind_addr) {
                 Ok(data) => auth::print_qr(&data),
                 Err(e) => eprintln!("Fehler: {e}"),
             }
@@ -135,6 +135,8 @@ async fn main() {
                 .route("/braindump", post(handlers::post_braindump))
                 .route("/braindump", get(handlers::list_braindumps))
                 .route("/braindump/{id}", get(handlers::get_braindump))
+                .route("/braindump/{id}", delete(handlers::delete_braindump))
+                .route("/braindump/recategorize", post(handlers::recategorize_unsorted))
                 .route("/projects/suggest", post(handlers::suggest_projects))
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))

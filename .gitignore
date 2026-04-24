@@ -36,3 +36,29 @@ credentials.json
 *.log
 logs/
 desktop/src-tauri/target/
+
+# === Tauri Sidecar-Binaries (werden lokal/CI erzeugt) ===
+desktop/src-tauri/binaries/nexus-core-*
+!desktop/src-tauri/binaries/README.md
+
+# === Tauri Dev-Icon-Platzhalter ===
+# Diese Varianten sind Copies der 2KB-icon.png und nur für `cargo check`/`tauri dev`
+# nötig. Echte Icons werden via `pnpm tauri icon icons/icon-source.png` erzeugt.
+desktop/src-tauri/icons/32x32.png
+desktop/src-tauri/icons/128x128.png
+desktop/src-tauri/icons/128x128@2x.png
+desktop/src-tauri/icons/icon.ico
+desktop/src-tauri/icons/icon.icns
+
+# === Node / pnpm ===
+desktop/node_modules/
+desktop/pnpm-lock.yaml
+desktop/package-lock.json
+
+# === Android Keystore (niemals committen!) ===
+android/app/keystore.jks
+android/app/*.jks
+android/app/keystore.b64
+
+# === Dev-Screenshots ===
+screenshots/

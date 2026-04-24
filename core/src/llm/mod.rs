@@ -1,6 +1,7 @@
 pub mod claude;
 pub mod gemini;
 pub mod ollama;
+pub mod openai_compatible;
 pub mod zai;
 
 use async_trait::async_trait;
@@ -85,6 +86,46 @@ pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, Stri
         "ollama" => {
             let model = keystore::get_key("ollama").unwrap_or_else(|_| "qwen2.5:3b".to_string());
             Ok(Box::new(ollama::OllamaProvider::new(model)))
+        }
+        "openai" => {
+            let key = keystore::get_key("openai")?;
+            Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
+                "https://api.openai.com/v1/chat/completions",
+                "gpt-4o-mini",
+                key,
+            )))
+        }
+        "mistral" => {
+            let key = keystore::get_key("mistral")?;
+            Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
+                "https://api.mistral.ai/v1/chat/completions",
+                "mistral-small-latest",
+                key,
+            )))
+        }
+        "groq" => {
+            let key = keystore::get_key("groq")?;
+            Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
+                "https://api.groq.com/openai/v1/chat/completions",
+                "llama-3.1-70b-versatile",
+                key,
+            )))
+        }
+        "deepseek" => {
+            let key = keystore::get_key("deepseek")?;
+            Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
+                "https://api.deepseek.com/v1/chat/completions",
+                "deepseek-chat",
+                key,
+            )))
+        }
+        "openrouter" => {
+            let key = keystore::get_key("openrouter")?;
+            Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
+                "https://openrouter.ai/api/v1/chat/completions",
+                "openai/gpt-4o-mini",
+                key,
+            )))
         }
         _ => Err(format!("Unbekannter Provider: {provider_name}")),
     }

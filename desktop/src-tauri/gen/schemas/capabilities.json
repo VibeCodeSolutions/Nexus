@@ -1,1 +1,1 @@
-{}
+{"default":{"identifier":"default","description":"Default capability for the NEXUS desktop app — allows spawning the nexus-core sidecar.","local":true,"windows":["main"],"permissions":["core:default",{"identifier":"shell:allow-execute","allow":[{"args":["serve"],"name":"binaries/nexus-core","sidecar":true}]},{"identifier":"shell:allow-spawn","allow":[{"args":["serve"],"name":"binaries/nexus-core","sidecar":true}]},{"identifier":"shell:allow-kill","allow":[{"args":["serve"],"name":"binaries/nexus-core","sidecar":true}]}]}}

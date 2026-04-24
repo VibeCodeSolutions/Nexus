@@ -1,0 +1,39 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the NEXUS desktop app — allows spawning the nexus-core sidecar.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/nexus-core",
+          "sidecar": true,
+          "args": ["serve"]
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/nexus-core",
+          "sidecar": true,
+          "args": ["serve"]
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-kill",
+      "allow": [
+        {
+          "name": "binaries/nexus-core",
+          "sidecar": true,
+          "args": ["serve"]
+        }
+      ]
+    }
+  ]
+}

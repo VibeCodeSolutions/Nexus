@@ -140,6 +140,7 @@ async fn main() {
                 .route("/projects/suggest", post(handlers::suggest_projects))
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))
+                .route("/projects/{id}", delete(handlers::delete_project))
                 .route("/projects/{id}/braindumps", get(handlers::get_project_braindumps))
                 .route("/projects/{id}/progress", get(handlers::get_project_progress))
                 .route("/tasks", post(handlers::create_task))
@@ -149,6 +150,10 @@ async fn main() {
                 .route("/stats", get(handlers::get_stats))
                 .route("/achievements", get(handlers::get_achievements))
                 .route("/xp/history", get(handlers::get_xp_history))
+                .route("/api/setup-status", get(handlers::setup_status))
+                .route("/api/onboard/set-provider", post(handlers::onboard_set_provider))
+                .route("/api/onboard/oauth", post(handlers::onboard_oauth))
+                .route("/api/pair/uri", get(handlers::pair_uri))
                 .layer(middleware::from_fn(auth::require_token))
                 .with_state(state);
 
@@ -174,7 +179,16 @@ async fn run_onboard() -> Result<(), String> {
 
     println!("\n🚀 NEXUS Onboarding\n");
 
-    let providers = vec!["Claude (Anthropic)", "Gemini (Google)", "z.ai (GLM)"];
+    let providers = vec![
+        "Claude (Anthropic)",
+        "Gemini (Google)",
+        "z.ai (GLM)",
+        "OpenAI (ChatGPT)",
+        "Mistral",
+        "Groq",
+        "DeepSeek",
+        "OpenRouter",
+    ];
     let provider_idx = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Welchen LLM-Provider möchtest du nutzen?")
         .items(&providers)
@@ -182,7 +196,17 @@ async fn run_onboard() -> Result<(), String> {
         .interact()
         .map_err(|e| e.to_string())?;
 
-    let provider = match provider_idx { 0 => "claude", 1 => "gemini", _ => "zai" };
+    let provider = match provider_idx {
+        0 => "claude",
+        1 => "gemini",
+        2 => "zai",
+        3 => "openai",
+        4 => "mistral",
+        5 => "groq",
+        6 => "deepseek",
+        7 => "openrouter",
+        _ => "zai",
+    };
 
     if provider == "claude" {
         let methods = vec![
@@ -214,13 +238,29 @@ async fn run_onboard() -> Result<(), String> {
             .map_err(|e| e.to_string())?;
         keystore::set_key("gemini", key.trim())?;
         println!("✅ Gemini API-Key gespeichert.");
-    } else {
+    } else if provider == "zai" {
         let key: String = Input::with_theme(&ColorfulTheme::default())
             .with_prompt("z.ai API-Key")
             .interact_text()
             .map_err(|e| e.to_string())?;
         keystore::set_key("zai", key.trim())?;
         println!("✅ z.ai API-Key gespeichert.");
+    } else {
+        let (label, prompt) = match provider {
+            "openai" => ("OpenAI", "OpenAI API-Key (sk-...)"),
+            "mistral" => ("Mistral", "Mistral API-Key"),
+            "groq" => ("Groq", "Groq API-Key (gsk_...)"),
+            "deepseek" => ("DeepSeek", "DeepSeek API-Key (sk-...)"),
+            "openrouter" => ("OpenRouter", "OpenRouter API-Key (sk-or-...)"),
+            _ => (provider, "API-Key"),
+        };
+        println!("ℹ️  {label} nutzt den OpenAI-kompatiblen API-Key-Flow.");
+        let key: String = Input::with_theme(&ColorfulTheme::default())
+            .with_prompt(prompt)
+            .interact_text()
+            .map_err(|e| e.to_string())?;
+        keystore::set_key(provider, key.trim())?;
+        println!("✅ {label} API-Key gespeichert.");
     }
 
     println!("\nFertig! Starte den Server mit: nexus serve");
@@ -236,7 +276,17 @@ fn print_status() {
     println!("Logs:             {}\n", cfg.log_dir.display());
 
     println!("Auth-Status:");
-    for provider in &["claude", "gemini", "zai"] {
+    for provider in &[
+        "claude",
+        "gemini",
+        "zai",
+        "ollama",
+        "openai",
+        "mistral",
+        "groq",
+        "deepseek",
+        "openrouter",
+    ] {
         let oauth = keystore::get_oauth(provider).ok();
         let api_key = keystore::get_key(provider).ok();
 

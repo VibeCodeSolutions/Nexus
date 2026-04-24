@@ -1,9 +1,10 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, Json};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::config::Config;
 use crate::llm::ProjectSuggestion;
 use crate::repo;
 use crate::AppState;
@@ -187,6 +188,17 @@ pub async fn list_projects(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
     Ok(Json(json!(projects)))
+}
+
+pub async fn delete_project(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    repo::delete_project(&state.pool, &id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    Ok(Json(json!({"deleted": id})))
 }
 
 pub async fn get_project_braindumps(
@@ -563,4 +575,105 @@ pub async fn recategorize_unsorted(
         "updated": updated,
         "failed": failed
     })))
+}
+
+// --- Setup / Onboarding Endpoints ---
+
+#[derive(Serialize)]
+pub struct SetupStatus {
+    pub paired: bool,
+    pub provider_configured: bool,
+    pub default_provider: String,
+    pub ollama_reachable: bool,
+    pub version: String,
+}
+
+async fn check_ollama() -> bool {
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(1))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => reqwest::Client::new(),
+    };
+    client
+        .get("http://localhost:11434/api/tags")
+        .send()
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
+}
+
+pub async fn setup_status() -> Json<SetupStatus> {
+    let cfg = Config::load();
+
+    // paired: existiert ~/.nexus_token?
+    let paired = crate::auth::token_path().exists();
+
+    // provider_configured: hat der Default-Provider einen API-Key oder OAuth-Token?
+    let default = cfg.default_provider.clone();
+    let has_key = crate::keystore::get_key(&default).is_ok();
+    let has_oauth = crate::keystore::get_oauth(&default).is_ok();
+    let provider_configured = has_key || has_oauth;
+
+    let ollama_reachable = check_ollama().await;
+
+    Json(SetupStatus {
+        paired,
+        provider_configured,
+        default_provider: default,
+        ollama_reachable,
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })
+}
+
+#[derive(Deserialize)]
+pub struct SetProviderRequest {
+    pub provider: String,
+    pub api_key: String,
+}
+
+pub async fn onboard_set_provider(
+    Json(payload): Json<SetProviderRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    crate::keystore::set_key(&payload.provider, &payload.api_key)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_key: {}", e)))?;
+    crate::keystore::set_default_provider(&payload.provider)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_default_provider: {}", e)))?;
+    Ok(Json(json!({"status": "ok", "provider": payload.provider})))
+}
+
+#[derive(Deserialize)]
+pub struct OAuthRequest {
+    pub provider: String,
+    pub code: String,
+    pub verifier: String,
+    pub state: String,
+}
+
+pub async fn onboard_oauth(
+    Json(payload): Json<OAuthRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    if payload.provider != "claude" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("OAuth wird nur für 'claude' unterstützt, nicht '{}'", payload.provider),
+        ));
+    }
+
+    let tokens = crate::oauth::exchange_code(&payload.code, &payload.verifier, &payload.state)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("oauth: {}", e)))?;
+
+    crate::keystore::set_oauth(&payload.provider, &tokens)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("set_oauth: {}", e)))?;
+
+    Ok(Json(json!({"status": "ok", "provider": payload.provider})))
+}
+
+pub async fn pair_uri() -> Result<Json<Value>, (StatusCode, String)> {
+    let cfg = Config::load();
+    let uri = crate::auth::pairing_uri(&cfg.bind_addr)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("pairing_uri: {}", e)))?;
+    Ok(Json(json!({"uri": uri})))
 }

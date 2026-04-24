@@ -17,9 +17,25 @@ android {
         versionName = "0.1.0-alpha"
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("NEXUS_KEYSTORE_PATH")
+                ?: System.getProperty("NEXUS_KEYSTORE_PATH")
+                ?: "keystore.jks"
+            storeFile = file(keystorePath)
+            storePassword = System.getenv("NEXUS_KEYSTORE_PASSWORD")
+                ?: System.getProperty("NEXUS_KEYSTORE_PASSWORD") ?: ""
+            keyAlias = System.getenv("NEXUS_KEY_ALIAS")
+                ?: System.getProperty("NEXUS_KEY_ALIAS") ?: "nexus"
+            keyPassword = System.getenv("NEXUS_KEY_PASSWORD")
+                ?: System.getProperty("NEXUS_KEY_PASSWORD") ?: ""
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -41,9 +41,11 @@ import com.vibecode.nexus.data.NexusApiClient
 import com.vibecode.nexus.speech.SpeechRecognizerManager
 import com.vibecode.nexus.ui.screen.BrainDumpHistoryScreen
 import com.vibecode.nexus.ui.screen.BrainDumpScreen
+import com.vibecode.nexus.ui.screen.PairScreen
 import com.vibecode.nexus.ui.screen.ProjectsScreen
 import com.vibecode.nexus.ui.screen.SettingsScreen
 import com.vibecode.nexus.ui.screen.TasksScreen
+import com.vibecode.nexus.ui.screen.WelcomeScreen
 import com.vibecode.nexus.ui.theme.NexusTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -129,6 +131,12 @@ class MainActivity : ComponentActivity() {
                     if (ok) {
                         isPaired = true
                         isConnected = apiClient.checkHealth()
+                        val currentRoute = navController.currentDestination?.route
+                        if (currentRoute in listOf("welcome", "pair")) {
+                            navController.navigate("braindump") {
+                                popUpTo("welcome") { inclusive = true }
+                            }
+                        }
                     } else {
                         Log.w("MainActivity", "Pairing deep-link could not be parsed: $uri")
                     }
@@ -161,11 +169,29 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
+                    val startDest = if (connectionSettings.isPaired) "braindump" else "welcome"
                     NavHost(
                         navController = navController,
-                        startDestination = "braindump",
+                        startDestination = startDest,
                         modifier = Modifier.padding(innerPadding)
                     ) {
+                        composable("welcome") {
+                            WelcomeScreen(
+                                onContinue = { navController.navigate("pair") }
+                            )
+                        }
+                        composable("pair") {
+                            PairScreen(
+                                connectionSettings = connectionSettings,
+                                onPaired = {
+                                    isPaired = true
+                                    navController.navigate("braindump") {
+                                        popUpTo("welcome") { inclusive = true }
+                                    }
+                                },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                         composable("braindump") {
                             BrainDumpScreen(
                                 speechManager = speechManager,

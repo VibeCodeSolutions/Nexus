@@ -26,6 +26,49 @@ NEXUS dient als externer Cortex für ADHS-Gehirne:
 
 Details: siehe [NEXUS_Masterplan.md](./NEXUS_Masterplan.md)
 
+## Installation
+
+Nexus ist Cross-Platform verfügbar. Lade dir die passenden Installer aus den [GitHub-Releases](https://github.com/VibeCodeSolutions/Nexus/releases) herunter.
+
+### Desktop
+
+#### Windows 11
+1. Lade `NEXUS_<version>_x64_en-US.msi` herunter
+2. Doppelklick — falls SmartScreen warnt:
+   - **"Weitere Informationen"** klicken → **"Trotzdem ausführen"**
+   - (Der Installer ist aktuell unsigniert — das ändert sich in einer späteren Version)
+3. Starte **NEXUS** über das Startmenü
+
+#### Fedora / RHEL / openSUSE
+```bash
+sudo dnf install ./nexus-<version>-1.x86_64.rpm
+```
+
+#### Ubuntu / Debian
+```bash
+sudo apt install ./nexus_<version>_amd64.deb
+```
+
+#### AppImage (andere Distros)
+```bash
+chmod +x NEXUS_<version>_amd64.AppImage
+./NEXUS_<version>_amd64.AppImage
+```
+
+### Android
+1. Lade `nexus-<version>.apk` auf dein Handy (USB, E-Mail oder Cloud)
+2. Erlaube *"Apps aus unbekannten Quellen"* in den Android-Einstellungen
+3. APK antippen → **Installieren**
+
+### Nach der Installation
+Beim ersten Start der Desktop-App wirst du durch ein kurzes Onboarding geführt:
+1. **Willkommen** — Intro
+2. **Handy koppeln** — QR-Code scannen mit der Android-App
+3. **KI-Provider wählen** — einer von: Claude, Gemini, Ollama (lokal), OpenAI, Mistral, Groq, DeepSeek, OpenRouter, z.ai. Du brauchst entweder einen API-Key oder eine lokale Ollama-Installation.
+4. **Fertig** — Dashboard ist dein neues Zuhause.
+
+Hat deine Android-App direkt einen QR gescannt? Dann bist du auch dort startklar.
+
 ## Projektstruktur
 
 ```
@@ -48,4 +91,4 @@ MIT — siehe [LICENSE](./LICENSE)
 
 ---
 
-*Ein Projekt von [VibeCode Solutions](https://github.com/VibeCode-Solutions)*
+*Ein Projekt von [VibeCode Solutions](https://github.com/VibeCodeSolutions)*

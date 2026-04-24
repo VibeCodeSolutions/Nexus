@@ -3,12 +3,11 @@ use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::Response;
 use std::fs;
-use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 
 use crate::config::home_dir;
 
-fn token_path() -> PathBuf {
+pub fn token_path() -> PathBuf {
     home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".nexus_token")
 }
 
@@ -22,13 +21,14 @@ pub fn generate_token() -> Result<String, String> {
     let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
 
     let path = token_path();
-    // Write with 0600 permissions (owner-only read/write)
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(&path)
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    opts.open(&path)
         .and_then(|mut f| std::io::Write::write_all(&mut f, token.as_bytes()))
         .map_err(|e| format!("Token konnte nicht gespeichert werden: {e}"))?;
 
@@ -126,7 +126,7 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
 pub async fn require_token(req: Request, next: Next) -> Result<Response, StatusCode> {
     // Health and dashboard are always public
     let path = req.uri().path().to_string();
-    if path == "/health" || path == "/" {
+    if path == "/health" || path == "/" || path == "/api/setup-status" {
         return Ok(next.run(req).await);
     }
 

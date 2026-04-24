@@ -44,9 +44,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import com.vibecode.nexus.data.ConnectionSettings
 import com.vibecode.nexus.data.NexusApiClient
 import kotlinx.coroutines.launch
@@ -66,14 +63,6 @@ fun SettingsScreen(
     var coreUrl by remember { mutableStateOf(connectionSettings.coreUrl ?: "") }
     var isConnected by remember { mutableStateOf<Boolean?>(null) }
     var manualPairInput by remember { mutableStateOf("") }
-
-    // Google ML Kit Code Scanner (Play Services component, keine Kamera-Permission nötig)
-    val codeScanner = remember {
-        val options = GmsBarcodeScannerOptions.Builder()
-            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-            .build()
-        GmsBarcodeScanning.getClient(context, options)
-    }
 
     fun applyPairing(raw: String, successMsg: String, failureMsg: String) {
         val ok = connectionSettings.saveFromQr(raw)
@@ -191,25 +180,20 @@ fun SettingsScreen(
             // QR Scan button — ML Kit Code Scanner (Play Services)
             Button(
                 onClick = {
-                    codeScanner.startScan()
-                        .addOnSuccessListener { barcode ->
-                            val raw = barcode.rawValue.orEmpty()
-                            if (raw.isEmpty()) {
-                                scope.launch { snackbarHostState.showSnackbar("Leerer Code") }
-                                return@addOnSuccessListener
-                            }
+                    startQrPairingScan(
+                        context = context,
+                        onSuccess = { raw ->
                             applyPairing(raw, "Gepaart", "QR-Code hat kein gültiges Pairing-Format")
-                        }
-                        .addOnCanceledListener {
-                            // User brach den Scan ab — stumm ignorieren
-                        }
-                        .addOnFailureListener { e ->
+                        },
+                        onCancel = {},
+                        onFailure = { e ->
                             scope.launch {
                                 snackbarHostState.showSnackbar(
                                     "Scanner-Fehler: ${e.message ?: e::class.java.simpleName}"
                                 )
                             }
                         }
+                    )
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

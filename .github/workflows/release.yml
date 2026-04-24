@@ -1,0 +1,211 @@
+name: Release
+
+# Produces 5 release artifacts on tag push (v*.*.*):
+#   - MSI (Windows Desktop)
+#   - DEB, RPM, AppImage (Linux Desktop)
+#   - APK (Android)
+#
+# NOTE: The `build-android` job requires signingConfigs in
+# android/app/build.gradle.kts which are set up in Phase 6 (AS-CLI).
+# Until that phase is done this job will fail on unsigned release builds.
+# To disable temporarily, comment out the `build-android` job and remove
+# its entry from the `release.needs` list below.
+#
+# NOTE: MSI is NOT listed in desktop/src-tauri/tauri.conf.json bundle targets
+# (so Linux CI does not try to build MSI). Windows job overrides via CLI flag
+# `--bundles msi`.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------- Core Builds ----------
+
+  build-core-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: Build Core
+        working-directory: core
+        run: cargo build --release
+      - name: Upload Core Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-core-linux
+          path: core/target/release/nexus-core
+          retention-days: 1
+
+  build-core-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: Build Core
+        working-directory: core
+        run: cargo build --release
+      - name: Upload Core Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-core-windows
+          path: core/target/release/nexus-core.exe
+          retention-days: 1
+
+  # ---------- Desktop Bundles ----------
+
+  build-desktop-linux:
+    needs: build-core-linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Install System Deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Desktop Deps
+        working-directory: desktop
+        run: npm install
+      - name: Download Core Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: nexus-core-linux
+          path: desktop/src-tauri/binaries/
+      - name: Rename + chmod Core Binary
+        run: |
+          mv desktop/src-tauri/binaries/nexus-core desktop/src-tauri/binaries/nexus-core-x86_64-unknown-linux-gnu
+          chmod +x desktop/src-tauri/binaries/nexus-core-x86_64-unknown-linux-gnu
+      - name: Build Desktop Bundles
+        working-directory: desktop
+        run: npm run tauri -- build --bundles deb,rpm,appimage
+      - name: Upload Linux Bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-desktop-linux
+          path: |
+            desktop/src-tauri/target/release/bundle/deb/*.deb
+            desktop/src-tauri/target/release/bundle/rpm/*.rpm
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+
+  build-desktop-windows:
+    needs: build-core-windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Desktop Deps
+        working-directory: desktop
+        run: npm install
+      - name: Download Core Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: nexus-core-windows
+          path: desktop/src-tauri/binaries/
+      - name: Rename Core Binary
+        shell: pwsh
+        run: |
+          Move-Item desktop/src-tauri/binaries/nexus-core.exe desktop/src-tauri/binaries/nexus-core-x86_64-pc-windows-msvc.exe
+      - name: Build Desktop MSI
+        working-directory: desktop
+        run: npm run tauri -- build --bundles msi
+      - name: Upload Windows Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-desktop-windows
+          path: desktop/src-tauri/target/release/bundle/msi/*.msi
+
+  # ---------- Android ----------
+  #
+  # Requires (from Phase 6 in AS-CLI):
+  #   - signingConfigs block in android/app/build.gradle.kts reading the
+  #     NEXUS_KEYSTORE_* env vars
+  #   - Repository secrets:
+  #       NEXUS_KEYSTORE_BASE64    (base64-encoded keystore.jks)
+  #       NEXUS_KEYSTORE_PASSWORD
+  #       NEXUS_KEY_ALIAS
+  #       NEXUS_KEY_PASSWORD
+  # Until those are in place this job will fail. Disable by commenting.
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Decode Keystore
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.NEXUS_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+      - name: Build Release APK
+        working-directory: android
+        env:
+          NEXUS_KEYSTORE_PATH: app/keystore.jks
+          NEXUS_KEYSTORE_PASSWORD: ${{ secrets.NEXUS_KEYSTORE_PASSWORD }}
+          NEXUS_KEY_ALIAS: ${{ secrets.NEXUS_KEY_ALIAS }}
+          NEXUS_KEY_PASSWORD: ${{ secrets.NEXUS_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-android
+          path: android/app/build/outputs/apk/release/*.apk
+
+  # ---------- Release ----------
+
+  release:
+    needs:
+      - build-desktop-linux
+      - build-desktop-windows
+      - build-android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: List Artifacts
+        run: find artifacts -type f
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/nexus-desktop-linux/**
+            artifacts/nexus-desktop-windows/**
+            artifacts/nexus-android/**
+          draft: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

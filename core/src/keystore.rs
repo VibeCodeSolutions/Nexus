@@ -1,10 +1,21 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
-const VALID_PROVIDERS: &[&str] = &["claude", "gemini", "zai", "ollama"];
+const VALID_PROVIDERS: &[&str] = &[
+    "claude",
+    "gemini",
+    "zai",
+    "ollama",
+    "openai",
+    "mistral",
+    "groq",
+    "deepseek",
+    "openrouter",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthTokens {
@@ -17,11 +28,15 @@ pub struct OAuthTokens {
 struct Store {
     keys: HashMap<String, String>,
     oauth: HashMap<String, OAuthTokens>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default_provider: Option<String>,
 }
 
 fn store_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".nexus").join("keys.json")
+    crate::config::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".nexus")
+        .join("keys.json")
 }
 
 fn load() -> Store {
@@ -41,14 +56,20 @@ fn save(store: &Store) -> Result<(), String> {
     let data = serde_json::to_string_pretty(store)
         .map_err(|e| format!("Serialisierung fehlgeschlagen: {e}"))?;
     fs::write(&path, &data).map_err(|e| format!("Speichern fehlgeschlagen: {e}"))?;
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
-        .map_err(|e| format!("Permissions konnten nicht gesetzt werden: {e}"))?;
+    #[cfg(unix)]
+    {
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("Permissions konnten nicht gesetzt werden: {e}"))?;
+    }
     Ok(())
 }
 
 pub fn set_key(provider: &str, value: &str) -> Result<(), String> {
     if !VALID_PROVIDERS.contains(&provider) {
-        return Err(format!("Unbekannter Provider: {provider}. Erlaubt: claude, gemini, zai"));
+        return Err(format!(
+            "Unbekannter Provider: {provider}. Erlaubt: {}",
+            VALID_PROVIDERS.join(", ")
+        ));
     }
     let mut store = load();
     store.keys.insert(provider.to_string(), value.to_string());
@@ -86,5 +107,28 @@ pub fn get_oauth(provider: &str) -> Result<OAuthTokens, String> {
 pub fn delete_oauth(provider: &str) -> Result<(), String> {
     let mut store = load();
     store.oauth.remove(provider);
+    save(&store)
+}
+
+pub fn set_default_provider(provider: &str) -> Result<(), String> {
+    if !VALID_PROVIDERS.contains(&provider) {
+        return Err(format!(
+            "Unbekannter Provider: {provider}. Erlaubt: {}",
+            VALID_PROVIDERS.join(", ")
+        ));
+    }
+    let mut store = load();
+    store.default_provider = Some(provider.to_string());
+    save(&store)
+}
+
+pub fn get_default_provider() -> Option<String> {
+    load().default_provider
+}
+
+#[allow(dead_code)]
+pub fn clear_default_provider() -> Result<(), String> {
+    let mut store = load();
+    store.default_provider = None;
     save(&store)
 }

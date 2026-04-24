@@ -111,7 +111,7 @@ class NexusApiClient(private val settings: ConnectionSettings) {
         }.body()
     }
 
-    suspend fun updateTask(id: Long, request: TaskUpdateRequest): Result<TaskResponse> = authedRequest {
+    suspend fun updateTask(id: String, request: TaskUpdateRequest): Result<TaskResponse> = authedRequest {
         client.put("$baseUrl/tasks/$id") {
             contentType(ContentType.Application.Json)
             bearerAuth(token!!)
@@ -119,7 +119,7 @@ class NexusApiClient(private val settings: ConnectionSettings) {
         }.body()
     }
 
-    suspend fun deleteTask(id: Long): Result<Unit> = authedRequest {
+    suspend fun deleteTask(id: String): Result<Unit> = authedRequest {
         client.delete("$baseUrl/tasks/$id") {
             bearerAuth(token!!)
         }

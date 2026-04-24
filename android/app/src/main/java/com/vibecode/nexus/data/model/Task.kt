@@ -17,10 +17,11 @@ data class TaskUpdateRequest(
 
 @Serializable
 data class TaskResponse(
-    val id: Long,
+    val id: String,
     val title: String,
     val status: String,
     val priority: String,
     val project_id: String? = null,
-    val created_at: String
+    val created_at: String,
+    val updated_at: String? = null
 )

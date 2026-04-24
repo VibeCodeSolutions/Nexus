@@ -49,6 +49,23 @@ pub async fn list_projects(pool: &SqlitePool) -> Result<Vec<Project>, sqlx::Erro
         .await
 }
 
+pub async fn delete_project(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE tasks SET project_id = NULL WHERE project_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM braindump_projects WHERE project_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM projects WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await
+}
+
 pub async fn assign_braindump_to_project(pool: &SqlitePool, braindump_id: &str, project_id: &str) -> Result<(), sqlx::Error> {
     sqlx::query("INSERT OR IGNORE INTO braindump_projects (braindump_id, project_id) VALUES (?, ?)")
         .bind(braindump_id)

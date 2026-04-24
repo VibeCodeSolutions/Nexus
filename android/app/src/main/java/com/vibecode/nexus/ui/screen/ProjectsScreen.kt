@@ -17,10 +17,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +47,7 @@ data class ProjectWithProgress(
     val progress: ProjectProgress?
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectsScreen(
     apiClient: NexusApiClient,
@@ -54,10 +57,9 @@ fun ProjectsScreen(
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<ProjectWithProgress>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isPaired) {
-        if (!isPaired) return@LaunchedEffect
-        isLoading = true
+    suspend fun loadData() {
         apiClient.getProjects().onSuccess { projects ->
             val withProgress = projects.map { project ->
                 val progress = apiClient.getProjectProgress(project.id).getOrNull()
@@ -65,6 +67,12 @@ fun ProjectsScreen(
             }
             items = withProgress
         }
+    }
+
+    LaunchedEffect(isPaired) {
+        if (!isPaired) return@LaunchedEffect
+        isLoading = true
+        loadData()
         isLoading = false
     }
 
@@ -100,22 +108,37 @@ fun ProjectsScreen(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (items.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Keine Projekte vorhanden",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            isRefreshing = true
+                            loadData()
+                            isRefreshing = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    items(items, key = { it.project.id }) { item ->
-                        ProjectCard(item)
+                    if (items.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Keine Projekte vorhanden",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(items, key = { it.project.id }) { item ->
+                                ProjectCard(item)
+                            }
+                        }
                     }
                 }
             }

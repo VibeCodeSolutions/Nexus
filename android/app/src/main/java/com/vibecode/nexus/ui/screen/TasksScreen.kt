@@ -33,6 +33,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,13 +68,18 @@ fun TasksScreen(
     var tasks by remember { mutableStateOf<List<TaskResponse>>(emptyList()) }
     var projects by remember { mutableStateOf<List<ProjectResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
+
+    suspend fun fetchData() {
+        apiClient.getTasks().onSuccess { tasks = it }
+        apiClient.getProjects().onSuccess { projects = it }
+    }
 
     fun loadData() {
         scope.launch {
             isLoading = true
-            apiClient.getTasks().onSuccess { tasks = it }
-            apiClient.getProjects().onSuccess { projects = it }
+            fetchData()
             isLoading = false
         }
     }
@@ -146,42 +152,57 @@ fun TasksScreen(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (tasks.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Keine Tasks vorhanden",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            isRefreshing = true
+                            fetchData()
+                            isRefreshing = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    items(tasks, key = { it.id }) { task ->
-                        SwipeableTaskCard(
-                            task = task,
-                            onMarkDone = {
-                                scope.launch {
-                                    apiClient.updateTask(task.id, TaskUpdateRequest(status = "done"))
-                                        .onSuccess { loadData() }
-                                        .onFailure { e ->
-                                            snackbarHostState.showSnackbar("Fehler: ${e.message}")
+                    if (tasks.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Keine Tasks vorhanden",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(tasks, key = { it.id }) { task ->
+                                SwipeableTaskCard(
+                                    task = task,
+                                    onMarkDone = {
+                                        scope.launch {
+                                            apiClient.updateTask(task.id, TaskUpdateRequest(status = "done"))
+                                                .onSuccess { loadData() }
+                                                .onFailure { e ->
+                                                    snackbarHostState.showSnackbar("Fehler: ${e.message}")
+                                                }
                                         }
-                                }
-                            },
-                            onDelete = {
-                                scope.launch {
-                                    apiClient.deleteTask(task.id)
-                                        .onSuccess { loadData() }
-                                        .onFailure { e ->
-                                            snackbarHostState.showSnackbar("Fehler: ${e.message}")
+                                    },
+                                    onDelete = {
+                                        scope.launch {
+                                            apiClient.deleteTask(task.id)
+                                                .onSuccess { loadData() }
+                                                .onFailure { e ->
+                                                    snackbarHostState.showSnackbar("Fehler: ${e.message}")
+                                                }
                                         }
-                                }
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }

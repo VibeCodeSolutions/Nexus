@@ -4,7 +4,6 @@
   "identifier": "com.nexus.desktop",
   "build": {
     "frontendDist": "../src",
-    "devUrl": "http://localhost:1420",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
   },

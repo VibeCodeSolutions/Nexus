@@ -12,6 +12,7 @@ mod repo;
 use axum::middleware;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
+use tower_http::cors::{Any, CorsLayer};
 use clap::Parser;
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
@@ -155,6 +156,12 @@ async fn main() {
                 .route("/api/onboard/oauth", post(handlers::onboard_oauth))
                 .route("/api/pair/uri", get(handlers::pair_uri))
                 .layer(middleware::from_fn(auth::require_token))
+                .layer(
+                    CorsLayer::new()
+                        .allow_origin(Any)
+                        .allow_methods(Any)
+                        .allow_headers(Any),
+                )
                 .with_state(state);
 
             let listener = tokio::net::TcpListener::bind(&config.bind_addr)

@@ -897,7 +897,7 @@ async function initOnboarding() {
 
   // First-Run-Entscheidung
   const onboarded = localStorage.getItem('nexus_onboarded') === 'true';
-  const fullyConfigured = !!(setupStatus.provider_configured && setupStatus.paired);
+  const fullyConfigured = !!setupStatus.provider_configured;
 
   if (onboarded || fullyConfigured) {
     document.getElementById('onboardingOverlay').classList.add('hidden');

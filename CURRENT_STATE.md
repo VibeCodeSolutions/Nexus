@@ -1,8 +1,26 @@
 # NEXUS — Current State
 
-**Stand:** 2026-04-13
-**Aktuelle Phase:** 13 — Gamification
-**Phase-Status:** Abgeschlossen (Phasen 0-13 komplett)
+**Stand:** 2026-04-25
+**Aktuelle Phase:** Release v0.1.0 (rc3 als Draft auf GitHub)
+**Phase-Status:** Phasen 0-13 abgeschlossen, Release-Sprint Phasen 0-8 komplett
+
+---
+
+## Release-Sprint v0.1.0 (siehe HANDOVER.md)
+
+Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/RPM/AppImage (Linux), signierte APK.
+
+- ✅ Core auf Windows portierbar
+- ✅ 9 LLM-Provider (claude, gemini, ollama, zai, openai, mistral, groq, deepseek, openrouter)
+- ✅ Tauri-Sidecar-Lifecycle
+- ✅ Setup-Status + Onboard-API
+- ✅ 4-Screen-Wizard (Welcome/Pair/Provider/Done) + 9 Provider-Cards
+- ✅ Android Welcome+Pair-Screen + Release-Signing
+- ✅ GitHub Actions Release-Pipeline
+- ✅ `scripts/bump-version.sh` + README-Installation
+- 🟡 End-to-End-Test angefangen, Pairing-Flow noch nicht durchgespielt
+
+---
 
 ---
 

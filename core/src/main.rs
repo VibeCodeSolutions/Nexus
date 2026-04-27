@@ -304,7 +304,7 @@ fn print_status() {
         } else {
             "— nicht konfiguriert"
         };
-        println!("  {provider:8} → aktiv: {active}");
+        println!("  {provider:10} → aktiv: {active}");
 
         if let Some(t) = oauth {
             let now = chrono::Utc::now().timestamp();

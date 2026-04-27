@@ -71,10 +71,11 @@ pub fn print_qr(data: &str) {
         .dark_color(svg::Color("#000000"))
         .light_color(svg::Color("#ffffff"))
         .build();
-    let svg_path = "/tmp/nexus-pair.svg";
-    if fs::write(svg_path, &svg_string).is_ok() {
-        let _ = webbrowser::open(svg_path);
-        println!("📱 QR-Code im Browser geöffnet: {svg_path}");
+    let svg_path = std::env::temp_dir().join("nexus-pair.svg");
+    if fs::write(&svg_path, &svg_string).is_ok() {
+        let path_str = svg_path.to_string_lossy();
+        let _ = webbrowser::open(path_str.as_ref());
+        println!("📱 QR-Code im Browser geöffnet: {path_str}");
     }
 
     let colors = code.to_colors();

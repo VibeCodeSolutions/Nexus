@@ -28,7 +28,7 @@ gekoppelt.
 3. Fertig. Beide Geräte teilen dieselbe Datenbasis.
 
 Details, Troubleshooting und Architektur-Überblick im
-[README](https://github.com/${GITHUB_REPOSITORY}/blob/main/README.md).
+[README](https://github.com/VibeCodeSolutions/Nexus/blob/main/README.md).
 
 ## Changelog
 

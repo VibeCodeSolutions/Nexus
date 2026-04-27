@@ -52,6 +52,14 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
 Nur Einträge gruppieren, die wirklich zusammengehören. Nicht jeder Eintrag muss einem Projekt zugeordnet werden.
 Keine zusätzliche Erklärung, nur das JSON-Array."#;
 
+pub(super) fn clean_json(raw: &str) -> &str {
+    raw.trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim()
+}
+
 pub struct NoOpProvider;
 
 #[async_trait]

@@ -74,13 +74,7 @@ impl ZaiProvider {
     }
 }
 
-fn clean_json(raw: &str) -> &str {
-    raw.trim()
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```")
-        .trim()
-}
+use super::clean_json;
 
 #[async_trait]
 impl LlmProvider for ZaiProvider {

@@ -1058,15 +1058,16 @@ async function saveProvider(provider, apiKey) {
       const t = await r.text();
       throw new Error(t || `HTTP ${r.status}`);
     }
-    // Sidecar-Restart via Tauri, damit Core den neuen Provider lädt
-    if (window.__TAURI__ && window.__TAURI__.core) {
-      try { await window.__TAURI__.core.invoke('restart_core'); } catch (e) { console.warn('restart_core:', e); }
-    }
-    return true;
   } catch (e) {
     alert(`Provider-Setup fehlgeschlagen: ${e.message}`);
     return false;
   }
+  // Restart außerhalb des Error-Pfads — Fehler hier sind kosmetisch,
+  // der Provider-Key wurde bereits erfolgreich gespeichert.
+  if (window.__TAURI__ && window.__TAURI__.core) {
+    try { await window.__TAURI__.core.invoke('restart_core'); } catch (e) { console.warn('restart_core:', e); }
+  }
+  return true;
 }
 
 async function recheckOllama() {

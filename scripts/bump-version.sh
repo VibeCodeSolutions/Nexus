@@ -56,8 +56,10 @@ fi
 # Android build.gradle.kts
 ANDROID_GRADLE="$ROOT/android/app/build.gradle.kts"
 sed -i -E "s/versionName = \"[^\"]*\"/versionName = \"$NEW_VERSION\"/" "$ANDROID_GRADLE"
-echo "  [android]  $ANDROID_GRADLE"
-echo "             (versionCode NICHT geändert — manuell in $ANDROID_GRADLE erhöhen!)"
+CURRENT_CODE=$(grep -E "versionCode = [0-9]+" "$ANDROID_GRADLE" | grep -oE "[0-9]+")
+NEW_CODE=$((CURRENT_CODE + 1))
+sed -i -E "s/versionCode = [0-9]+/versionCode = $NEW_CODE/" "$ANDROID_GRADLE"
+echo "  [android]  $ANDROID_GRADLE (versionCode $CURRENT_CODE → $NEW_CODE)"
 
 echo ""
 echo "Version $NEW_VERSION gesetzt. Review mit:"

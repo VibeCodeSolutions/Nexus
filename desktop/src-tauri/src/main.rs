@@ -13,11 +13,29 @@ struct SidecarHandle(Mutex<Option<CommandChild>>);
 
 #[tauri::command]
 fn get_core_token() -> Result<String, String> {
+    // The sidecar writes ~/.nexus_token shortly after spawn. The Tauri
+    // window may load before that finishes, so retry briefly (up to ~5s).
     let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
     let path = home.join(".nexus_token");
-    fs::read_to_string(&path)
-        .map(|s| s.trim().to_string())
-        .map_err(|e| format!("token read failed ({}): {}", path.display(), e))
+    let mut last_err = String::new();
+    for _ in 0..50 {
+        match fs::read_to_string(&path) {
+            Ok(s) => {
+                let trimmed = s.trim();
+                if !trimmed.is_empty() {
+                    return Ok(trimmed.to_string());
+                }
+                last_err = "token file empty".to_string();
+            }
+            Err(e) => last_err = e.to_string(),
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    Err(format!(
+        "token read failed after retries ({}): {}",
+        path.display(),
+        last_err
+    ))
 }
 
 #[tauri::command]

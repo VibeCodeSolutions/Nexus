@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +27,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vibecode.nexus.data.ConnectionSettings
+import com.vibecode.nexus.data.NexusApiClient
+import kotlinx.coroutines.launch
 
 @Composable
 fun PairScreen(
@@ -35,8 +38,28 @@ fun PairScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var scanTriggered by remember { mutableStateOf(false) }
+
+    fun completePairing(raw: String) {
+        if (!connectionSettings.saveFromQr(raw)) {
+            errorMessage = "QR-Code hat kein gültiges Pairing-Format"
+            return
+        }
+        scope.launch {
+            val client = NexusApiClient(connectionSettings)
+            val result = client.pairHandshake()
+            client.close()
+            if (result.isSuccess) {
+                onPaired()
+            } else {
+                connectionSettings.clear()
+                val cause = result.exceptionOrNull()
+                errorMessage = "Pairing fehlgeschlagen: ${cause?.message ?: cause?.let { it::class.java.simpleName } ?: "unbekannt"}"
+            }
+        }
+    }
 
     // Auto-open scanner on first composition
     LaunchedEffect(Unit) {
@@ -44,11 +67,7 @@ fun PairScreen(
             scanTriggered = true
             startQrPairingScan(
                 context = context,
-                onSuccess = { raw ->
-                    val ok = connectionSettings.saveFromQr(raw)
-                    if (ok) onPaired()
-                    else errorMessage = "QR-Code hat kein gültiges Pairing-Format"
-                },
+                onSuccess = { raw -> completePairing(raw) },
                 onCancel = { /* stay on screen, show retry */ },
                 onFailure = { e ->
                     errorMessage = "Scanner-Fehler: ${e.message ?: e::class.java.simpleName}"
@@ -95,11 +114,7 @@ fun PairScreen(
                 errorMessage = null
                 startQrPairingScan(
                     context = context,
-                    onSuccess = { raw ->
-                        val ok = connectionSettings.saveFromQr(raw)
-                        if (ok) onPaired()
-                        else errorMessage = "QR-Code hat kein gültiges Pairing-Format"
-                    },
+                    onSuccess = { raw -> completePairing(raw) },
                     onCancel = {},
                     onFailure = { e ->
                         errorMessage = "Scanner-Fehler: ${e.message ?: e::class.java.simpleName}"

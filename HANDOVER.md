@@ -1,5 +1,7 @@
 # NEXUS — Übergabeprotokoll v0.1.0-rc3
 
+> **Update 2026-04-28** — Pair-Detection-Fix in Arbeit, Windows-Sprint geplant via Chakotay-Kette, siehe Abschnitt **"Session 2026-04-28"** weiter unten.
+
 **Datum:** 2026-04-25
 **Status:** Release-Kandidat 3 als Draft auf GitHub. Lokaler End-to-End-Test angefangen, vor Pairing abgebrochen.
 
@@ -190,3 +192,101 @@ git push origin v0.1.0
 3. **Restart-Race-Condition** beim Provider-Save — entweder Frontend-Delay oder Server-Side-Live-Reload (`RwLock<Arc<dyn LlmProvider>>`)
 4. **Backlog-Tickets aus QS_FINDINGS.md** abarbeiten (in Reihenfolge von High zu Low)
 5. **Final v0.1.0** taggen + Draft-Release veröffentlichen
+
+---
+
+## Session 2026-04-28 — Pair-Detection + Windows-Sprint-Plan
+
+### Was angegangen wurde
+
+**Wizard-Bug:** Pairing klappt auf APK-Seite (App pingt `/health`), aber der Tauri-Wizard sah nie `paired:true` und hing auf der Pair-Screen.
+
+**Root-Cause:** Die alte APK speicherte den QR nur lokal (`saveFromQr()`), rief danach **keinen Bearer-authentifizierten Endpoint** auf. Der Health-Check geht ohne Bearer durch, also feuert die Auth-Middleware `mark_paired_now()` nie. `~/.nexus_paired_at` blieb leer → `paired:false` → Wizard wartet ewig.
+
+### Patch-Stand (uncommitted, 9 Files, +343/−63 LoC)
+
+| Layer | Datei | Was |
+|-------|-------|-----|
+| Core | `core/src/auth.rs` | Auth-Tracing (DEBUG für jede Anfrage, INFO bei `mark_paired_now`-Trigger, WARN bei Bearer-Mismatch) |
+| Core | `core/src/handlers.rs` | Neuer `pair_handshake()`-Handler — bestätigt Pairing, liest `paired_at` |
+| Core | `core/src/main.rs` | Route `POST /api/pair/handshake`, EnvFilter erweitert um `nexus_core::auth=debug` |
+| Desktop | `desktop/src/index.html` | 15s-Timeout-Fallback "Trotzdem weiter"-Link auf der Pair-Screen |
+| Desktop | `desktop/src-tauri/*` | (Vorhandene rc3-Diffs unverändert mit drin) |
+| Android | `data/NexusApiClient.kt` | Neue Methode `pairHandshake()` — POST mit Bearer |
+| Android | `ui/screen/PairScreen.kt` | Nach `saveFromQr()` ruft `completePairing()` den Handshake auf, rollt Settings bei Fehler zurück |
+| Android | `MainActivity.kt` | Deep-Link-Pfad konsistent: nach `saveFromQr()` Handshake, bei Fehler `clear()` |
+
+**Nicht angefasst:** `core/src/keystore.rs` (NTFS-ACL-Thema gehört zum Windows-Sprint, nicht hier).
+
+### Status der Verifikation
+
+- ✅ `cargo check` und `cargo build` (Core) sauber
+- ✅ Localhost-Test des Handshake-Endpoints (HTTP 200)
+- ❌ **E2E mit echter APK noch nicht bestätigt** — letzter Pair-Versuch zeigte im Core-Log nur `/health`-Pings vom Phone, keinen `path=/api/pair/handshake`-Hit
+- 🔍 **Verdacht:** APK auf Handy hatte alten Pair-State in EncryptedSharedPrefs (App startete direkt in BrainDump → mein neuer `completePairing()`-Pfad wurde nie durchlaufen). Lösung: in der App **Settings → Unpair** vor erneutem QR-Scan
+- 🔍 **Reachability-Stolperfalle entdeckt:** Bei Dual-Stack-Networking (Ethernet+WiFi auf gleichem /24) kann das Phone die Server-IP timeout-en — ein Interface deaktivieren ist der schnelle Workaround
+
+### Windows-Sprint vorbereitet (Chakotay-Kette)
+
+**Ergebnis der Kette:** Chakotay → B'Elanna → Seven → Harry. Aktiv für Implementierung blockiert auf E2E-Verifikation des Wizard-Fix.
+
+- Pakete W1–W6 zerlegt in P1–P6 (CI-Stub Win, check-desktop-windows-Job, `/tmp/nexus-pair.svg` → `std::env::temp_dir()`, Tauri externalBin-Triple-Verifikation, NTFS-ACL für `keys.json`, Win11-VM-Smoke-Test)
+- Sevens Verdikt: **EIN kombinierter Spezialist** statt zwei
+- **Reginald Barclay** als Skill `vc-windows` erstellt (Modell `claude-opus-4-7`), Trigger-Reich (NTFS-ACL, MSI, Win11-Smoke-Test, externalBin, Defender, etc.)
+- **Test-Plattform = native Win11-Partition** (Dualboot), keine VM
+- B'Elanna behält P1–P3, Barclay übernimmt P4 (Verifikation) + P5 (NTFS-ACL) + P6 (Smoke-Test-Checkliste-Schreiben + Findings-Analyse), Admin klickt durch
+- Tuvok prüft alles am Ende über QS_FINDINGS.md mit `WIN-XXX`-IDs
+
+### Was als Nächstes passiert
+
+1. **Vor Commit:** Tuvok-Review der 9 uncommitted Files (Code-Qualität, Korrektheit, Konsistenz) — **kalt in einer frischen Session** nach `/clear`
+2. **Parallel auf User-Seite (AS-CLI):** APK über `./gradlew assembleDebug && adb install`, in Android Studio `adb logcat` während Pair-Versuch — damit klar wird ob `completePairing()` und `pairHandshake()` wirklich laufen
+3. **Nach grünem E2E-Test + Tuvok-Freigabe:** Commit + Final-v0.1.0-Release
+4. **Dann Windows-Sprint:** Barclay übernimmt P4–P6, B'Elanna P1–P3
+
+---
+
+### 📋 Brief für Tuvok (in frischer Session nach `/clear`)
+
+> Bitte den Skill `vc-qualitaet` (Tuvok) mit folgendem Auftrag triggern. Kalt lesen — keine Diagnose-Vorbelastung aus der Vor-Session.
+
+**Auftrag:** QS-Review für den Wizard-Pair-Detection-Fix vor Commit zu NEXUS v0.1.0. Admin-Order: kein Commit ohne Tuvok-Freigabe.
+
+**Geänderte Files (9, +343/−63 LoC, alle uncommitted gegen `main` HEAD `63b4433`):**
+
+| Layer | Datei |
+|-------|-------|
+| Core | `core/src/auth.rs` — Tracing in `mark_paired_now()` und `require_token()`, Logik unverändert |
+| Core | `core/src/handlers.rs` — Neuer Handler `pair_handshake()` (am Ende der Datei) |
+| Core | `core/src/main.rs` — Route `POST /api/pair/handshake`, EnvFilter um `nexus_core::auth=debug` erweitert |
+| Desktop | `desktop/src/index.html` — 15s-Timeout-Skip-Link auf der Pair-Screen (`pairSkipHint`/`pairSkipLink`/`pairSkipTimer`) |
+| Desktop | `desktop/src-tauri/src/main.rs` und `tauri.conf.json` — kursorisch, vorwiegend rc3-Diffs, peripher angefasst |
+| Android | `android/app/src/main/java/com/vibecode/nexus/data/NexusApiClient.kt` — Neue Methode `pairHandshake()` |
+| Android | `android/app/src/main/java/com/vibecode/nexus/ui/screen/PairScreen.kt` — Neuer Helper `completePairing()` ruft Handshake nach `saveFromQr()`, rollt Settings bei Fehler zurück |
+| Android | `android/app/src/main/java/com/vibecode/nexus/MainActivity.kt` — Deep-Link-Pfad ruft auch Handshake nach `saveFromQr()` |
+
+**Risiko-Punkte zum genauen Hinschauen:**
+
+1. **Core — Handler-Race:** `handlers::pair_handshake` liest `paired_at` direkt nachdem die Middleware `mark_paired_now()` aufgerufen hat. Schreibt non-async, sollte race-free sein — verifiziere die Annahme.
+2. **Core — Tracing in Production:** `auth=debug` als hartcodierte Default-Direktive. Ist das in Release-Builds OK oder über env steuerbar machen? Performance-Impact?
+3. **Core — `require_token` Doc-Kommentar (Zeile 168–173):** Sagt *"the Android client pings `/health` right after scanning the QR"* — diese Annahme stimmt nicht mehr. Mit dem neuen Handshake-Endpoint ist `/health` nicht mehr der Pair-Trigger. Doc-Kommentar muss aktualisiert werden.
+4. **Desktop — Timer-Lifecycle:** `pairSkipTimer` wird in `startPairPolling()` gesetzt, in `stopPairPolling()` und in `showPairSkip` (durch `setTimeout`-Auflösung) gecleart. Was passiert wenn der Wizard-Screen vor dem 15s-Tick zerstört wird (z.B. App schließt)? Memory-Leak möglich?
+5. **Android — `NexusApiClient`-Lifecycle:** In `PairScreen.completePairing` wird ein neuer `NexusApiClient` erzeugt und mit `client.close()` direkt entsorgt. MainActivity hat schon einen Singleton (`apiClient` über `remember`). Sollte stattdessen der Singleton genutzt werden? Trade-off: Singleton hält stale `connectionSettings`-Werte, neue Instanz ist immer fresh. Bewertung?
+6. **Android — `connectionSettings.clear()` bei Handshake-Failure:** Mit MainActivity's `isPaired by remember { mutableStateOf(connectionSettings.isPaired) }` gibt es zwei Wahrheits-Quellen. Race-Conditions? Konsistenz wenn der `LaunchedEffect(navBackStackEntry)` zwischendurch feuert?
+7. **Android — Deep-Link Reihenfolge:** In `MainActivity.LaunchedEffect(pendingUri)` ist die Order: `saveFromQr → handshake → isPaired = true`. Was wenn die Composition zwischendurch rendert mit `isPaired` aus alten Settings (true)? UI flicker möglich? `isPaired = false` vor handshake setzen für Sauberkeit?
+8. **Android — Kein Timeout-Handling für `pairHandshake()` explizit:** Verlässt sich auf den `connectTimeoutMillis = 10_000` aus der ktor-Config. Reicht das, oder eigener Timeout um den User-Feedback-Loop kürzer zu halten?
+
+**E2E-Status:** Im Core-Log noch kein `path=/api/pair/handshake`-Hit vom Phone gesehen, vermutlich weil alter Pair-State in EncryptedSharedPrefs den `completePairing()`-Pfad umgeht. **Admin klärt das parallel via `adb logcat` in der AS-CLI** — du prüfst nur Code-Qualität, nicht E2E-Funktion.
+
+**Was du tust:**
+- Files unter `/home/kaik/Projekte/Apps/Nexus/` direkt lesen (Read/Grep)
+- Findings in `QS_FINDINGS.md` mit IDs `WIZ-001-KAT`, `WIZ-002-KAT`, ... (Kat = KOR/COD/KON/SIC etc.)
+- Schweregrade 🔴 Blocker / 🟡 Major / 🟢 Minor sauber begründen
+- Ergebnis-Header an B'Elanna, klares Verdikt: ✅ Freigabe / ⚠️ Freigabe mit Auflagen / ❌ Rückgabe
+
+**Was du NICHT tust:**
+- Keine E2E-Verifikation (Admin macht das via adb logcat)
+- Keine Code-Fixes selbst — du dokumentierst, B'Elanna entscheidet
+- Keinen Commit auslösen
+
+**Bezugspunkte:** Last commit `63b4433 docs: handoff snapshot at v0.1.0-rc3`. Branch `main`. Alle Diffs sichtbar via `git diff` aus dem Repo-Root.

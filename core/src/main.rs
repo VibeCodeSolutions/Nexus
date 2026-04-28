@@ -16,6 +16,7 @@ use tower_http::cors::{Any, CorsLayer};
 use clap::Parser;
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -95,7 +96,8 @@ async fn main() {
             let (file_writer, _guard) = tracing_appender::non_blocking(file_appender);
 
             let filter = EnvFilter::from_default_env()
-                .add_directive("nexus_core=info".parse().unwrap());
+                .add_directive("nexus_core=info".parse().unwrap())
+                .add_directive("nexus_core::auth=debug".parse().unwrap());
 
             tracing_subscriber::registry()
                 .with(filter)
@@ -155,6 +157,7 @@ async fn main() {
                 .route("/api/onboard/set-provider", post(handlers::onboard_set_provider))
                 .route("/api/onboard/oauth", post(handlers::onboard_oauth))
                 .route("/api/pair/uri", get(handlers::pair_uri))
+                .route("/api/pair/handshake", post(handlers::pair_handshake))
                 .layer(middleware::from_fn(auth::require_token))
                 .layer(
                     CorsLayer::new()
@@ -170,9 +173,12 @@ async fn main() {
 
             tracing::info!("NEXUS Core läuft auf http://{}", config.bind_addr);
 
-            axum::serve(listener, app)
-                .await
-                .expect("Server-Fehler");
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
+            .expect("Server-Fehler");
         }
     }
 }

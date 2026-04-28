@@ -127,18 +127,27 @@ class MainActivity : ComponentActivity() {
                 // Consume deep-link pairings
                 LaunchedEffect(pendingUri) {
                     val uri = pendingUri ?: return@LaunchedEffect
-                    val ok = connectionSettings.saveFromQr(uri)
-                    if (ok) {
-                        isPaired = true
-                        isConnected = apiClient.checkHealth()
-                        val currentRoute = navController.currentDestination?.route
-                        if (currentRoute in listOf("welcome", "pair")) {
-                            navController.navigate("braindump") {
-                                popUpTo("welcome") { inclusive = true }
-                            }
-                        }
-                    } else {
+                    val parsed = connectionSettings.saveFromQr(uri)
+                    if (!parsed) {
                         Log.w("MainActivity", "Pairing deep-link could not be parsed: $uri")
+                        pendingPairingUri.value = null
+                        return@LaunchedEffect
+                    }
+                    val handshake = apiClient.pairHandshake()
+                    if (handshake.isFailure) {
+                        Log.w("MainActivity", "Pair handshake failed", handshake.exceptionOrNull())
+                        connectionSettings.clear()
+                        isPaired = false
+                        pendingPairingUri.value = null
+                        return@LaunchedEffect
+                    }
+                    isPaired = true
+                    isConnected = apiClient.checkHealth()
+                    val currentRoute = navController.currentDestination?.route
+                    if (currentRoute in listOf("welcome", "pair")) {
+                        navController.navigate("braindump") {
+                            popUpTo("welcome") { inclusive = true }
+                        }
                     }
                     pendingPairingUri.value = null
                 }

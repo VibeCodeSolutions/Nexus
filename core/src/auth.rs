@@ -1,14 +1,52 @@
-use axum::extract::Request;
+use axum::extract::{ConnectInfo, Request};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::Response;
 use std::fs;
+use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config::home_dir;
 
 pub fn token_path() -> PathBuf {
     home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".nexus_token")
+}
+
+pub fn paired_path() -> PathBuf {
+    home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".nexus_paired_at")
+}
+
+/// Write the current Unix timestamp to ~/.nexus_paired_at to record that
+/// a non-localhost client successfully authenticated. Errors are logged
+/// and swallowed — failure to update this file must never break auth.
+pub fn mark_paired_now() {
+    let ts = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(d) => d.as_secs(),
+        Err(_) => return,
+    };
+    let path = paired_path();
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    match opts
+        .open(&path)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, ts.to_string().as_bytes()))
+    {
+        Ok(()) => tracing::info!("Pairing markiert: {} ({})", path.display(), ts),
+        Err(e) => tracing::warn!("paired_at konnte nicht geschrieben werden: {e}"),
+    }
+}
+
+/// Read the last-paired timestamp, if any.
+pub fn paired_at() -> Option<u64> {
+    fs::read_to_string(paired_path())
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
 }
 
 /// Generate a random pairing token and store it with restrictive permissions.
@@ -122,37 +160,71 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
         == 0
 }
 
-/// Axum middleware: verify Bearer token on API routes.
-pub async fn require_token(req: Request, next: Next) -> Result<Response, StatusCode> {
-    // Health and dashboard are always public
-    let path = req.uri().path().to_string();
-    if path == "/health" || path == "/" || path == "/api/setup-status" {
-        return Ok(next.run(req).await);
-    }
+fn is_loopback(addr: &SocketAddr) -> bool {
+    addr.ip().is_loopback()
+}
 
-    // Token MUST exist for protected endpoints — if missing, deny access
-    let token = match fs::read_to_string(token_path()) {
-        Ok(t) if !t.trim().is_empty() => t.trim().to_string(),
-        _ => {
-            tracing::error!("Kein Pairing-Token gefunden — alle API-Zugriffe blockiert");
-            return Err(StatusCode::UNAUTHORIZED);
-        }
-    };
+/// Axum middleware: verify Bearer token on API routes.
+///
+/// Public paths (`/`, `/health`, `/api/setup-status`) are always allowed.
+/// However, if a request to *any* path carries a valid Bearer token from a
+/// non-loopback peer, we record it as a pairing event. The Android client
+/// makes this explicit via `POST /api/pair/handshake` right after consuming
+/// the QR — that handshake is what the Wizard's `paired`-poll waits for.
+pub async fn require_token(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let path = req.uri().path().to_string();
+    let is_public = path == "/health" || path == "/" || path == "/api/setup-status";
+
+    let stored = fs::read_to_string(token_path())
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
 
     let auth_header = req
         .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok());
 
-    match auth_header {
-        Some(header) if header.starts_with("Bearer ") => {
-            let provided = &header[7..];
-            if constant_time_eq(provided, &token) {
-                Ok(next.run(req).await)
-            } else {
-                Err(StatusCode::UNAUTHORIZED)
-            }
+    let has_auth = auth_header.is_some();
+    let bearer_valid = match (&stored, auth_header) {
+        (Some(token), Some(h)) if h.starts_with("Bearer ") => {
+            constant_time_eq(&h[7..], token)
         }
-        _ => Err(StatusCode::UNAUTHORIZED),
+        _ => false,
+    };
+
+    let loopback = is_loopback(&addr);
+    tracing::debug!(
+        "auth: path={} peer={} loopback={} has_auth={} bearer_valid={}",
+        path, addr, loopback, has_auth, bearer_valid
+    );
+    if has_auth && !bearer_valid {
+        tracing::warn!("auth: ungültiger Bearer von peer={} path={}", addr, path);
+    }
+
+    // Track pairing whenever a remote client presents a valid token,
+    // regardless of which endpoint they hit.
+    if bearer_valid && !loopback {
+        tracing::info!("auth: pairing-event von peer={} path={}", addr, path);
+        mark_paired_now();
+    }
+
+    if is_public {
+        return Ok(next.run(req).await);
+    }
+
+    // Protected endpoints require a stored token AND a valid Bearer.
+    if stored.is_none() {
+        tracing::error!("Kein Pairing-Token gefunden — alle API-Zugriffe blockiert");
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    if bearer_valid {
+        Ok(next.run(req).await)
+    } else {
+        Err(StatusCode::UNAUTHORIZED)
     }
 }

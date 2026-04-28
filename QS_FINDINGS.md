@@ -472,3 +472,363 @@ Bump-Script funktional auf allen 5 Zielen, Rollback sauber. README vollständig 
 3. Nach Fix: **Admin freigeben für Tag-Push** (`v0.1.0`) — alle anderen Phasen (2, 3, 4, 7, 8) sind release-tauglich.
 
 Sobald der Blocker down ist, ist das Gate **OPEN** — die 10 MINORs sind Backlog und können parallel zum Android-AS-CLI-Sweep (Phasen 5+6) aufgeräumt werden.
+
+---
+
+## Wizard-Pair-Detection-Fix — Pre-Commit-Review — 2026-04-28
+**Status: ✅ Freigabe (nach Re-Review 2026-04-28, Zyklus 1/2 — beide Auflagen erledigt)**
+
+> **Update Re-Review:** WIZ-001-KOR und WIZ-002-KON wurden in Zyklus 1 vollständig adressiert (Edits durch B'Elannas Pair-Programming-Pfad). Sprint-Verdikt von ⚠️ auf ✅ angehoben. Backlog WIZ-003 bis WIZ-009 bleibt offen, blockiert keinen Commit.
+
+**Original-Status (vor Re-Review): ⚠️ Freigabe mit Auflagen (1 MAJOR Bug + 1 MAJOR Doc-Drift, sonst Minors)**
+
+Prüfung durchgeführt von: Tuvok (QS VibeCoding) — kalt, ohne Vor-Session-Kontext.
+
+### Was geprüft wurde
+- 9 uncommitted Files (`core/src/auth.rs`, `handlers.rs`, `main.rs`; `desktop/src-tauri/src/main.rs`, `tauri.conf.json`; `desktop/src/index.html`; `android/.../MainActivity.kt`, `data/NexusApiClient.kt`, `ui/screen/PairScreen.kt`)
+- Diff vs. `main` HEAD `63b4433` (+443 / −63 LoC)
+- Frischer `cargo check` für Core und Desktop-Tauri — beide GRÜN
+- Lesen der nicht-diff'ten Stellen für Kontext (`ConnectionSettings.kt`, voller `auth.rs`, voller Wizard-JS)
+
+### Findings
+
+---
+
+## WIZ-001-KOR
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Korrektheit
+- **Prüfgegenstand:** `NexusApiClient.pairHandshake()` ignoriert HTTP-Status
+- **Spezialist:** Android-Layer
+- **Befund:** `pairHandshake()` ruft `client.post(...)` und gibt direkt `Unit` zurück, ohne den `HttpResponse.status` zu prüfen. ktor (mit OkHttp-Engine) wirft per Default *keine* Exception bei 4xx/5xx (`expectSuccess = false`). Konsequenz: ein 401 (falsches/abgelaufenes Token) oder 500 (Server-Fehler) führt zu `Result.success(Unit)`. In `PairScreen.completePairing` und `MainActivity.LaunchedEffect(pendingUri)` wird das als „handshake erfolgreich" interpretiert → `connectionSettings` bleiben gesetzt, `isPaired = true`, App glaubt an gültige Pairing-Verbindung. Da `checkHealth()` keinen Bearer braucht, schlägt der Health-Check trotzdem grün an, und der falsche Pair-State zementiert sich. Der gesamte neue Handshake-Flow verfehlt damit seinen Zweck (Schutz gegen ungültige QR-Codes / falsche Server) im Failure-Pfad still.
+- **Korrekturvorschlag:**
+  ```kotlin
+  suspend fun pairHandshake(): Result<Unit> = authedRequest {
+      val response = client.post("$baseUrl/api/pair/handshake") {
+          bearerAuth(token!!)
+      }
+      if (!response.status.isSuccess()) {
+          error("Handshake HTTP ${response.status.value}")
+      }
+      Unit
+  }
+  ```
+  Alternativ `expectSuccess = true` im HttpClient-Setup für alle Requests gleichzeitig — sicherer, aber breitere Auswirkung auf bestehende Calls (vorher gegen Regressionen prüfen, da andere Endpoints derzeit `.body()` aufrufen, das auf seinem Weg eigene Exceptions schmeißt).
+- **Status:** ✅ erledigt (Re-Review 2026-04-28, Zyklus 1/2) — Status-Check eingebaut wie vorgeschlagen, `error()`-Throw läuft sauber durch `authedRequest`-Try-Catch in `Result.failure`, Aufrufer-Pfad in `PairScreen` und `MainActivity` triggert jetzt korrekt `connectionSettings.clear()` bei Server-Ablehnung.
+- **Korrektur-Zyklen:** 1/2
+
+---
+
+## WIZ-002-KON
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Konsistenz / Doku
+- **Prüfgegenstand:** Stale Doc-Kommentar in `auth::require_token`
+- **Spezialist:** Core-Layer
+- **Befund:** `core/src/auth.rs:167-173` Doc-Kommentar lautet:
+  > "the Android client pings `/health` right after scanning the QR, and that handshake is what the Wizard waits for"
+  Diese Aussage ist nach Einführung von `POST /api/pair/handshake` falsch. `/health` ist im is_public-Set (Z.180) und triggert die Bearer-Validierung gar nicht — ein `/health`-Ping wird also *nie* `mark_paired_now()` auslösen, egal ob ein Bearer mitgeschickt wird oder nicht (die Middleware ruft `mark_paired_now()` nur außerhalb des is_public-Returns; oh, falsch — siehe Re-Read: tatsächlich wird `mark_paired_now()` *vor* dem is_public-Check aufgerufen, in Z.211. Damit *würde* `/health` mit gültigem Bearer auch markieren. Der ursprüngliche Kommentar ist also faktisch teilweise korrekt). **Trotzdem:** Der Android-Client schickt zu `/health` keinen Bearer (siehe `NexusApiClient.checkHealth`, Z.62-78 — nur `client.get(...)`, kein `bearerAuth`). Damit triggert `/health` von der App aus *nie* den Pair-Mark. Der echte Trigger ist der neue `pairHandshake()`-Call, der den Bearer mitschickt. Der Doc-Kommentar erwähnt diesen explizit erstellten Endpoint nicht und führt jeden zukünftigen Reviewer in die Irre.
+- **Korrekturvorschlag:** Doc-Block ersetzen durch:
+  ```rust
+  /// However, if a request to *any* path carries a valid Bearer token from a
+  /// non-loopback peer, we record it as a pairing event. The Android client
+  /// makes this explicit via `POST /api/pair/handshake` right after consuming
+  /// the QR — that handshake is what the Wizard's `paired`-poll waits for.
+  ```
+- **Status:** ✅ erledigt (Re-Review 2026-04-28, Zyklus 1/2) — Doc-Kommentar in `auth.rs:167-173` exakt nach Vorschlag ersetzt, beschreibt jetzt korrekt den expliziten `POST /api/pair/handshake`-Trigger und den Wizard-Poll-Mechanismus.
+- **Korrektur-Zyklen:** 1/2
+
+---
+
+## WIZ-003-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität / Wartbarkeit
+- **Prüfgegenstand:** `auth=debug`-Direktive hartcodiert ohne Override
+- **Spezialist:** Core-Layer
+- **Befund:** `core/src/main.rs:99-100` ergänzt `nexus_core::auth=debug` über `add_directive`. Die spezifischere Modul-Direktive gewinnt gegenüber `nexus_core=info` aus dem Default-Filter, *und* gewinnt auch gegenüber einem User-`RUST_LOG=nexus_core::auth=warn`, weil `add_directive` nach `from_default_env()` aufgerufen wird (zuletzt-hinzugefügt = höchste Priorität). User kann das Logging also nur erhöhen, nie reduzieren. Performance-Impact pro Request: 1 DEBUG-Line + ggf. 1 INFO-Line. Bei einem Solo-Tool praktisch irrelevant; konzeptuell aber eine Wartungs-Mine.
+- **Korrekturvorschlag:** Direktive hinter Env-Switch oder `cfg!(debug_assertions)` legen, z.B.:
+  ```rust
+  let mut filter = EnvFilter::from_default_env()
+      .add_directive("nexus_core=info".parse().unwrap());
+  if std::env::var("NEXUS_AUTH_DEBUG").is_ok() {
+      filter = filter.add_directive("nexus_core::auth=debug".parse().unwrap());
+  }
+  ```
+  Für die aktuelle Pair-Detection-Sprint-Phase aber durchaus tolerierbar — Backlog für post-v0.1.0.
+- **Status:** offen (Backlog post-v0.1.0)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-004-PER
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Performance / Wartbarkeit
+- **Prüfgegenstand:** `mark_paired_now()` schreibt auf jedem authentifizierten Remote-Request
+- **Spezialist:** Core-Layer
+- **Befund:** `auth.rs:211-214`: jeder erfolgreich-authentifizierte non-loopback-Request löst einen synchronen Disk-Write nach `~/.nexus_paired_at` aus (truncate+write+drop = open + flush). Bei reaktiver Handy-Nutzung schnell 100+ Writes/Tag. Funktional egal — der Timestamp wird bei jedem Write neu gesetzt, idempotent in der Semantik —, aber Disk-IO wäre vermeidbar.
+- **Korrekturvorschlag:** Skip wenn `paired_at()` gesetzt und jünger als z.B. 60s. Spart 99% der Writes ohne Funktionsänderung.
+- **Status:** offen (Backlog)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-005-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität / Konsistenz
+- **Prüfgegenstand:** Eigene `NexusApiClient`-Instanz in `PairScreen.completePairing`
+- **Spezialist:** Android-Layer
+- **Befund:** `PairScreen.kt:50-53` erzeugt eine neue `NexusApiClient(connectionSettings)`-Instanz, ruft `pairHandshake()` und schließt sie sofort wieder. MainActivity hält bereits einen Singleton-Client (Z.82). Da `NexusApiClient.baseUrl`/`token` Property-Getter sind, die direkt aus `settings` lesen (`get() = settings.coreUrl`), liest auch der Singleton stets frische Werte — eine separate Instanz ist nicht nötig. Side-Effect: zweiter OkHttp-Pool-Allocate, marginaler Overhead. Inkonsistenz zur sonstigen Architektur.
+- **Korrekturvorschlag:** Singleton als `apiClient: NexusApiClient` durch das Composable durchreichen (analog zu `BrainDumpScreen`/`TasksScreen` in MainActivity). Code wird gleichzeitig kürzer.
+- **Status:** offen (Backlog)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-006-KOR
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Korrektheit (UI-Konsistenz / Race)
+- **Prüfgegenstand:** `isPaired`-Flicker zwischen `saveFromQr` und Handshake-Result
+- **Spezialist:** Android-Layer (MainActivity, PairScreen)
+- **Befund:** Zwischen `saveFromQr()` (synchroner in-memory-Write von ConnectionSettings) und dem `await`-Ergebnis von `pairHandshake()` ist `connectionSettings.isPaired` bereits `true`. Der `LaunchedEffect(navBackStackEntry)` (MainActivity Z.122-125) liest dieselben Settings. Wenn der Effect in dieser kurzen Zeitspanne re-triggert, wird `isPaired = true` gesetzt; bei anschließendem Handshake-Failure wird `clear()` + `isPaired = false` angewandt → kurzer paired→unpaired-Flicker. Wahrscheinlichkeit gering (Window misst sich in der Round-Trip-Zeit eines POST), aber konzeptuell unsauber.
+- **Korrekturvorschlag:** Reihenfolge umdrehen — Handshake mit *temporärem* In-Memory-Token vor `saveFromQr()` durchführen, Settings erst nach Erfolg persistieren. Größerer Eingriff in `ConnectionSettings`-API, daher im Backlog.
+- **Status:** offen (Backlog)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-007-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität (UX)
+- **Prüfgegenstand:** Kein expliziter Timeout für `pairHandshake()`
+- **Spezialist:** Android-Layer
+- **Befund:** `NexusApiClient.kt:34-36` setzt `requestTimeoutMillis = 60_000` global. Für einen leichtgewichtigen Handshake-Call ist 60s eine Ewigkeit — wenn Server hängt, wartet der User eine ganze Minute auf das "Pairing fehlgeschlagen"-Toast. Für `checkHealth`/`pairHandshake` würden 5s reichen.
+- **Korrekturvorschlag:**
+  ```kotlin
+  client.post("$baseUrl/api/pair/handshake") {
+      bearerAuth(token!!)
+      timeout { requestTimeoutMillis = 5_000 }
+  }
+  ```
+- **Status:** offen (Backlog)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-008-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität (UI)
+- **Prüfgegenstand:** `pairSkipHint` bleibt sichtbar nach erfolgreichem Pairing
+- **Spezialist:** Desktop-Layer (index.html)
+- **Befund:** `checkPairStatusOnce()` (Z.1042-1071) aktualisiert bei `paired===true` den Status-Text und enabled den Next-Button, ruft aber `hidePairSkip()` nicht auf. Wenn die 15s-Timeout schon abgelaufen war (Hint sichtbar), bleibt der "Pairing scheint zu hängen? Trotzdem weiter"-Hint sichtbar zusammen mit "✓ Verbunden mit Handy" — visuell widersprüchlich.
+- **Korrekturvorschlag:** `hidePairSkip()` direkt nach `nextBtn.disabled = false;` aufrufen.
+- **Status:** offen (Backlog)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-009-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität (UI)
+- **Prüfgegenstand:** "Erneut prüfen"-Button resettet Polling-Lifecycle nicht vollständig
+- **Spezialist:** Desktop-Layer (index.html)
+- **Befund:** Z.953-958: Klick auf `pairRecheckBtn` ruft `renderPairQr()` und `checkPairStatusOnce()`, aber NICHT `startPairPolling()`. Wenn der `pairSkipTimer` schon gefeuert hat (Hint angezeigt, `lastPairedSeen` möglicherweise stale), bleibt das alles im alten Zustand. Erwartung des Users: "Erneut prüfen" = frischer Versuch. Tatsächlich: nur QR neu geladen + ein einzelner Check.
+- **Korrekturvorschlag:** `startPairPolling()` statt `checkPairStatusOnce()` aufrufen — startet Polling sauber neu inkl. `hidePairSkip()` und Timer-Reset.
+- **Status:** offen (Backlog)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-010-KOR
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Korrektheit (Edge Case)
+- **Prüfgegenstand:** Race `pair_handshake` ↔ `mark_paired_now`
+- **Spezialist:** Core-Layer (verifiziert)
+- **Befund:** Risiko aus dem Brief (Punkt 1). `require_token` ruft `mark_paired_now()` *vor* `next.run(req).await` auf. `mark_paired_now()` schreibt synchron via `OpenOptions::open + write_all` — der File-Descriptor ist nach Rückkehr aus der Funktion gedroppt, der Inhalt ist im Page-Cache sichtbar (POSIX read-after-write-Semantik, dito NTFS). Anschließend liest `pair_handshake` via `paired_at()` denselben File. Race-frei sowohl auf Linux als auch auf Windows. Annahme aus dem Brief bestätigt, kein Befund — als „verifiziert" dokumentiert.
+- **Korrekturvorschlag:** Keine Änderung. Optional: Doc-Kommentar in `handlers.rs:608-612` ergänzen, dass die Read-After-Write-Garantie auf Page-Cache-Ebene angenommen wird (defensiv für künftige Reviewer).
+- **Status:** verifiziert / kein Issue
+- **Korrektur-Zyklen:** —
+
+---
+
+## WIZ-011-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität (Defensiv)
+- **Prüfgegenstand:** Timer-Lifecycle bei abruptem Window-Teardown
+- **Spezialist:** Desktop-Layer (verifiziert)
+- **Befund:** Risiko aus dem Brief (Punkt 4). `pairPollTimer`/`pairSkipTimer` sind im Window-Scope. Bei `WindowEvent::CloseRequested` (Tauri) wird der Renderer-Process terminiert — Browser räumt alle Timer und Closures auf. Die Closures halten nur eine Referenz auf top-level-Funktionen und freie `let`-Variablen, keine zyklischen DOM-Refs. Kein Memory-Leak. `clearInterval`/`clearTimeout`-Pfade in `stopPairPolling()` sind sauber, Doppel-Calls idempotent. Annahme aus dem Brief bestätigt — kein Befund.
+- **Status:** verifiziert / kein Issue
+- **Korrektur-Zyklen:** —
+
+---
+
+### Verifikation
+- **`cd core && cargo check` (clean):** GRÜN — ohne Warnungen
+- **`cd desktop/src-tauri && cargo check`:** GRÜN — ohne Warnungen
+- Routing-Layer-Reihenfolge in `main.rs:135-168` korrekt — `pair_handshake`-Route liegt vor `.layer(require_token)`, läuft also durch die Middleware
+- `into_make_service_with_connect_info::<SocketAddr>()` korrekt für `ConnectInfo<SocketAddr>`-Extractor in der Middleware (sonst hätte axum 500 geworfen)
+- `withGlobalTauri: true` in `tauri.conf.json` ist konsistent mit der `window.__TAURI__.core.invoke`-Nutzung in `index.html`
+- `get_core_token`-Retry-Loop (50 × 100ms = 5s) in `desktop/src-tauri/src/main.rs` deckt Sidecar-Bootstrap ab — sinnvoll dimensioniert
+
+### Verdikt
+
+**✅ Freigabe — beide Auflagen in Zyklus 1 erledigt (Re-Review 2026-04-28).**
+
+**Auflagen vor Commit — beide ERLEDIGT:**
+1. **WIZ-001-KOR** ✅ — `pairHandshake` prüft jetzt `response.status.isSuccess()`, `error()`-Throw läuft sauber durch `authedRequest` in `Result.failure`. Failure-Pfad geschlossen bis ans UI.
+2. **WIZ-002-KON** ✅ — Doc-Kommentar in `auth.rs:167-173` ersetzt, beschreibt korrekt den `POST /api/pair/handshake`-Trigger und den Wizard-Poll.
+
+**Backlog (post-Commit, vor v1.0 abarbeiten):**
+- WIZ-003-COD — `auth=debug` hinter Env-Switch
+- WIZ-004-PER — `mark_paired_now` Schreib-Throttle
+- WIZ-005-COD — Singleton-`NexusApiClient` in `PairScreen`
+- WIZ-006-KOR — `isPaired`-Flicker-Race
+- WIZ-007-COD — kürzerer Timeout für `pairHandshake`
+- WIZ-008-COD — `pairSkipHint` bei Erfolg verstecken
+- WIZ-009-COD — "Erneut prüfen" sollte Polling vollständig neu starten
+
+**Zwei verifizierte Risiken aus dem Brief, kein Befund:**
+- WIZ-010-KOR — `pair_handshake`/`mark_paired_now` Race: race-frei
+- WIZ-011-COD — Timer-Lifecycle: kein Leak
+
+### Nicht im Scope
+- E2E-Verifikation des Pair-Flows (Admin via `adb logcat` + native Test)
+- Performance-Messung des Disk-Writes unter realer Last
+- Windows-Verhalten (gehört zum Barclay-Sprint)
+
+---
+
+## Wizard-Pair-Detection-Fix — Vollständiger Re-Re-Review — 2026-04-28
+**Status: ⚠️ Freigabe mit Auflage (1 neuer MAJOR aufgedeckt, sonst alles bestätigt)**
+
+> Auftrag: vollständiger Review der **aktuellen** uncommitted Änderungen vs. HEAD `63b4433`. Diff-Stat: 11 Files, +668/−63 LoC. Tuvok hat den kompletten Diff erneut kalt durchgelesen, die behaupteten Behebungen aus dem ersten Re-Review verifiziert und nach neuen Issues gesucht, die im ersten Durchgang nicht aufgefallen sind.
+
+### Verifikation der bisherigen Behebungen
+- **WIZ-001-KOR (`pairHandshake` Status-Check):** ✅ verifiziert in `NexusApiClient.kt:51-59`. `if (!response.status.isSuccess()) { error("Handshake HTTP ${response.status.value}") }` ist exakt wie vorgeschlagen drin. `error()`-Throw läuft sauber durch `authedRequest`-Try-Catch in `Result.failure`. Aufrufer-Pfade in `MainActivity.kt:136-143` und `PairScreen.kt:50-60` werten `Result.isFailure` korrekt aus.
+- **WIZ-002-KON (Doc-Kommentar):** ✅ verifiziert in `auth.rs:167-173`. Wortlaut entspricht dem Korrekturvorschlag, beschreibt jetzt korrekt den `POST /api/pair/handshake`-Trigger.
+
+### Neue Befunde aus diesem Durchgang
+
+---
+
+## WIZ-012-KOR
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Korrektheit (Datenverlust)
+- **Prüfgegenstand:** Re-Pair-Failure überschreibt funktionierende Settings, ohne Rollback zu altem Zustand
+- **Spezialist:** Android-Layer (MainActivity + PairScreen)
+- **Befund:** In `MainActivity.kt:128-153` (Deep-Link-Pfad) und `PairScreen.kt:43-62` läuft die Sequenz:
+  1. `connectionSettings.saveFromQr(uri)` — schreibt **persistent** die neuen `coreUrl` + `token` in EncryptedSharedPrefs.
+  2. `apiClient.pairHandshake()` — async POST gegen den neuen Server.
+  3. Bei Failure: `connectionSettings.clear()` — löscht **alle** Settings, inkl. der eben überschriebenen alten.
+  Cold-Start (App war noch nie gepaired) ist unproblematisch — `clear()` löscht leere Settings, der User landet wieder im Welcome-Flow. Das ist gewollt.
+  **Aber bei einem Re-Pair-Versuch** (App war vorher gepaired, User scannt einen neuen/falschen QR oder klickt einen alten Deep-Link an) sind die alten, funktionierenden Settings durch `saveFromQr` schon **vor** dem Handshake-Call überschrieben. Schlägt der Handshake dann fehl (Server unreachable, falscher Token, anderer Fehler), wirft `clear()` auch die alten Settings weg → die App ist **silently unpaired**, obwohl sie unmittelbar zuvor noch funktionierte. Kein User-Hint, dass das alte Pairing geopfert wurde.
+  Wahrscheinlichkeit nicht zu hoch (Hauptpfad ist Cold-Pair), aber der Datenverlust ist real und nicht reversibel ohne neuen QR-Scan.
+- **Korrekturvorschlag:**
+  ```kotlin
+  // Snapshot vor saveFromQr
+  val prevUrl = connectionSettings.coreUrl
+  val prevToken = connectionSettings.token
+  val prevPaired = connectionSettings.isPaired
+
+  if (!connectionSettings.saveFromQr(uri)) { ... }
+
+  val handshake = apiClient.pairHandshake()
+  if (handshake.isFailure) {
+      // Rollback statt clear()
+      if (prevPaired) {
+          connectionSettings.restore(prevUrl, prevToken)
+      } else {
+          connectionSettings.clear()
+      }
+      // … Fehler-Hint anzeigen
+  }
+  ```
+  Erfordert eine `restore(url, token)` (oder äquivalente API) auf `ConnectionSettings`. Alternativ: Handshake-Call mit *ephemeren* Werten **vor** `saveFromQr`, und persistent-Schreiben erst nach Success. Letzteres ist sauberer (und überlappt mit WIZ-006).
+- **Status:** offen (Empfehlung: Backlog, nicht Commit-Blocker — Cold-Pair-Pfad funktioniert korrekt)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+## WIZ-013-PER
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Performance / Code-Qualität
+- **Prüfgegenstand:** `mark_paired_now()` macht synchronen Disk-Write in async axum-Middleware
+- **Spezialist:** Core-Layer (`auth.rs:23-43`, aufgerufen aus `require_token` Z.211-214)
+- **Befund:** `OpenOptions::open + write_all` ist blocking sync I/O. Wird innerhalb der async `require_token`-Middleware aufgerufen, blockt also einen Tokio-Worker-Thread für die Dauer eines Datei-Writes. Bei Solo-Nutzung praktisch unsichtbar, konzeptuell aber Anti-Pattern. Überschneidet sich teilweise mit WIZ-004-PER (Schreib-Throttle), adressiert aber das Sync-vs-Async-Pattern, nicht die Schreib-Frequenz.
+- **Korrekturvorschlag:** Entweder `tokio::task::spawn_blocking(mark_paired_now)` aufrufen, oder die Funktion auf `tokio::fs` umziehen (`async fn mark_paired_now()` + `.await`). Beim Throttle-Fix (WIZ-004) gleich mit erschlagen.
+- **Status:** offen (Backlog, post-v0.1.0)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
+### Verifikation der weiteren Diff-Bereiche
+
+- **`core/src/handlers.rs`** (`SetupStatus.paired_at`, `pair_handshake`, neue `setup_status`-Semantik):
+  - `paired` basiert jetzt auf `paired_at().is_some()` statt `token_path().exists()`. Korrekt — Token-File-Existenz war ein Falsch-Positiv (Core legt es selbst an), jetzt ist es ein echter "remote-client-hat-sich-mal-authentifiziert"-Marker.
+  - Semantik-Hinweis: `paired === true` heißt "hat *jemals* ein Bearer-Hit von non-loopback gegeben", nicht "ist *aktuell* gepaired". Bei Token-Rotation/-Reset bleibt das Flag stehen. Für die Wizard-Logik ausreichend — wäre für eine "Geräteliste"-Feature später unzureichend. Kein Befund, nur Doku-Wert.
+  - `paired_at` im Response-JSON wird derzeit im Frontend nur in der initialen Default-Struct gespiegelt, aber nirgends ausgewertet. Tot, aber harmlos. Kein Befund.
+
+- **`core/src/main.rs`** (Routing + ConnectInfo):
+  - Route `POST /api/pair/handshake` korrekt **vor** dem `.layer(require_token)` registriert (Z.160-161), läuft also durch die Middleware. Bestätigt.
+  - `into_make_service_with_connect_info::<SocketAddr>()` korrekt für den `ConnectInfo<SocketAddr>`-Extractor in `require_token`. Sonst hätte axum bei jedem Request 500 geworfen.
+  - `nexus_core::auth=debug`-Direktive im `EnvFilter` — siehe WIZ-003. Nicht-Blocker.
+
+- **`desktop/src-tauri/src/main.rs`** (`get_core_token`-Retry):
+  - 50 × 100ms Retry-Loop deckt Sidecar-Bootstrap. `std::thread::sleep` ist OK, weil `#[tauri::command] fn` synchron auf dedizierten Worker-Threads läuft (nicht auf der Tauri-Async-Runtime). Kein Tokio-Block.
+  - Edge-Case: leeres Token-File wird in `last_err = "token file empty"` umgesetzt und führt nach 5s zur Fehlermeldung. Sauber.
+  - Kein Befund.
+
+- **`desktop/src-tauri/tauri.conf.json`** (`withGlobalTauri: true`):
+  - Erforderlich, weil `index.html` über `window.__TAURI__.core.invoke` zugreift. Ohne das Flag wäre die Globale nicht verfügbar (Tauri v2 Default ist `false`). Konsistent mit dem bestehenden Wizard-Code.
+  - Kein Befund.
+
+- **`desktop/src/index.html`** (Polling, Fallback-URI, Skip-Hint, neue First-Run-Logik):
+  - **First-Run-Logik (Z.902-927):** drei Pfade — `(onboarded || (paired && providerConfigured))` → Dashboard; `paired && !providerConfigured` → Wizard direkt auf Provider-Schritt; sonst Cold-Start. Logisch konsistent.
+  - **Polling-Lifecycle (Z.997-1086):** `startPairPolling`/`stopPairPolling` korrekt verschachtelt mit `showScreen`. Idempotent durch Null-Checks.
+  - **`pairUriFallback` + Copy-Button:** sinnvoll als Backup wenn QR-Scan auf dem Handy klemmt. `currentPairUri` wird in `renderPairQr` gesetzt, beim Copy-Button-Click ausgelesen — sauber.
+  - **Bestehende Backlog-Findings WIZ-008/WIZ-009** explizit verifiziert: nicht behoben (war erwartet, da Backlog).
+  - Kein neuer Befund.
+
+- **`android/.../MainActivity.kt` + `PairScreen.kt` + `NexusApiClient.kt`:**
+  - WIZ-001 verifiziert behoben (siehe oben).
+  - **WIZ-012 neu** (Datenverlust bei Re-Pair-Failure, siehe Befund).
+  - WIZ-005/WIZ-006/WIZ-007 verifiziert nicht behoben (Backlog).
+
+- **Build-Status:**
+  - `cargo check` für Core + Desktop-Tauri war im ersten Re-Review (selbe Diff-Basis) bereits als GRÜN dokumentiert. Seit dem Re-Review keine weiteren Änderungen — Build-Garantie übernommen. Lokales Re-Run in der QS-Sandbox blockiert (read-only `target/`), kein neuer Verdacht.
+
+### Verdikt
+
+**⚠️ Freigabe mit Auflage — eine Major-Empfehlung, kein Hard-Blocker.**
+
+**Empfehlung an B'Elanna:**
+- Commit kann erfolgen — der Cold-Pair-Hauptpfad ist sauber und alle ursprünglichen Auflagen aus dem ersten Re-Review sind erledigt.
+- **WIZ-012-KOR (Re-Pair-Datenverlust) sollte vor v1.0 adressiert werden**, idealerweise zusammen mit WIZ-006 (Flicker-Race), weil beide dasselbe Pattern teilen: "persistent schreiben vor Validierung". Saubere Lösung wäre Handshake mit ephemeren Werten **vor** `saveFromQr`, persistent-Schreiben erst nach Success.
+- WIZ-013-PER (sync I/O in async) ist Backlog-Kosmetik, kein User-impact bei Solo-Nutzung.
+
+**Backlog-Liste nach diesem Review (in Reihenfolge der Wichtigkeit):**
+1. WIZ-012-KOR — Re-Pair-Failure-Rollback (Major, vor v1.0)
+2. WIZ-006-KOR — `isPaired`-Flicker-Race (Minor, gleicher Fix-Pfad wie WIZ-012)
+3. WIZ-001/002 — ✅ erledigt
+4. WIZ-003-COD — `auth=debug` hinter Env-Switch
+5. WIZ-004-PER + WIZ-013-PER — `mark_paired_now` async + Schreib-Throttle (gemeinsam fixen)
+6. WIZ-005-COD — Singleton-Client in PairScreen
+7. WIZ-007-COD — kürzerer Timeout für Handshake
+8. WIZ-008-COD — `pairSkipHint` bei Erfolg verstecken
+9. WIZ-009-COD — "Erneut prüfen" sollte Polling vollständig neu starten
+
+### Nicht im Scope
+- E2E-Verifikation des Pair-Flows (Admin via `adb logcat`)
+- Windows-Verhalten (Barclay-Sprint)
+- `cargo check` Live-Lauf (durch Sandbox blockiert; Build-Status durch ersten Re-Review für identische Diff-Basis bestätigt)
+
+---
+
+### Tuvok-Cross-Verifikation (Core+Desktop-CLI) — 2026-04-28
+
+Diese CLI (Core+Desktop-Scope) hat den AS-CLI-Re-Re-Review gegen den Code-Stand abgeglichen:
+
+- **WIZ-012-KOR** — Befund-Logik nachverfolgt: `MainActivity.kt:130` und `PairScreen.kt:46` rufen `connectionSettings.saveFromQr(uri)` synchron-persistent vor dem `pairHandshake()`-Call. SharedPrefs schreiben in-memory + `apply()` async-disk. Bei Handshake-Failure löst `connectionSettings.clear()` (`MainActivity.kt:139`, `PairScreen.kt:57`) den kompletten Prefs-Wipe aus — auch alte funktionierende Werte sind weg. AS-CLI's Major-Einstufung **bestätigt**, kein Blocker für Cold-Pair.
+
+- **WIZ-013-PER** — Befund am Code verifiziert (`auth.rs:23-43`, `OpenOptions::open + write_all` synchron in `async fn require_token`). Auf Solo-Tier-Hardware nicht messbar, mit WIZ-004-Throttle gemeinsam zu adressieren. AS-CLI's Minor-Einstufung **bestätigt**.
+
+- **Build-Garantie** — `cargo check` Core + Desktop-Tauri war vor und nach den WIZ-001/WIZ-002-Edits in dieser CLI grün. Seit dem Re-Review keine weiteren Code-Änderungen am Diff. AS-CLI's Build-Übernahme ist mit dem hier gemessenen Stand konsistent.
+
+**Cross-CLI-Verdikt: beide Tuvoks einig.** Pair-Detection-Fix ist commit-fähig. WIZ-012 und WIZ-013 sind Backlog, blockieren keinen v0.1.0-Commit.

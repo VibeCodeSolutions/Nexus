@@ -312,11 +312,21 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
     <h1>Handy koppeln</h1>
     <p>Installiere die NEXUS-App auf deinem Handy und scanne diesen Code.</p>
     <div id="qrContainer"></div>
+    <div id="pairUriFallback" class="hidden">
+      <p class="subtle" style="margin-top:1rem;">Falls du den QR nicht scannen kannst, öffne diese URI auf dem Handy:</p>
+      <code id="pairUriText" style="display:block;padding:0.6rem;background:var(--bg-input);border-radius:6px;font-size:12px;word-break:break-all;"></code>
+      <button class="btn-secondary" id="pairUriCopy" style="margin-top:0.4rem;">Kopieren</button>
+    </div>
     <p id="pairStatus" class="subtle">Warte auf Pairing …</p>
     <div class="button-row">
       <button class="btn-secondary" data-prev="screenWelcome">Zurück</button>
-      <button class="btn-primary" data-next="screenProvider">Weiter</button>
+      <button class="btn-secondary" id="pairRecheckBtn">Erneut prüfen</button>
+      <button class="btn-primary" id="pairNextBtn" data-next="screenProvider" disabled>Warte auf Pairing …</button>
     </div>
+    <p id="pairSkipHint" class="subtle hidden" style="margin-top:0.8rem;font-size:12px;color:var(--text-dim);">
+      Pairing scheint zu hängen?
+      <a href="#" id="pairSkipLink" style="color:var(--text-dim);text-decoration:underline;">Trotzdem weiter</a>
+    </p>
   </section>
 
   <section id="screenProvider" class="onboarding-screen">
@@ -892,20 +902,31 @@ async function initOnboarding() {
     console.warn('setup-status fetch failed:', e);
   }
   if (!setupStatus) {
-    setupStatus = { paired: false, provider_configured: false, ollama_reachable: false, default_provider: null };
+    setupStatus = { paired: false, paired_at: null, provider_configured: false, ollama_reachable: false, default_provider: null };
   }
 
-  // First-Run-Entscheidung
+  // First-Run-Entscheidung:
+  //   - Beide bedingungen erfüllt → Wizard komplett überspringen.
+  //   - Nur paired (Handy schon mal verbunden), aber Provider fehlt → Wizard starten,
+  //     aber direkt auf Provider-Schritt springen.
+  //   - Sonst (Cold-Start) → Welcome → Pair → Provider.
   const onboarded = localStorage.getItem('nexus_onboarded') === 'true';
-  const fullyConfigured = !!setupStatus.provider_configured;
+  const paired = !!setupStatus.paired;
+  const providerConfigured = !!setupStatus.provider_configured;
 
-  if (onboarded || fullyConfigured) {
+  if (onboarded || (paired && providerConfigured)) {
     document.getElementById('onboardingOverlay').classList.add('hidden');
     initDashboard();
+    return;
+  }
+
+  // Wizard starten
+  renderProviderGrid();
+  if (paired) {
+    // Pair-Schritt überspringen
+    showScreen('screenProvider');
   } else {
-    // Wizard starten
     renderPairQr();
-    renderProviderGrid();
   }
 }
 
@@ -921,12 +942,70 @@ function showScreen(id) {
   document.querySelectorAll('.onboarding-screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(id);
   if (target) target.classList.add('active');
+  if (id === 'screenPair') {
+    startPairPolling();
+  } else {
+    stopPairPolling();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const recheck = document.getElementById('pairRecheckBtn');
+  if (recheck) {
+    recheck.addEventListener('click', () => {
+      renderPairQr();
+      checkPairStatusOnce();
+    });
+  }
+  const skip = document.getElementById('pairSkipLink');
+  if (skip) {
+    skip.addEventListener('click', (e) => {
+      e.preventDefault();
+      stopPairPolling();
+      showScreen('screenProvider');
+    });
+  }
+  const copy = document.getElementById('pairUriCopy');
+  if (copy) {
+    copy.addEventListener('click', async () => {
+      if (!currentPairUri) return;
+      try {
+        await navigator.clipboard.writeText(currentPairUri);
+        copy.textContent = '✓ Kopiert';
+        setTimeout(() => { copy.textContent = 'Kopieren'; }, 1500);
+      } catch (e) {
+        copy.textContent = 'Fehler';
+        setTimeout(() => { copy.textContent = 'Kopieren'; }, 1500);
+      }
+    });
+  }
+});
+
+let pairPollTimer = null;
+let pairSkipTimer = null;
+let lastPairedSeen = false;
+let currentPairUri = '';
+
+const PAIR_SKIP_TIMEOUT_MS = 15000;
+
+function showPairSkip() {
+  const hint = document.getElementById('pairSkipHint');
+  if (hint) hint.classList.remove('hidden');
+}
+
+function hidePairSkip() {
+  const hint = document.getElementById('pairSkipHint');
+  if (hint) hint.classList.add('hidden');
 }
 
 async function renderPairQr() {
   const container = document.getElementById('qrContainer');
   const status = document.getElementById('pairStatus');
+  const fallback = document.getElementById('pairUriFallback');
+  const fallbackText = document.getElementById('pairUriText');
   container.innerHTML = '';
+  currentPairUri = '';
+  if (fallback) fallback.classList.add('hidden');
   if (!onboardCoreToken) {
     container.innerHTML = '<p class="subtle" style="color:#666;padding:1rem;">Kein Core-Token verfügbar. Starte NEXUS im Tauri-App-Kontext.</p>';
     if (status) status.textContent = 'Token fehlt.';
@@ -938,8 +1017,12 @@ async function renderPairQr() {
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const { uri } = await r.json();
+    currentPairUri = uri;
+    if (fallbackText) fallbackText.textContent = uri;
+    if (fallback) fallback.classList.remove('hidden');
     if (typeof QRCode === 'undefined') {
-      container.innerHTML = '<p style="color:#666;padding:1rem;">QR-Code-Lib nicht geladen.</p>';
+      container.innerHTML = '<p style="color:#666;padding:1rem;">QR-Code-Lib nicht geladen — nutze die URI unten.</p>';
+      if (status) status.textContent = 'QR-Lib fehlt — URI manuell auf dem Handy einlesen.';
       return;
     }
     new QRCode(container, {
@@ -951,8 +1034,59 @@ async function renderPairQr() {
     });
     if (status) status.textContent = 'Warte auf Pairing … (Scan den Code mit der NEXUS-App)';
   } catch (e) {
-    container.innerHTML = `<p style="color:#666;padding:1rem;">Fehler: ${esc(e.message)}</p>`;
-    if (status) status.textContent = 'QR konnte nicht geladen werden.';
+    container.innerHTML = `<p style="color:#666;padding:1rem;">QR konnte nicht geladen werden: ${esc(e.message)}</p>`;
+    if (status) status.textContent = 'Fehler beim Laden — Erneut prüfen.';
+  }
+}
+
+async function checkPairStatusOnce() {
+  try {
+    const r = await fetch(`${onboardCoreUrl}/api/setup-status`);
+    if (!r.ok) return;
+    const data = await r.json();
+    setupStatus = data;
+    const status = document.getElementById('pairStatus');
+    const nextBtn = document.getElementById('pairNextBtn');
+    if (data.paired) {
+      if (status) {
+        status.textContent = '✓ Verbunden mit Handy';
+        status.style.color = 'var(--success, #4ade80)';
+      }
+      if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.textContent = 'Weiter';
+      }
+      if (!lastPairedSeen) {
+        lastPairedSeen = true;
+        stopPairPolling();
+        const pairScreen = document.getElementById('screenPair');
+        if (pairScreen && pairScreen.classList.contains('active')) {
+          setTimeout(() => showScreen('screenProvider'), 800);
+        }
+      }
+    }
+  } catch (e) {
+    // Silent — Polling läuft weiter, nächster Tick versucht es erneut.
+  }
+}
+
+function startPairPolling() {
+  stopPairPolling();
+  lastPairedSeen = false;
+  hidePairSkip();
+  checkPairStatusOnce();
+  pairPollTimer = setInterval(checkPairStatusOnce, 2000);
+  pairSkipTimer = setTimeout(showPairSkip, PAIR_SKIP_TIMEOUT_MS);
+}
+
+function stopPairPolling() {
+  if (pairPollTimer) {
+    clearInterval(pairPollTimer);
+    pairPollTimer = null;
+  }
+  if (pairSkipTimer) {
+    clearTimeout(pairSkipTimer);
+    pairSkipTimer = null;
   }
 }
 

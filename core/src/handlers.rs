@@ -582,6 +582,7 @@ pub async fn recategorize_unsorted(
 #[derive(Serialize)]
 pub struct SetupStatus {
     pub paired: bool,
+    pub paired_at: Option<u64>,
     pub provider_configured: bool,
     pub default_provider: String,
     pub ollama_reachable: bool,
@@ -604,11 +605,25 @@ async fn check_ollama() -> bool {
         .unwrap_or(false)
 }
 
+/// Explicit pair-handshake endpoint. The Android client calls this once
+/// right after scanning the QR code, with the Bearer token. Reaching this
+/// route already requires `require_token` to have validated the Bearer,
+/// which in turn calls `mark_paired_now()` for non-loopback peers — so
+/// by the time we get here, the pairing flag is set. We just confirm.
+pub async fn pair_handshake() -> Json<Value> {
+    Json(json!({
+        "status": "ok",
+        "paired_at": crate::auth::paired_at(),
+    }))
+}
+
 pub async fn setup_status() -> Json<SetupStatus> {
     let cfg = Config::load();
 
-    // paired: existiert ~/.nexus_token?
-    let paired = crate::auth::token_path().exists();
+    // paired: a non-localhost client successfully authenticated at least once.
+    // Token-file existence is *not* a pairing signal — the core auto-creates it.
+    let paired_at = crate::auth::paired_at();
+    let paired = paired_at.is_some();
 
     // provider_configured: hat der Default-Provider einen API-Key oder OAuth-Token?
     let default = cfg.default_provider.clone();
@@ -620,6 +635,7 @@ pub async fn setup_status() -> Json<SetupStatus> {
 
     Json(SetupStatus {
         paired,
+        paired_at,
         provider_configured,
         default_provider: default,
         ollama_reachable,

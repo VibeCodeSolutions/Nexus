@@ -48,6 +48,18 @@ class NexusApiClient(private val settings: ConnectionSettings) {
     @Volatile var lastHealthError: String? = null
         private set
 
+    // Pairing
+
+    suspend fun pairHandshake(): Result<Unit> = authedRequest {
+        val response = client.post("$baseUrl/api/pair/handshake") {
+            bearerAuth(token!!)
+        }
+        if (!response.status.isSuccess()) {
+            error("Handshake HTTP ${response.status.value}")
+        }
+        Unit
+    }
+
     // Health
 
     suspend fun checkHealth(): Boolean {

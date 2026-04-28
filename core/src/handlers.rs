@@ -693,3 +693,72 @@ pub async fn pair_uri() -> Result<Json<Value>, (StatusCode, String)> {
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("pairing_uri: {}", e)))?;
     Ok(Json(json!({"uri": uri})))
 }
+
+use crate::diag::{
+    list_reports, run_core_diagnostics, store_report, DiagListQuery, DiagReport,
+    DiagReportSubmission,
+};
+
+pub async fn diag_run(State(state): State<AppState>) -> Json<DiagReport> {
+    tracing::info!("diag/run: starting core self-test");
+    let mut report = run_core_diagnostics(&state).await;
+    report.created_at = chrono::Utc::now().timestamp();
+    if let Err(e) = store_report(&state.pool, &report).await {
+        tracing::warn!("diag/run: store_report failed: {e}");
+    }
+    Json(report)
+}
+
+pub async fn diag_report(
+    State(state): State<AppState>,
+    Json(submission): Json<DiagReportSubmission>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    if !["android", "desktop"].contains(&submission.source.as_str()) {
+        return Err((StatusCode::BAD_REQUEST, "invalid source".into()));
+    }
+    let report = DiagReport {
+        source: submission.source,
+        device_id: submission.device_id,
+        app_version: submission.app_version,
+        device_info: submission.device_info,
+        results: submission.results,
+        pass_count: submission.pass_count,
+        warn_count: submission.warn_count,
+        fail_count: submission.fail_count,
+        created_at: chrono::Utc::now().timestamp(),
+    };
+    tracing::info!(
+        "diag/report: {} from {:?} pass={} warn={} fail={}",
+        report.source,
+        report.device_id,
+        report.pass_count,
+        report.warn_count,
+        report.fail_count,
+    );
+    let id = store_report(&state.pool, &report)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(json!({ "id": id, "created_at": report.created_at })))
+}
+
+pub async fn diag_list(
+    State(state): State<AppState>,
+    Query(q): Query<DiagListQuery>,
+) -> Result<Json<Vec<DiagReport>>, (StatusCode, String)> {
+    let limit = q.limit.unwrap_or(10).clamp(1, 50);
+    tracing::info!(
+        "diag/reports: limit={} source={:?} device={:?}",
+        limit,
+        q.source,
+        q.device_id
+    );
+    let reports = list_reports(
+        &state.pool,
+        limit,
+        q.source.as_deref(),
+        q.device_id.as_deref(),
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(reports))
+}

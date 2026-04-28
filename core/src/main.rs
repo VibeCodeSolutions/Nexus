@@ -2,6 +2,7 @@ mod auth;
 mod cli;
 mod config;
 mod db;
+mod diag;
 mod handlers;
 mod keystore;
 mod llm;
@@ -30,6 +31,7 @@ use llm::LlmProvider;
 pub struct AppState {
     pub pool: SqlitePool,
     pub llm: Arc<dyn LlmProvider>,
+    pub started_at: std::time::Instant,
 }
 
 #[tokio::main]
@@ -130,6 +132,7 @@ async fn main() {
             let state = AppState {
                 pool,
                 llm: llm_provider,
+                started_at: std::time::Instant::now(),
             };
 
             let app = Router::new()
@@ -158,6 +161,9 @@ async fn main() {
                 .route("/api/onboard/oauth", post(handlers::onboard_oauth))
                 .route("/api/pair/uri", get(handlers::pair_uri))
                 .route("/api/pair/handshake", post(handlers::pair_handshake))
+                .route("/api/diag/run", post(handlers::diag_run))
+                .route("/api/diag/report", post(handlers::diag_report))
+                .route("/api/diag/reports", get(handlers::diag_list))
                 .layer(middleware::from_fn(auth::require_token))
                 .layer(
                     CorsLayer::new()

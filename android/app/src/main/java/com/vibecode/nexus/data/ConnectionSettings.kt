@@ -8,6 +8,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.util.UUID
 
 @Serializable
 data class QrPayload(
@@ -26,6 +27,16 @@ class ConnectionSettings(context: Context) {
     var token: String?
         get() = prefs.getString(KEY_TOKEN, null)?.stripWhitespace()?.takeIf { it.isNotEmpty() }
         set(value) = prefs.edit().putString(KEY_TOKEN, value?.stripWhitespace()).apply()
+
+    val deviceId: String
+        @Synchronized
+        get() {
+            val existing = prefs.getString(KEY_DEVICE_ID, null)?.takeIf { it.isNotBlank() }
+            if (existing != null) return existing
+            val fresh = UUID.randomUUID().toString()
+            prefs.edit().putString(KEY_DEVICE_ID, fresh).apply()
+            return fresh
+        }
 
     private fun String.stripWhitespace(): String = filter { !it.isWhitespace() }
 
@@ -75,6 +86,7 @@ class ConnectionSettings(context: Context) {
         private const val PREFS_NAME = "nexus_connection"
         private const val KEY_URL = "core_url"
         private const val KEY_TOKEN = "core_token"
+        private const val KEY_DEVICE_ID = "device_id"
 
         // Both the MasterKey build and the EncryptedSharedPreferences create
         // can throw when a restored-from-backup prefs file no longer matches

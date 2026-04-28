@@ -8,6 +8,8 @@ import com.vibecode.nexus.data.model.ProjectResponse
 import com.vibecode.nexus.data.model.TaskCreateRequest
 import com.vibecode.nexus.data.model.TaskResponse
 import com.vibecode.nexus.data.model.TaskUpdateRequest
+import com.vibecode.nexus.diagnostics.DiagReport
+import com.vibecode.nexus.diagnostics.DiagReportAck
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -22,6 +24,7 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
@@ -155,6 +158,29 @@ class NexusApiClient(private val settings: ConnectionSettings) {
     suspend fun getProjectBrainDumps(projectId: String): Result<List<BrainDumpResponse>> = authedRequest {
         client.get("$baseUrl/projects/$projectId/braindumps") {
             bearerAuth(token!!)
+        }.body()
+    }
+
+    // Diagnostics
+
+    suspend fun submitDiagReport(report: DiagReport): Result<DiagReportAck> = authedRequest {
+        client.post("$baseUrl/api/diag/report") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token!!)
+            setBody(report)
+        }.body()
+    }
+
+    suspend fun listDiagReports(
+        limit: Int = 5,
+        source: String? = null,
+        deviceId: String? = null,
+    ): Result<List<DiagReport>> = authedRequest {
+        client.get("$baseUrl/api/diag/reports") {
+            bearerAuth(token!!)
+            parameter("limit", limit)
+            source?.let { parameter("source", it) }
+            deviceId?.let { parameter("device_id", it) }
         }.body()
     }
 

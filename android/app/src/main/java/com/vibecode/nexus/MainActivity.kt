@@ -49,6 +49,7 @@ import com.vibecode.nexus.ui.screen.WelcomeScreen
 import com.vibecode.nexus.ui.theme.NexusTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 data class BottomNavItem(
     val route: String,
@@ -143,6 +144,9 @@ class MainActivity : ComponentActivity() {
                     }
                     isPaired = true
                     isConnected = apiClient.checkHealth()
+                    (application as? NexusApplication)?.let { app ->
+                        app.applicationScope.launch { app.runDiagnostics() }
+                    }
                     val currentRoute = navController.currentDestination?.route
                     if (currentRoute in listOf("welcome", "pair")) {
                         navController.navigate("braindump") {

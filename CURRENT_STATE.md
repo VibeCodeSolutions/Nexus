@@ -1,8 +1,8 @@
 # NEXUS — Current State
 
-**Stand:** 2026-04-25
+**Stand:** 2026-04-30
 **Aktuelle Phase:** Release v0.1.0 (rc3 als Draft auf GitHub)
-**Phase-Status:** Phasen 0-13 abgeschlossen, Release-Sprint Phasen 0-8 komplett
+**Phase-Status:** Phasen 0-13 abgeschlossen, Release-Sprint Phasen 0-8 komplett, End-to-End-Test grün
 
 ---
 
@@ -18,7 +18,9 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 - ✅ Android Welcome+Pair-Screen + Release-Signing
 - ✅ GitHub Actions Release-Pipeline
 - ✅ `scripts/bump-version.sh` + README-Installation
-- 🟡 End-to-End-Test angefangen, Pairing-Flow noch nicht durchgespielt
+- ✅ End-to-End-Test durchgespielt (2026-04-30): Phone-Pair via QR + Handshake (LAN) → Wizard-Auto-Advance → Provider-Save → Voice-Capture (`/braindump`) → Ollama-Kategorisierung (Task/Tags/Summary) → Dashboard
+- ✅ Wizard-Skip-Bugs gefixt: leerer API-Key zählt nicht mehr als konfiguriert; Server-State ist Single-Source-of-Truth (kein client-side `nexus_onboarded`-Flag mehr)
+- ✅ Ollama-Fallback-Bug gefixt: leerer keystore-Eintrag fällt sauber auf `qwen2.5:3b` zurück
 
 ---
 

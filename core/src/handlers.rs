@@ -625,13 +625,20 @@ pub async fn setup_status() -> Json<SetupStatus> {
     let paired_at = crate::auth::paired_at();
     let paired = paired_at.is_some();
 
-    // provider_configured: hat der Default-Provider einen API-Key oder OAuth-Token?
+    // provider_configured: kann der Default-Provider tatsächlich Anfragen bedienen?
+    // Ollama braucht keinen Key, dafür muss aber der Daemon erreichbar sein.
+    // Andere Provider brauchen einen NICHT-leeren API-Key oder OAuth-Token.
     let default = cfg.default_provider.clone();
-    let has_key = crate::keystore::get_key(&default).is_ok();
-    let has_oauth = crate::keystore::get_oauth(&default).is_ok();
-    let provider_configured = has_key || has_oauth;
-
     let ollama_reachable = check_ollama().await;
+    let provider_configured = if default == "ollama" {
+        ollama_reachable
+    } else {
+        let has_nonempty_key = crate::keystore::get_key(&default)
+            .map(|k| !k.is_empty())
+            .unwrap_or(false);
+        let has_oauth = crate::keystore::get_oauth(&default).is_ok();
+        has_nonempty_key || has_oauth
+    };
 
     Json(SetupStatus {
         paired,

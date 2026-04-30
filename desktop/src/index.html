@@ -905,16 +905,17 @@ async function initOnboarding() {
     setupStatus = { paired: false, paired_at: null, provider_configured: false, ollama_reachable: false, default_provider: null };
   }
 
-  // First-Run-Entscheidung:
-  //   - Beide bedingungen erfüllt → Wizard komplett überspringen.
+  // First-Run-Entscheidung — Server-State ist Single Source of Truth:
+  //   - paired UND providerConfigured → Wizard überspringen.
   //   - Nur paired (Handy schon mal verbunden), aber Provider fehlt → Wizard starten,
   //     aber direkt auf Provider-Schritt springen.
-  //   - Sonst (Cold-Start) → Welcome → Pair → Provider.
-  const onboarded = localStorage.getItem('nexus_onboarded') === 'true';
+  //   - Sonst (Cold-Start oder Reset) → Welcome → Pair → Provider.
+  // Das alte localStorage-Flag `nexus_onboarded` wird ignoriert, damit ein Server-
+  // seitiger Reset (paired_at + keys.json gelöscht) den Wizard zuverlässig zurückbringt.
   const paired = !!setupStatus.paired;
   const providerConfigured = !!setupStatus.provider_configured;
 
-  if (onboarded || (paired && providerConfigured)) {
+  if (paired && providerConfigured) {
     document.getElementById('onboardingOverlay').classList.add('hidden');
     initDashboard();
     return;

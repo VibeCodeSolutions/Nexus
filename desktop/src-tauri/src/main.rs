@@ -51,7 +51,32 @@ fn restart_core(
     if let Some(child) = state.0.lock().unwrap().take() {
         let _ = child.kill();
     }
+    // Wait for the OS to actually release the bind port before respawning.
+    // Without this the new sidecar can race the old one and fail to bind 7777,
+    // which surfaces as "Connection refused" in the wizard right after a
+    // provider-save (Restart-Race noted in HANDOVER.md).
+    wait_for_port_free(7777, std::time::Duration::from_millis(1000));
     spawn_sidecar(&app).map_err(|e| format!("respawn failed: {}", e))
+}
+
+/// Poll once every 25ms for up to `budget` until a TCP connect to
+/// 127.0.0.1:`port` is refused — i.e. nobody is listening anymore.
+fn wait_for_port_free(port: u16, budget: std::time::Duration) {
+    use std::net::{Shutdown, TcpStream};
+    let deadline = std::time::Instant::now() + budget;
+    let addr = format!("127.0.0.1:{}", port);
+    while std::time::Instant::now() < deadline {
+        match TcpStream::connect_timeout(
+            &addr.parse().expect("static localhost addr"),
+            std::time::Duration::from_millis(50),
+        ) {
+            Ok(s) => {
+                let _ = s.shutdown(Shutdown::Both);
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            Err(_) => return,
+        }
+    }
 }
 
 /// Spawn the bundled `nexus-core` sidecar and store its handle in the managed state.

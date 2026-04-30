@@ -902,3 +902,35 @@ Geprüft: `core/src/auth.rs`, `core/src/handlers.rs`, `core/src/repo.rs` als Dif
 
 Empfehlung: **1 Iteration** auf das Streak-Verhalten, dann grün. Beide Minor (N-015, N-016) ins Backlog. Aufwand für N-014: ca. 3 Zeilen Code-Reorganisation, kein Re-Test der grünen Fixes nötig.
 
+
+---
+
+## Pre-Commit-QS — Desktop-Schicht 2 (AUFTRAG #4) — 2026-05-01
+
+Geprüft: `desktop/src-tauri/tauri.conf.json`, `desktop/src-tauri/src/main.rs` als Diff gegen Schicht-1-Commit.
+
+### N-017-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität
+- **Prüfgegenstand:** `desktop/src-tauri/src/main.rs::wait_for_port_free`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Bei Erreichen der `budget`-Deadline (Sidecar-Kill hat nicht innerhalb 1s gegriffen) returnt die Funktion stillschweigend, und `spawn_sidecar` wird trotzdem aufgerufen. Der nachfolgende `bind`-Fehler ist informativ („respawn failed") — aber ohne Hinweis, dass der Port tatsächlich noch besetzt war. Bei Debug einer hartnäckigen Race wäre ein log-Eintrag „wait_for_port_free: deadline reached, port still in use" eine Spur.
+- **Korrekturvorschlag:** Optional `eprintln!("[restart_core] wait_for_port_free: 7777 still bound after {budget:?}")` vor dem Loop-Exit.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- **N-012-COD** (`tauri.conf.json` CSP): Streichung des ungültigen CIDR-Patterns `http://192.168.0.0/16:7777`. CSP `connect-src` versteht keine CIDR-Notation — der Eintrag war ohne Effekt, Streichung ist sauber. Verbleibend `'self' http://127.0.0.1:7777 http://localhost:7777` deckt den Tauri-Use-Case.
+- **N-013-COD** (`restart_core` + `wait_for_port_free`):
+  - Logik korrekt: Connect-Loop bis Refused, dann Return. Edge-Cases TIME_WAIT, Sidecar-tot-aber-Port-besetzt, Sidecar-überlebt-kill: alle handhabbar.
+  - 25ms-Polling, 50ms connect_timeout, 1s-Budget — verhältnismäßig.
+  - `addr.parse().expect(...)`: statisches Format, kann nie panicen. expect ist hier akzeptabel.
+  - Doc-Kommentar verweist sauber auf HANDOVER.md-Race-Bug.
+  - Kein Live-Test (Tauri-Dev) erforderlich für Code-Review-Akzeptanz, weil der Effekt rein zeitlich und ohne externe Abhängigkeiten ist.
+- `cargo check` + `cargo clippy --all-targets -- -D warnings` beide grün auf dem neuen Diff.
+
+### Verdikt
+
+**✅ Freigabe.** N-017-COD ist Backlog-Kosmetik, kein Commit-Blocker.
+

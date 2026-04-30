@@ -832,3 +832,73 @@ Diese CLI (Core+Desktop-Scope) hat den AS-CLI-Re-Re-Review gegen den Code-Stand 
 - **Build-Garantie** — `cargo check` Core + Desktop-Tauri war vor und nach den WIZ-001/WIZ-002-Edits in dieser CLI grün. Seit dem Re-Review keine weiteren Code-Änderungen am Diff. AS-CLI's Build-Übernahme ist mit dem hier gemessenen Stand konsistent.
 
 **Cross-CLI-Verdikt: beide Tuvoks einig.** Pair-Detection-Fix ist commit-fähig. WIZ-012 und WIZ-013 sind Backlog, blockieren keinen v0.1.0-Commit.
+
+---
+
+## Pre-Commit-QS — Core-Schicht 1 (AUFTRAG #4) — 2026-05-01
+
+Geprüft: `core/src/auth.rs`, `core/src/handlers.rs`, `core/src/repo.rs` als Diff gegen HEAD `2c77576`.
+
+### N-014-KOR
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Korrektheit
+- **Prüfgegenstand:** `core/src/repo.rs::on_task_completed`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Der neue Idempotenz-Early-Return überspringt `update_streak(pool)`. Im Original-Code lief `update_streak` immer. Folge: wenn ein User heute (= neuer Tag, kein Streak-Update bisher) einen alten "done"-Task antippt (open → done) — z.B. weil er die Erledigung dokumentieren will, ohne den Task zu duplizieren — wird der Streak NICHT mehr fortgeführt, obwohl es eine Tagesaktivität ist. `update_streak` ist intern bereits idempotent (Z. 232-234: `last_active_date == today` → no-op), daher ist der Skip nicht nötig.
+- **Korrekturvorschlag:** `update_streak` immer ausführen, nur die `award_xp`-Schleife idempotent halten. Patch:
+  ```rust
+  pub async fn on_task_completed(...) -> Result<(bool, Vec<String>), sqlx::Error> {
+      use sqlx::Row;
+      let row = sqlx::query("SELECT COUNT(*) AS c FROM xp_events ...").bind(task_id).fetch_one(pool).await?;
+      let already: i64 = row.get("c");
+
+      // Streak-Update ist Tagesaktivität, nicht XP-gebunden — immer aufrufen.
+      update_streak(pool).await?;
+
+      if already > 0 {
+          let achievements = check_achievements(pool).await?;
+          return Ok((false, achievements));
+      }
+
+      award_xp(pool, "task_done", XP_TASK_DONE, Some(task_id)).await?;
+      let achievements = check_achievements(pool).await?;
+      Ok((true, achievements))
+  }
+  ```
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### N-015-VOL
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** `core/src/repo.rs::tests::test_task_done_xp_is_idempotent`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Der neue Test deckt die XP-Dimension der Idempotenz vollständig ab, aber nicht die Streak-Dimension. Bei einem Datums-Change zwischen 1. und 2. Done-Toggle würde der aktuelle Code (mit N-014 ungefixt) einen Streak-Regression einführen, der unbemerkt durchschlüpft. Ein Test, der `last_active_date` manipuliert und einen 2nd-Done-Aufruf durchführt, würde N-014 sofort fangen.
+- **Korrekturvorschlag:** Zusätzlicher Test der `update_streak` über `last_active_date`-Mock prüft. Backlog.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### N-016-PER
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Performance
+- **Prüfgegenstand:** Migrations + `on_task_completed`-Idempotenz-Query
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Die Idempotenz-Query `SELECT COUNT(*) FROM xp_events WHERE action='task_done' AND reference_id=?` läuft pro Task-Done. `xp_events` hat keinen Index auf `(action, reference_id)`. Bei 10k Events O(n) — für Solo-User irrelevant, aber Trivial-Optimierung.
+- **Korrekturvorschlag:** Neue Migration `20260501_001_xp_events_index.sql` mit `CREATE INDEX IF NOT EXISTS idx_xp_events_action_ref ON xp_events (action, reference_id);`.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- **N-001-SIC** Fix in `auth.rs`: `/` aus `is_public` entfernt, Doc-Kommentar erklärt das Why präzise. Live-Verifikation zeigt 401 ohne Token, 200 mit Token. `/health` und `/api/setup-status` weiterhin public — Wizard-Flow nicht betroffen, weil Tauri-WebView aus `frontendDist` lädt (kein HTTP-`/`-Roundtrip).
+- **N-002-KOR XP-Idempotenz-Kern**: SQL-Pre-Check sauber gebunden (Parameter-Bind), Tuple-Return gut dokumentiert. Handler-Adapter spiegelt das Flag nach `xp_gained` durch — UX-Konsistenz korrekt.
+- **Pre-existing Clippy-Fixes** (`collapsible_if`, `double_ended_iterator_last`): mechanisch korrekt, keine Verhaltensänderung.
+- **Tests**: 5/5 grün, neuer Idempotenz-Test deckt 3-fach-Toggle ab.
+- **Selbstkritik im Auftrag** (clippy-EXIT-Code übersehen): notiert. Empfehlung: Persona-Update mit dem Pattern „bei Background-Bash mit `; echo EXIT=$?` immer den EXIT explizit greppen, nicht nur tail -5".
+
+### Verdikt
+
+**⚠️ Freigabe mit Auflage** — eine Major-Korrektur (N-014-KOR) vor dem Commit.
+
+Empfehlung: **1 Iteration** auf das Streak-Verhalten, dann grün. Beide Minor (N-015, N-016) ins Backlog. Aufwand für N-014: ca. 3 Zeilen Code-Reorganisation, kein Re-Test der grünen Fixes nötig.
+

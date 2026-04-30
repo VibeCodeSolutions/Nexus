@@ -85,7 +85,7 @@ pub fn get_or_create_token() -> Result<String, String> {
 pub fn pairing_uri(bind_addr: &str) -> Result<String, String> {
     let token = get_or_create_token()?;
 
-    let port = bind_addr.split(':').last().unwrap_or("7777");
+    let port = bind_addr.split(':').next_back().unwrap_or("7777");
     let url = match local_ip_address::local_ip() {
         Ok(ip) => format!("http://{}:{}", ip, port),
         Err(_) => format!("http://127.0.0.1:{}", port),
@@ -166,18 +166,24 @@ fn is_loopback(addr: &SocketAddr) -> bool {
 
 /// Axum middleware: verify Bearer token on API routes.
 ///
-/// Public paths (`/`, `/health`, `/api/setup-status`) are always allowed.
-/// However, if a request to *any* path carries a valid Bearer token from a
-/// non-loopback peer, we record it as a pairing event. The Android client
-/// makes this explicit via `POST /api/pair/handshake` right after consuming
-/// the QR — that handshake is what the Wizard's `paired`-poll waits for.
+/// Public paths (`/health`, `/api/setup-status`) are always allowed —
+/// these are unauthenticated probes the Wizard and any LAN peer may hit.
+/// The dashboard root `/` is *not* public: it renders all stored
+/// braindumps, projects and stats, and the default bind is `0.0.0.0`,
+/// so leaving `/` unauthenticated would leak everything to anyone on the
+/// same network. Bearer auth required.
+///
+/// If a request to *any* path carries a valid Bearer from a non-loopback
+/// peer, we record it as a pairing event. The Android client makes this
+/// explicit via `POST /api/pair/handshake` right after consuming the QR
+/// — that handshake is what the Wizard's `paired`-poll waits for.
 pub async fn require_token(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
     let path = req.uri().path().to_string();
-    let is_public = path == "/health" || path == "/" || path == "/api/setup-status";
+    let is_public = path == "/health" || path == "/api/setup-status";
 
     let stored = fs::read_to_string(token_path())
         .ok()

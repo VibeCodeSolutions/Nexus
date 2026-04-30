@@ -298,13 +298,15 @@ pub async fn update_task(
     .await
     .map_err(|e| (StatusCode::NOT_FOUND, Json(json!({"error": format!("Task nicht gefunden: {e}")}))))?;
 
-    // Gamification: XP bei Task-Abschluss
+    // Gamification: XP bei Task-Abschluss (nur beim *ersten* Übergang nach done)
     let mut response = json!(task);
     if payload.status.as_deref() == Some("done") {
-        let new_achievements = repo::on_task_completed(&state.pool, &id).await.unwrap_or_default();
+        let (xp_awarded, new_achievements) = repo::on_task_completed(&state.pool, &id)
+            .await
+            .unwrap_or((false, Vec::new()));
         let stats = repo::get_user_stats(&state.pool).await.ok();
         if let Some(obj) = response.as_object_mut() {
-            obj.insert("xp_gained".to_string(), json!(25));
+            obj.insert("xp_gained".to_string(), json!(if xp_awarded { 25 } else { 0 }));
             obj.insert("new_achievements".to_string(), json!(new_achievements));
             if let Some(s) = stats {
                 obj.insert("stats".to_string(), json!({"total_xp": s.total_xp, "level": s.level, "streak": s.current_streak}));

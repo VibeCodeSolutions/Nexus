@@ -327,10 +327,8 @@ pub async fn check_achievements(pool: &SqlitePool) -> Result<Vec<String>, sqlx::
     ];
 
     for (id, condition) in checks {
-        if condition {
-            if unlock_achievement(pool, id).await? {
-                unlocked.push(id.to_string());
-            }
+        if condition && unlock_achievement(pool, id).await? {
+            unlocked.push(id.to_string());
         }
     }
 
@@ -344,11 +342,39 @@ pub async fn on_braindump_created(pool: &SqlitePool, braindump_id: &str) -> Resu
     check_achievements(pool).await
 }
 
-/// Convenience: award XP for task completion
-pub async fn on_task_completed(pool: &SqlitePool, task_id: &str) -> Result<Vec<String>, sqlx::Error> {
+/// Convenience: award XP for task completion.
+///
+/// Idempotent in the XP dimension — flipping a task done → open → done must
+/// not let the user farm XP. We check `xp_events` for an existing
+/// `task_done` row referencing this task; if present, we only re-evaluate
+/// achievements (state may have changed elsewhere) and skip the XP award.
+///
+/// Returns `(xp_awarded, newly_unlocked_achievements)`. The handler uses
+/// `xp_awarded` so the client UI doesn't claim "+25 XP" on a no-op.
+pub async fn on_task_completed(pool: &SqlitePool, task_id: &str) -> Result<(bool, Vec<String>), sqlx::Error> {
+    use sqlx::Row;
+    let row = sqlx::query(
+        "SELECT COUNT(*) AS c FROM xp_events WHERE action = 'task_done' AND reference_id = ?"
+    )
+    .bind(task_id)
+    .fetch_one(pool)
+    .await?;
+    let already: i64 = row.get("c");
+
+    // Streak ist eine Tagesaktivität — auch ein Re-Toggle eines alten Tasks
+    // soll den Streak fortführen, wenn das letzte aktive Datum nicht heute ist.
+    // `update_streak` ist intern idempotent (no-op bei `last_active_date == today`),
+    // daher steht der Aufruf vor dem XP-Idempotenz-Pfad.
     update_streak(pool).await?;
+
+    if already > 0 {
+        let achievements = check_achievements(pool).await?;
+        return Ok((false, achievements));
+    }
+
     award_xp(pool, "task_done", XP_TASK_DONE, Some(task_id)).await?;
-    check_achievements(pool).await
+    let achievements = check_achievements(pool).await?;
+    Ok((true, achievements))
 }
 
 /// Convenience: award XP for project creation
@@ -414,7 +440,8 @@ mod tests {
         // Create a task, complete it
         let task = create_task(&pool, "Test task", None, None).await.unwrap();
         update_task(&pool, &task.id, Some("done"), None).await.unwrap();
-        let unlocked = on_task_completed(&pool, &task.id).await.unwrap();
+        let (xp_awarded, unlocked) = on_task_completed(&pool, &task.id).await.unwrap();
+        assert!(xp_awarded);
         assert!(unlocked.contains(&"first_task_done".to_string()));
 
         let stats = get_user_stats(&pool).await.unwrap();
@@ -424,6 +451,46 @@ mod tests {
         assert_eq!(super::level_from_xp(0), 1);
         assert_eq!(super::level_from_xp(281), 1); // xp_for_level(2) = 282
         assert_eq!(super::level_from_xp(282), 2);
+    }
+
+    #[tokio::test]
+    async fn test_task_done_xp_is_idempotent() {
+        let pool = db::init_pool("sqlite::memory:").await.unwrap();
+
+        let task = create_task(&pool, "Idempotenz", None, None).await.unwrap();
+
+        // First completion → XP awarded
+        let (awarded1, _) = on_task_completed(&pool, &task.id).await.unwrap();
+        assert!(awarded1, "first task_done must award XP");
+        let stats_after_first = get_user_stats(&pool).await.unwrap();
+        assert_eq!(stats_after_first.total_xp, XP_TASK_DONE);
+
+        // Toggle done a second time → must NOT award XP again
+        let (awarded2, _) = on_task_completed(&pool, &task.id).await.unwrap();
+        assert!(!awarded2, "second task_done must NOT award XP again");
+        let stats_after_second = get_user_stats(&pool).await.unwrap();
+        assert_eq!(
+            stats_after_second.total_xp, stats_after_first.total_xp,
+            "task-done XP must be idempotent per task"
+        );
+
+        // And a third time, just to be sure
+        let (awarded3, _) = on_task_completed(&pool, &task.id).await.unwrap();
+        assert!(!awarded3);
+        let stats_after_third = get_user_stats(&pool).await.unwrap();
+        assert_eq!(stats_after_third.total_xp, stats_after_first.total_xp);
+
+        // xp_events should have exactly ONE task_done row for this task
+        use sqlx::Row;
+        let row = sqlx::query(
+            "SELECT COUNT(*) AS c FROM xp_events WHERE action = 'task_done' AND reference_id = ?"
+        )
+        .bind(&task.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let count: i64 = row.get("c");
+        assert_eq!(count, 1);
     }
 
     #[tokio::test]

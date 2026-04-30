@@ -84,7 +84,12 @@ pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, Stri
             Ok(Box::new(zai::ZaiProvider::new(api_key)))
         }
         "ollama" => {
-            let model = keystore::get_key("ollama").unwrap_or_else(|_| "qwen2.5:3b".to_string());
+            // Empty/whitespace-only entries fall back to the default model —
+            // Ollama's API rejects model="" with 400 "model is required".
+            let model = keystore::get_key("ollama")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "qwen2.5:3b".to_string());
             Ok(Box::new(ollama::OllamaProvider::new(model)))
         }
         "openai" => {

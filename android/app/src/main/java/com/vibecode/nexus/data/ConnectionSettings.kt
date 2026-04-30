@@ -77,8 +77,15 @@ class ConnectionSettings(context: Context) {
         }
     }
 
+    /**
+     * Clears the connection state (URL + token) but keeps [deviceId] so
+     * diagnostic reports correlate across re-pair cycles.
+     */
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove(KEY_URL)
+            .remove(KEY_TOKEN)
+            .apply()
     }
 
     companion object {
@@ -111,6 +118,9 @@ class ConnectionSettings(context: Context) {
                 Log.w(TAG, "Encrypted prefs unreadable — resetting and retrying", e)
             }
 
+            // Reset attempt: clear any leftover prefs file before the retry, in
+            // case a stale entry from a restored backup is what's tripping the
+            // keystore.
             try {
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .edit().clear().commit()
@@ -122,8 +132,16 @@ class ConnectionSettings(context: Context) {
             return try {
                 buildEncrypted(context)
             } catch (e: Exception) {
-                Log.w(TAG, "Encrypted prefs still failing after reset — falling back to plain SharedPreferences", e)
-                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                // Hard fail — we never write the bearer token to unencrypted
+                // SharedPreferences. The earlier plain fallback was a silent
+                // security regression; surface it instead. NexusApplication
+                // and MainActivity must catch this and present a re-install
+                // banner rather than crash.
+                Log.e(TAG, "Encrypted prefs still failing after reset — refusing to fall back to plain", e)
+                throw SecurityException(
+                    "Encrypted storage unavailable. Reinstall NEXUS or check device security state.",
+                    e
+                )
             }
         }
     }

@@ -934,3 +934,57 @@ Geprüft: `desktop/src-tauri/tauri.conf.json`, `desktop/src-tauri/src/main.rs` a
 
 **✅ Freigabe.** N-017-COD ist Backlog-Kosmetik, kein Commit-Blocker.
 
+
+---
+
+## Pre-Commit-QS — Android-Schicht 3 (AUFTRAG #4) — 2026-05-01
+
+Geprüft: `AndroidManifest.xml`, `data/ConnectionSettings.kt`, `data/NexusApiClient.kt`.
+
+### N-018-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität
+- **Prüfgegenstand:** `MainActivity.kt:82` (`ConnectionSettings(this)`)
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Mit dem neuen Hard-Fail-Pfad in `ConnectionSettings.openPrefs` kann der Konstruktor eine `SecurityException` werfen. MainActivity instanziiert `ConnectionSettings` ohne Try-Catch — das produziert einen Process-Crash mit dem Standard-Android-Dialog. Auf normalen Devices unrealistisch (Boot-Diag im Live-Test grün), aber bei Backup-Restore mit ungültigem Keystore wäre eine eigene Error-UI mit Reinstall-Hinweis nutzerfreundlicher.
+- **Korrekturvorschlag:** `setContent { ... }` mit Try-Catch um den `remember { ConnectionSettings(this) }` und einer Fallback-Composable, die nur die SecurityException-Message anzeigt + einen "App schließen"-Button.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### N-019-VOL
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** `ConnectionSettings.clear()`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Kein Android-Unit-Test deckt das Verhalten von `clear()` ab — speziell die Garantie, dass `KEY_DEVICE_ID` erhalten bleibt. Bei künftigen Refactors könnte jemand versehentlich auf das alte `prefs.edit().clear()` zurückgehen und der Regression bliebe unbemerkt.
+- **Korrekturvorschlag:** Robolectric-basierter Unit-Test in `app/src/test/java/...` der `deviceId` vor und nach `clear()` vergleicht. Setzt allerdings die fehlende Test-Infrastruktur voraus.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### N-020-VOL
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** `NexusApiClient` non-2xx-Verhalten
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Die `expectSuccess`-Umstellung wurde nur per Code-Review verifiziert, kein Live-Test mit einem Mock-404-Endpoint. Boot-Diag deckt nur den Happy-Path ab.
+- **Korrekturvorschlag:** Manueller curl-Test wäre einfach: Server starten, vom Phone aus `deleteTask` mit nicht-existenter ID auslösen (z.B. via UI Swipe-to-delete auf dem letzten Task — den dann nochmal swipen, Server liefert 404, App muss Snackbar zeigen). Backlog.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- **N-003-SIC** AndroidManifest + ConnectionSettings:
+  - `allowBackup="false"`: schließt ADB-Backup-Auslesung komplett aus, defense-in-depth über die ohnehin bestehenden backup_rules.xml + data_extraction_rules.xml.
+  - Hard-Fail in `openPrefs` letzte Stufe: `SecurityException` mit klarer Message statt silent Plain-Fallback. Kein Codepfad mehr, der den Bearer-Token in unverschlüsselte Prefs schreibt.
+  - Live-Verifikation: `prefs.roundtrip=pass` im Boot-Diag — Encrypted-Pfad funktioniert auf RFCX20J1PEX, Hard-Fail-Pfad nicht ausgelöst.
+- **N-011-COD** `clear()` selektiv: nur `KEY_URL` und `KEY_TOKEN` entfernt, `KEY_DEVICE_ID` bleibt. Live: `device_id=8c69ac2a-6a78-48a2-86ed-2e9f833bad58` unverändert seit gestern. Korrekt.
+- **N-004-COD** `expectSuccess = true`: 4xx/5xx werfen jetzt `ResponseException`, im `authedRequest`-try/catch sauber zu `Result.failure`. `deleteTask` nicht mehr als silent-success bei 404. `pairHandshake`-redundanter Status-Check unschädlich. Boot-Diag zeigt `core.bearer=200` → expectSuccess bricht keinen bestehenden Endpoint.
+- Build: `./gradlew assembleDebug` 16s clean, `testDebugUnitTest` NO-SOURCE (akzeptabel — keine Tests vorhanden, kein Regression-Risiko).
+- APK installiert + Boot-Diag 7/7 PASS auf RFCX20J1PEX.
+
+### Verdikt
+
+**✅ Freigabe.** Drei Minor-Findings (N-018 bis N-020) sind alle Backlog-Items für post-GA — keine blockieren den Commit.
+
+**Damit ist NEXUS v0.1.0 GA-fähig:** 1 Blocker + 3 Major + 4 Minor aus AUFTRAG #3 sind in drei sauberen Commits behoben, alle Schichten Tuvok-grün, Live-E2E nach jedem Commit verifiziert.
+

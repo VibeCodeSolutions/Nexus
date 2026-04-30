@@ -31,6 +31,11 @@ import kotlinx.serialization.json.Json
 class NexusApiClient(private val settings: ConnectionSettings) {
 
     private val client = HttpClient(OkHttp) {
+        // Make non-2xx responses throw a ResponseException so authedRequest
+        // surfaces them as Result.failure. Without this, Ktor 2.x silently
+        // returns the error body and our DELETE handlers (which don't call
+        // .body()) would treat 4xx/5xx as success.
+        expectSuccess = true
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }

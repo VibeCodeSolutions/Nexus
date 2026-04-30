@@ -1,14 +1,66 @@
 # NEXUS — Statusbericht für Admin
 
-**Datum:** 2026-05-01 00:35
-**Modus:** autonomer Nachtbetrieb (Admin schlief)
-**Quell-Auftrag:** „Tuvok-Vollreview NEXUS, Seven-Konsultation, Chakotay-Routing"
+**Datum:** 2026-05-01 02:00 (Update nach Implementierungs-Lauf)
+**Modus:** autonomer Nachtbetrieb (Admin schlief, Direktive „komplett selber machen")
+**Quell-Auftrag:** „Tuvok-Vollreview NEXUS, Seven-Konsultation, Chakotay-Routing" + AUFTRAG #4 „Pflicht-Fixes komplett alleine"
 
 ---
 
-## Zusammenfassung in einem Satz
+## Zusammenfassung in zwei Sätzen
 
-NEXUS ist aktuell **funktional vollständig und live grün getestet**, hat aber **einen Sicherheits-Blocker** vor v0.1.0 GA und drei Major-Findings vor Public-Announcement — alle dokumentiert und sauber zugewiesen. Phasen 14/15-Vorarbeit ist bei Privat vorgemerkt.
+**NEXUS v0.1.0 ist GA-fähig.** Alle vier Pflicht-Fixes (1 Blocker + 3 Major) sind in drei sauberen, Tuvok-grün geprüften Commits drüber, drei zugehörige Minor-Findings sind mitgenommen, Live-E2E nach jeder Schicht verifiziert (Core-Diag und Phone-Diag je 7/7 PASS). Du musst nur noch den Tag setzen und pushen.
+
+---
+
+## Was seit dem ersten Statusbericht passiert ist
+
+Vier Commits über `main` HEAD `2c77576`:
+
+| Hash | Schicht | Inhalt |
+|---|---|---|
+| `502c422` | Doku | Tuvok-Vollreview + Seven-Bedarfsanalyse + Status-Report (review.md, todo.md, STATUS_REPORT_2026-05-01.md, QS_FINDINGS.md-Erweiterungen) |
+| `4ef6272` | Core | N-001-SIC Dashboard-Bearer + N-002-KOR XP-Idempotenz mit Streak-Erhalt + 2 pre-existing Clippy-Fixes |
+| `fdc6965` | Desktop | N-012-COD CSP CIDR-Eintrag raus + N-013-COD `restart_core` wait-for-port-free |
+| `6f4e53c` | Android | N-003-SIC `allowBackup=false` + Hard-Fail-statt-Plain-Prefs + N-004-COD Ktor `expectSuccess=true` + N-011-COD `clear()` selektiv (device_id stabil) |
+
+QS-Loop pro Schicht: Diff → Tuvok-Skill → Findings → ggf. Korrektur → Tuvok grün → Commit. Schicht 1 hatte einen Tuvok-Major-Befund (N-014-KOR: `update_streak` wurde im Idempotenz-Pfad übersprungen) — sofort gefixt vor Commit. Schichten 2 und 3 direkt grün.
+
+Pre-existing-Befund nebenbei aufgedeckt: das ursprüngliche Review hatte `cargo clippy --all-targets -- -D warnings` fälschlich als grün markiert. Tatsächlich war EXIT=101 mit zwei pre-existing Clippy-Errors (`collapsible_if`, `double_ended_iterator_last`). Beide jetzt mit dem Core-Commit gefixt — sauber, kein Backlog mehr.
+
+---
+
+## Aktueller Findings-Status
+
+| ID | Kategorie | Status |
+|---|---|---|
+| N-001-SIC | Blocker → Sicherheit | ✅ behoben (Commit 4ef6272) |
+| N-002-KOR | Major → Korrektheit | ✅ behoben (Commit 4ef6272) |
+| N-003-SIC | Major → Sicherheit | ✅ behoben (Commit 6f4e53c) |
+| N-004-COD | Major → Code | ✅ behoben (Commit 6f4e53c) |
+| N-005…N-013 | Minor (9) | offen — Backlog post-GA |
+| N-011-COD | Minor (war in dem Set) | ✅ behoben mit Schicht 3 |
+| N-012-COD | Minor | ✅ behoben (Commit fdc6965) |
+| N-013-COD | Minor | ✅ behoben (Commit fdc6965) |
+| N-014-KOR | Major (Schicht-1-Review-Befund) | ✅ behoben vor Commit (in 4ef6272) |
+| N-015-VOL, N-016-PER | Minor (Schicht-1-Review) | offen — Backlog |
+| N-017-COD | Minor (Schicht-2-Review) | offen — Backlog |
+| N-018-COD, N-019-VOL, N-020-VOL | Minor (Schicht-3-Review) | offen — Backlog |
+
+Verbleibende Minor (alle nicht GA-blockierend): siehe `todo.md` (alte Liste) + `QS_FINDINGS.md` (neue Sektionen ab „Pre-Commit-QS — Core-Schicht 1 (AUFTRAG #4)").
+
+---
+
+## Was du als Erstes tun kannst, wenn du wach bist
+
+1. `git log --oneline -6` ansehen — 4 neue Commits.
+2. `git diff 2c77576..HEAD` für den Gesamtüberblick (≈220 LoC, klar strukturiert).
+3. Wenn alles passt: `git tag v0.1.0 && git push origin main v0.1.0`. CI-Workflow `release.yml` zieht den Tag und baut die Artefakte als Draft-Release (siehe HANDOVER.md).
+4. Optional vorher: einmal manuell `tauri dev` starten, im Wizard durchklicken — alle vier Fix-Pfade sind im normalen Happy-Path nicht sichtbar (außer dass das Dashboard nun einen Bearer braucht, was der Tauri-Wizard sowieso schickt).
+
+## Wenn du etwas zurückrollen willst
+
+Jeder Fix ist sein eigener Commit. Gezielter Revert ist eine Zeile pro Schicht:
+- `git revert 6f4e53c` (Android), `fdc6965` (Desktop), `4ef6272` (Core), `502c422` (Doku).
 
 ---
 

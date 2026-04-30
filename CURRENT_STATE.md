@@ -1,12 +1,12 @@
 # NEXUS — Current State
 
-**Stand:** 2026-04-30
-**Aktuelle Phase:** Release v0.1.0 (rc3 als Draft auf GitHub)
-**Phase-Status:** Phasen 0-13 abgeschlossen, Release-Sprint Phasen 0-8 komplett, End-to-End-Test grün
+**Stand:** 2026-05-01
+**Aktuelle Phase:** Release v0.1.0 — **GA-fähig**
+**Phase-Status:** Phasen 0-13 abgeschlossen, Release-Sprint Phasen 0-8 komplett, autonomer Vollreview + Pflicht-Fixes (AUFTRAG #4) abgeschlossen, alle Schichten Tuvok-grün
 
 ---
 
-## Release-Sprint v0.1.0 (siehe HANDOVER.md)
+## Release-Sprint v0.1.0 (siehe HANDOVER.md, STATUS_REPORT_2026-05-01.md)
 
 Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/RPM/AppImage (Linux), signierte APK.
 
@@ -21,6 +21,15 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 - ✅ End-to-End-Test durchgespielt (2026-04-30): Phone-Pair via QR + Handshake (LAN) → Wizard-Auto-Advance → Provider-Save → Voice-Capture (`/braindump`) → Ollama-Kategorisierung (Task/Tags/Summary) → Dashboard
 - ✅ Wizard-Skip-Bugs gefixt: leerer API-Key zählt nicht mehr als konfiguriert; Server-State ist Single-Source-of-Truth (kein client-side `nexus_onboarded`-Flag mehr)
 - ✅ Ollama-Fallback-Bug gefixt: leerer keystore-Eintrag fällt sauber auf `qwen2.5:3b` zurück
+- ✅ **Vollreview + Pflicht-Fixes (2026-05-01, autonomer Nachtbetrieb, AUFTRAG #4)**:
+  - **N-001-SIC**: Dashboard `/` ist Bearer-pflichtig (Default-Bind 0.0.0.0 leakte vorher alle BrainDumps an LAN-Peers)
+  - **N-002-KOR**: Task-Done XP idempotent pro Task; `update_streak` läuft weiterhin pro Aufruf (Streak-Erhalt)
+  - **N-003-SIC**: Android `allowBackup=false`, `ConnectionSettings.openPrefs` macht Hard-Fail statt Plain-Fallback (Bearer-Token landet nie in unverschlüsselten Prefs)
+  - **N-004-COD**: Ktor `expectSuccess=true`, non-2xx wird konsistent zu `Result.failure`; `deleteTask` schluckt 404 nicht mehr
+  - **N-011-COD**: `ConnectionSettings.clear()` selektiv, `device_id` über Re-Pair stabil
+  - **N-012-COD / N-013-COD**: Tauri-CSP CIDR-Eintrag raus, `restart_core` wartet auf Port-Freigabe
+  - 4 saubere Commits (`502c422` Doku, `4ef6272` Core, `fdc6965` Desktop, `6f4e53c` Android), je Schicht Tuvok-grün, Live-E2E nach jedem Commit verifiziert (Core+Phone Diag-Stack 7/7 PASS)
+  - Verbleibende Backlog-Findings (alle Minor): N-005..N-010, N-015..N-020 — kein GA-Blocker
 
 ---
 

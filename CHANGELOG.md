@@ -13,10 +13,13 @@
 - **`NexusTheme`-API:** Parameter `themeMode: ThemeMode` (Enum LIGHT/DARK/SYSTEM) statt `darkTheme: Boolean`. **`dynamicColor`-Pfad entfernt** — bewusst, um konsistente Marken-Palette über Desktop+Android zu garantieren.
 - **CSS-Tokens (Desktop):** `--accent` → `--primary`, neue Tokens `--primary-tint`, `--secondary`, `--radius-card`, `--radius-btn`, `--shadow-soft`. Hartcodierte Lila-rgba durch `--primary-tint` ersetzt.
 
+### Fixed
+- **PC-LIVE-1 (Major, Live-Run-Fund):** `NexusFooter` wurde von der Android-Gestenleiste teilweise verdeckt — `enableEdgeToEdge()` zog das UI bis hinter die System-Bars, der Footer im Scaffold.bottomBar-Column bekam keinen Bottom-Inset. Fix: `Modifier.navigationBarsPadding()` auf die Footer-Row.
+
 ### Hardware-/Build-Auflagen (Final-Gate)
 - Tauri-Build (`cd desktop && cargo tauri build` / `pnpm tauri build`) grün.
-- Android-Build (`cd android && ./gradlew assembleDebug`) grün.
-- Live-Verifikation: Theme-Cycle 3-fach, OS-Theme-Wechsel auf "System", Persistenz über App-Restart, Footer auf allen Routes.
+- Android-Build (`cd android && ./gradlew assembleDebug`) grün — auf Pixel verifiziert (RFCX20J1PEX).
+- Live-Verifikation: Theme-Switch Hell→Dunkel→System, Persistenz über App-Restart, Footer sichtbar auf allen Routes (BrainDump + Settings live geprüft).
 
 ---
 

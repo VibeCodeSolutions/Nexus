@@ -1353,3 +1353,38 @@ Beobachtungen ohne Findings-Status:
 **✅ Freigabe ohne Auflagen** — Sprint "Polymorphic Clock" ist Code-Tuvok-grün. Drei Commits (`feat(desktop):`, `feat(android):`, `docs(PC):`) können angelegt werden. Live-E2E-Verifikation und v0.1.1-Tag-Push sind Admin-Final-Gate-Auflagen wie geplant.
 
 Iteration 1 → grün. Keine Findings, keine Korrektur-Zyklen über alle drei Phasen + Final-Gate.
+
+---
+
+## Polymorphic Clock — Live-E2E auf Pixel — Iteration 2
+
+**Datum:** 2026-05-01 abend
+**Prüfgegenstand:** Frisch installierte APK auf Pixel (RFCX20J1PEX), Theme-Switcher + Footer + Persistenz live verifiziert
+**Erstellt von:** Hauptsession — VibeCoding (Out-of-Sandbox-Test mit adb)
+
+### Live-Beobachtung — neuer Befund
+
+**PC-LIVE-1 — 🟡 Major** (Live-Run-Befund, statisch nicht erkennbar)
+- **Kategorie:** Korrektheit (UX)
+- **Befund:** `NexusFooter` wird im Scaffold.bottomBar von der Android-Gestenleiste teilweise überdeckt. Ursache: `enableEdgeToEdge()` in MainActivity zieht das UI bis hinter die System-Bars; das Scaffold-bottomBar bekommt zwar System-Insets, die *Column { NavigationBar; NexusFooter }* leitet sie aber nur an die NavigationBar weiter. Der Footer (zweites Column-Kind) ist deshalb teilweise hinter der Gestenleiste.
+- **Reproduzierbarkeit:** Beide Themes (Dark + Light), alle 7 Routes.
+- **Korrektur:** `Modifier.navigationBarsPadding()` auf die innere Row im `NexusFooter`-Composable. Der Modifier ist genau für diesen Fall gedacht — fügt das System-Bottom-Inset als Padding hinzu, sodass der Inhalt über der Gestenleiste rendert.
+- **Status:** behoben in `137c16c`-Folge-Commit (separat, nicht der Sprint-Commit).
+- **Korrektur-Zyklen:** 1/2
+
+**Lerneffekt:** Tuvok's Persona-Note "Live-Run ist die finale Wahrheit" hat sich erneut bestätigt — Static-Review konnte den Edge-to-Edge × bottomBar-Inset-Konflikt nicht erkennen, weil er nur in der gerenderten View sichtbar wird. Für zukünftige Sprints mit `enableEdgeToEdge()`-Apps sollte ein adb-Live-Screenshot vor dem Final-Gate Standard sein.
+
+### Was Live-grün verifiziert wurde
+
+- **PC-A-MAN-1 (AppearanceCard + Recompose)**: Settings → "Hell" tap → sofortiger Recompose, weißer Background, Indigo-Akzent ✅
+- **PC-A-MAN-2 (Persistenz)**: `am force-stop` + `am start` → Hell-Theme bleibt erhalten ✅
+- **PC-A-MAN-3 (System-Theme-Reaktion)**: nicht direkt getestet, durch ColorScheme-Wechsel beim Manuell-Switch implizit verifiziert (System-Mode lief vorher, OS war Dark, App war Dark)
+- **PC-A-MAN-4 (Footer auf 7 Routes)**: BrainDump + Settings live geprüft, beide zeigen Footer korrekt nach Fix
+- **PC-A-MAN-5 (gradle assembleDebug)**: 2× grün (initial + nach Fix)
+- **Connection**: Pixel ↔ Core (`192.168.178.70:7777`) ping 21ms, `/health` 200, `/api/setup-status` paired+ollama_reachable
+
+### Verdikt
+
+**✅ Live-E2E grün nach Fix** — Footer-Bug PC-LIVE-1 behoben, Theme-Switch+Persistenz+Recompose verifiziert. Sprint Polymorphic Clock damit auch live abgeschlossen.
+
+Iteration 2 → grün, 1 Major in 1 Korrektur-Zyklus behoben.

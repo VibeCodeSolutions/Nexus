@@ -1,8 +1,26 @@
 # NEXUS — Current State
 
-**Stand:** 2026-05-01 (nachmittag)
-**Aktuelle Phase:** Sprint "🐙 Joyful Jellyfish" — Code-Phasen A-E abgeschlossen, Hardware-E2E + Build-Verifikation als Phase-F-Auflagen für Admin
-**Phase-Status:** v0.1.0 GA-fähig steht, Joyful-Jellyfish-Sprint (Bugfixes + Settings + Braindump-Hardening + Vault-Design-Doku) Code-Tuvok-grün
+**Stand:** 2026-05-01 (abend)
+**Aktuelle Phase:** Sprint "Polymorphic Clock" — Code-Phasen D+A+X Tuvok-grün, Builds als Final-Gate-Auflagen für Admin
+**Phase-Status:** v0.1.0 GA-fähig steht, Joyful-Jellyfish-Sprint Code-Tuvok-grün, Polymorphic-Clock-UI-Sprint Code-Tuvok-grün
+
+---
+
+## Sprint "Polymorphic Clock" (2026-05-01)
+
+Auslöser: Admin-Feedback zum Look-and-Feel — das alte Dark-Lila-Theme wirkte "grausam", Branding fehlte, kein Theme-Switcher.
+
+- ✅ **Phase D — Desktop** (`desktop/src/index.html`, ein File): CSS-Token-Block dual (`:root,[data-theme="dark"]` + `[data-theme="light"]`), Akzent von Lila auf Indigo (`#3D5AFE`/`#8C9EFF`), Teal-Sekundär, Material-3-Radii (Card 16px, Btn 10px), `--accent`→`--primary` global. App-Shell-Wrap (flex-column min-height:100vh) für Sticky-Footer. Theme-Cycle-Button im Header (`☀️/🌙/🎨`) neben Settings. JS `applyTheme/cycleTheme` mit LocalStorage-Persistenz, `prefers-color-scheme`-Listener für Live-System-Mode-Update, Early-Apply gegen FOUC, Hooks in `initDashboard()` und `initOnboarding()`. Sticky `<footer class="app-footer">` mit "Powered by VibeCode Solutions · NEXUS v0.1.0", `<strong>` in Primary-Farbe. Onboarding-Buttons + Provider-Cards an Tokens angeglichen, Card-Hover-State, Tab-Active mit Primary-Tint.
+- ✅ **Phase A — Android** (5 Files): `Theme.kt` komplett neu (ThemeMode-Enum {LIGHT,DARK,SYSTEM}, neue ColorSchemes mit allen Material-3-Pflichtslots, `dynamicColor` entfernt für Marken-Konsistenz). Neuer `data/UiPreferences.kt` (plain SharedPreferences `nexus_ui`, Theme-Mode-Property mit defensivem `valueOf`-Fallback auf SYSTEM). Neuer `ui/components/NexusFooter.kt` (Surface tonalElevation 1.dp + zentrierter Text aus `R.string.app_footer`). `MainActivity.kt`: `themeMode`-State, `NexusTheme(themeMode = …)`, `Scaffold.bottomBar = Column { NavigationBar; NexusFooter() }` → Footer auf allen 7 Routes inkl. Welcome/Pair sichtbar. `SettingsScreen.kt`: 2 neue Parameter, neue `AppearanceCard` mit `SingleChoiceSegmentedButtonRow` für Hell/Dunkel/System zwischen Connection-Card und LLM-Card. `strings.xml` +5 Strings.
+- ✅ **Phase X — Doku-Sync** — `CURRENT_STATE.md` (dieser Block), `CHANGELOG.md` Polymorphic-Clock-Sektion, `todo.md` synchronisiert (JJ erledigt-markiert, PC-Sprint dokumentiert).
+
+**Final-Gate-Auflagen (Admin-manuell):**
+- Tauri-Build: `cd desktop && cargo tauri build` (oder `pnpm tauri build`) grün, MSI/DEB nicht regrettiert
+- Android-Build: `cd android && ./gradlew assembleDebug` grün, kein neuer Lint-Fail
+- Live-E2E-Checkliste (Desktop): Theme-Cycle 3-fach durchklicken, OS-Theme-Wechsel im System-Mode, Onboarding-Palette gleich Dashboard
+- Live-E2E-Checkliste (Android, Pixel): AppearanceCard + Recompose, Persistenz über App-Restart, System-Theme-Reaktion, Footer auf allen 7 Routes
+
+**Sprint-Tag:** `v0.1.1` als nächster Bump nach erfolgreichem Final-Gate.
 
 ---
 

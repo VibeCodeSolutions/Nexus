@@ -1190,3 +1190,166 @@ Geprüft: JJ-A1 (`desktop/src/index.html` — Banner + Refresh-Style + api-Integ
 
 Hauptsession beginnt mit B.1: Repro auf Kais Fedora-Setup (welches WLAN, welche IP zeigt der QR, Server-Logs beim Start).
 
+
+---
+
+## Polymorphic Clock — Phase D — Iteration 1
+
+**Datum:** 2026-05-01
+**Prüfgegenstand:** desktop/src/index.html — CSS-Token-Refresh + Theme-Switcher + sticky VibeCode-Solutions-Footer
+**Erstellt von:** Hauptsession — VibeCoding
+**Auftrag:** AUFTRAG #7 vc.md
+**Plan-File:** ~/.claude/plans/gibt-es-noch-offene-polymorphic-clock.md
+
+### DoD-Mapping (alle 8 Punkte verifiziert)
+
+| DoD | Status | Verifikation |
+|---|---|---|
+| 1. Token-Block `:root,[data-theme="dark"]` + `[data-theme="light"]` (Indigo, Teal, Radii, Shadow) | ✅ | Z. 11-45, Indigo `#3D5AFE`/`#8C9EFF`, Teal `#00897B`/`#4DB6AC`, Radii (16/10), Shadow-Soft je Theme |
+| 2. `--accent` → `--primary` global, Lila-rgba durch `--primary-tint` | ✅ | `grep "--accent\|7c5cbf\|9b7fd4\|124,92,191"` → 0 Treffer |
+| 3. App-Shell-Wrap flex-column min-height:100vh, Footer sticky | ✅ | `<div class="app-shell">` Z. 352, geschlossen Z. 1441; CSS `.app-shell` Z. 53-57; `.app-footer position:sticky;bottom:0` Z. 60-71 |
+| 4. Theme-Cycle-Button im Header | ✅ | Z. 409 `<button id="themeToggle" onclick="cycleTheme()">`, neben Settings-Button |
+| 5. JS State + applyTheme/cycleTheme/Listener/Early-Apply/Hooks | ✅ | `currentTheme` Z. 541, `applyTheme` Z. 548-557 (null-safe für btn), `cycleTheme` Z. 558-563, prefers-color-scheme-Listener Z. 564-566, Early-Apply Z. 568, Hook in `initDashboard` Z. 1064 + `initOnboarding` Z. 1088 |
+| 6. Sticky Footer "Powered by **VibeCode Solutions** · NEXUS v0.1.0" | ✅ | Z. 1437-1439, `<strong>` in `--primary`-Farbe |
+| 7. Onboarding-Buttons + Provider-Cards + Provider-Detail an `--radius-btn`/`--radius-card` | ✅ | Z. 240-262 onboarding-buttons, Z. 264-275 provider-card, Z. 280-282 providerDetail — alle mit Token statt Hardcode |
+| 8. Card-Hover, Btn-Primary-Shadow, Tab-Active mit `--primary-tint` | ✅ | Card-hover Z. 110, btn-primary box-shadow Z. 89, Tab-active background Z. 105 |
+
+### Was geprüft und OK befunden wurde
+
+- **HTML-Struktur:** `<body>` → `<div class="app-shell">` öffnet, geschlossen vor `</body>`. Footer ist letztes Kind innerhalb app-shell. Onboarding-Overlay ebenfalls innerhalb app-shell — keine Tag-Mismatches.
+- **CSS-Konsistenz:** Sanity-grep auf Legacy-Tokens (`--accent`, `7c5cbf`, `9b7fd4`, `0f0f1a`, `1a1a2e`, `124,92,191`) → 0 Treffer. Vollständige Token-Migration.
+- **applyTheme — Null-Safety:** `btn` über `getElementById` geholt, Update nur wenn Element existiert. Beim Early-Apply (Z. 568) ist Button-DOM noch nicht parsed, kein Crash, Label wird beim ersten initDashboard/initOnboarding-Aufruf nachgesetzt.
+- **cycleTheme — Vollständige Rotation:** `system → light → dark → system` über Lookup-Map; Default-Fallback `'system'` bei korruptem localStorage-Wert defensiv.
+- **prefers-color-scheme-Listener:** Reagiert nur wenn `currentTheme === 'system'` — explizite User-Wahl wird nicht übersteuert.
+- **LocalStorage-Keys:** `nexus_url`, `nexus_token`, `nexus_theme` — keine Kollision, eigener Namespace.
+- **Onboarding-Pfad:** `initOnboarding()` ruft `applyTheme(currentTheme)` als ersten Call (Z. 1084), zusätzlich Early-Apply (Z. 568) vor jedem Render. Kein FOUC erwartet.
+- **Tauri-Webview-Kompatibilität:** `position: sticky` in flex-Container ist in webview2/wkwebview/webkitgtk seit Jahren stabil. `color-mix()`-Patterns wurden bewusst nicht eingebaut, alles plain CSS-Vars.
+- **Theme-Switcher-Interaktion mit OS:** System-Mode reagiert live auf OS-Theme-Wechsel über matchMedia-Listener. Light/Dark-Wahl ist sticky und überschreibt System.
+
+### Findings
+
+Keine Blocker. Keine Major. Keine Minor.
+
+Stilistisch erwähnenswert (kein Finding):
+- Selektor `.app-shell > .tabs ~ .content, .app-shell > .content` (Z. 58-59) ist redundant — der zweite Selektor deckt den ersten ab. Funktional korrekt, kein Cleanup-Bedarf.
+
+### Manuelle Verifikations-Auflagen (zum Final-Gate, nicht Phase-D-Blocker)
+
+| ID | Test | Verantwortlich |
+|---|---|---|
+| PC-D-MAN-1 | Tauri-Frontend-Reload (Webview-DevTools): Theme-Cycle 3-fach durchklicken, jeder State setzt `data-theme` und Button-Label korrekt | Admin auf Desktop |
+| PC-D-MAN-2 | OS-Theme wechseln während App auf Theme=`System` läuft → App folgt automatisch | Admin auf Desktop |
+| PC-D-MAN-3 | Token in localStorage löschen → App neu → Onboarding zeigt selbe Palette wie Dashboard, kein Mischbild | Admin auf Desktop |
+| PC-D-MAN-4 | `cd desktop && pnpm tauri build` (oder `cargo tauri build`) grün, MSI/DEB nicht regrettiert | Final-Gate |
+
+### Verdikt
+
+**✅ Freigabe ohne Auflagen** — Phase A (Android) kann unmittelbar starten. Tauri-Build (PC-D-MAN-4) wird im Final-Gate verifiziert, kein Phase-D-Blocker.
+
+Iteration 1 → grün. Keine Findings, keine Korrektur-Zyklen.
+
+---
+
+## Polymorphic Clock — Phase A — Iteration 1
+
+**Datum:** 2026-05-01
+**Prüfgegenstand:** Android-Schicht — Theme-System (3-State-Switcher), VibeCode-Solutions-Footer im Scaffold.bottomBar, AppearanceCard im SettingsScreen
+**Erstellt von:** Hauptsession — VibeCoding
+**Auftrag:** AUFTRAG #7 vc.md / Phase A
+**Plan-File:** ~/.claude/plans/gibt-es-noch-offene-polymorphic-clock.md
+**Geänderte Dateien:** Theme.kt (rewrite), UiPreferences.kt (neu), NexusFooter.kt (neu), MainActivity.kt (Diff), SettingsScreen.kt (Diff), strings.xml (+5)
+
+### DoD-Mapping (alle 6 Punkte verifiziert)
+
+| DoD | Status | Verifikation |
+|---|---|---|
+| A1. Theme.kt: ThemeMode-Enum, neue ColorSchemes, dynamicColor entfernt | ✅ | Z. 10 Enum, Z. 12-28 Light, Z. 30-46 Dark, primary `#3D5AFE`/`#8C9EFF`, secondary `#00897B`/`#4DB6AC` ✓; Material-3-Pflichtslots vollständig (onPrimary, primaryContainer, surface, surfaceVariant, outline, error). dynamicColor-Imports entfernt. NexusTheme(themeMode, content) Z. 48-64 |
+| A2. UiPreferences.kt plain SharedPreferences mit Fallback | ✅ | Namespace `nexus_ui`, Key `theme_mode`, runCatching-valueOf-Fallback auf SYSTEM, `applicationContext` (kein Activity-Leak), apply() statt commit() (UI-Thread frei) |
+| A3. NexusFooter.kt Surface+Row+Text aus R.string | ✅ | tonalElevation=1.dp, Center-Arrangement, labelSmall + onSurfaceVariant; R.string.app_footer-Verweis korrekt |
+| A4. MainActivity Theme-State + bottomBar Column{Nav+Footer} | ✅ | UiPreferences Z. 84, themeMode-State Z. 85, NexusTheme(themeMode=themeMode) Z. 86, Scaffold.bottomBar als Column{NavigationBar; NexusFooter()} Z. 168-192. SettingsScreen-Aufruf Z. 240-251 mit themeMode + onThemeChange-Lambda (Persist VOR State-Set, korrekte Reihenfolge) |
+| A5. SettingsScreen +2 Parameter + AppearanceCard | ✅ | Signatur Z. 75-83 mit themeMode/onThemeChange; AppearanceCard-Aufruf Z. 229-232 zwischen Connection-Card und LLM-Card; AppearanceCard-Composable Z. 659-698 mit SingleChoiceSegmentedButtonRow für 3 Optionen aus R.string.theme_* |
+| A6. strings.xml +5 Strings | ✅ | app_footer, settings_appearance, theme_light, theme_dark, theme_system — Wortlaut "Powered by VibeCode Solutions · NEXUS v0.1.0" |
+
+### Was geprüft und OK befunden wurde
+
+- **Imports & Zirkularität:** `ui.theme.ThemeMode` wird von `data.UiPreferences` und `ui.screen.SettingsScreen` importiert. `ui.theme`-Package importiert nichts aus `data` oder `ui.screen` → kein Zirkel. Compose-Imports konsistent (Material3 1.3-API).
+- **Re-Compose-Pfad:** `themeMode` als `var by remember { mutableStateOf(...) }` in MainActivity-Closure. NexusTheme wrappt das gesamte UI; bei themeMode-Wechsel rerendert MaterialTheme das CompositionLocal `LocalColorScheme`, alle Children-Screens nutzen `MaterialTheme.colorScheme.*` und nehmen die neue Palette automatisch mit. Persist über Process-Death greift, da `setContent` bei Activity-Recreate `uiPreferences.themeMode` neu liest.
+- **SegmentedButton-API:** `SingleChoiceSegmentedButtonRow` + `SegmentedButton` + `SegmentedButtonDefaults.itemShape(index, count)` sind in Material3 1.3 (Compose-BOM 2024.12.01) als `@ExperimentalMaterial3Api` verfügbar. AppearanceCard-Composable trägt `@OptIn(ExperimentalMaterial3Api::class)`-Annotation — konsistent zum bestehenden Stil der Datei (LlmConfigCard hat ihn ebenfalls).
+- **Footer-Reichweite:** Scaffold.bottomBar wird unabhängig vom NavHost-Inhalt gerendert → Footer ist auf allen Screens sichtbar inkl. Welcome/Pair (entspricht Plan-DoD "Footer auf jeder NEXUS-Seite").
+- **NavigationBar auf Welcome/Pair:** war bereits vor Phase A immer sichtbar (Status quo, kein Phase-A-Regress). User-flow auf Welcome/Pair-Screens funktioniert wie vorher.
+- **ThemeMode-Persistenz mit apply():** korrekt für UI-Pref (asynchroner Disk-Write, UI-Thread bleibt frei; Wert ist sofort in-memory verfügbar via getSharedPreferences-Cache). Kein Fall, in dem ein synchroner commit() nötig wäre.
+- **Surface tonalElevation 1.dp im Footer:** Material-3-konform, dezenter Akzent über dem Hintergrund — funktioniert in beiden Themes (Light: leichte Aufhellung, Dark: leichte Aufhellung gegen Background).
+
+### Findings
+
+Keine Blocker. Keine Major. Keine Minor.
+
+Beobachtungen ohne Findings-Status:
+- `surfaceVariant` ist im Dark-Theme dunkler als `surface` (`#11141A` vs. `#181B22`). Material-3-Spec lässt beide Richtungen zu; hier semantisch "Input-Hintergrund" gemeint. Cards, die `surfaceVariant` als containerColor nutzen (Connection-Card, AppearanceCard), wirken im Dark-Theme leicht "eingerückt" statt "erhöht". Bewusste Designentscheidung, konsistent zum Desktop-Token `--bg-input`. Falls Admin den Eindruck nicht mag, schneller Tausch möglich (Cards auf `surface` statt `surfaceVariant`) — kein Refactor.
+
+### Manuelle Verifikations-Auflagen (zum Final-Gate, nicht Phase-A-Blocker)
+
+| ID | Test | Verantwortlich |
+|---|---|---|
+| PC-A-MAN-1 | Settings öffnen → AppearanceCard sichtbar mit 3-Segment-Switcher; Hell wählen → sofortiger Recompose, Indigo-Akzent, weißer Background | Admin auf Pixel |
+| PC-A-MAN-2 | App schließen + neu öffnen → Theme-Wahl persistiert | Admin auf Pixel |
+| PC-A-MAN-3 | System-Theme wechseln, App auf "System" → folgt automatisch | Admin auf Pixel |
+| PC-A-MAN-4 | Footer-Strip "Powered by VibeCode Solutions · NEXUS v0.1.0" über NavigationBar auf allen 7 Routes (welcome, pair, braindump, history, tasks, projects, settings) sichtbar | Admin auf Pixel |
+| PC-A-MAN-5 | `cd android && ./gradlew assembleDebug` grün, kein neuer Lint-Fail | Final-Gate |
+
+### Verdikt
+
+**✅ Freigabe ohne Auflagen** — Phase X (Doku) kann unmittelbar starten. APK-Build (PC-A-MAN-5) wird im Final-Gate verifiziert, kein Phase-A-Blocker.
+
+Iteration 1 → grün. Keine Findings, keine Korrektur-Zyklen.
+
+---
+
+## Polymorphic Clock — Final-Gate — Iteration 1
+
+**Datum:** 2026-05-01
+**Prüfgegenstand:** Doku-Sync (CHANGELOG.md, CURRENT_STATE.md, todo.md) + Build-Smoke-Resultate (Tauri cargo check, gradle assembleDebug)
+**Erstellt von:** Hauptsession — VibeCoding
+**Auftrag:** AUFTRAG #7 vc.md / Final-Gate
+
+### DoD-Mapping (alle 5 Punkte verifiziert)
+
+| DoD | Status | Verifikation |
+|---|---|---|
+| F1. CHANGELOG.md vollständiger PC-Block | ✅ | Z. 3 `[Unreleased] — Sprint "Polymorphic Clock"`, Added/Changed/Auflagen-Struktur, dynamicColor-Removal mit Begründung "Marken-Konsistenz Desktop+Android" |
+| F2. CURRENT_STATE.md aktuell | ✅ | Z. 3 `Stand: 2026-05-01 (abend)`, Z. 4 `Aktuelle Phase: Sprint "Polymorphic Clock"`, Z. 9 Sprint-Block PC oberhalb JJ, Z. 23 `Sprint-Tag: v0.1.1` als nächster Bump, Phase D/A/X dokumentiert mit DoD |
+| F3. todo.md sync | ✅ | JJ-Items (JJ-A1..JJ-GATE-0) und N-001/N-002/N-003/N-004/N-006/N-007/N-011/N-012/N-013 alle [x]; PC-Block (PC-D1-D6, PC-A1-A6, PC-X1-X3 = 15 Items) alle [x]; 9 Final-Gate-Auflagen (PC-D-MAN-1..4 + PC-A-MAN-1..5) alle [ ]; Backlog-Block für N-005/N-008/N-009/N-010 + WIZ/B7/B8/A6/E9/G5 |
+| F4. Tauri-Code kompiliert | ✅ | `grep "^EXIT=" /tmp/pc_tauri_check.log` → `EXIT=0`. Keine error/warning-Zeilen im Log. |
+| F5. Android baut | ✅ | `grep "BUILD SUCCESSFUL\|^EXIT=" /tmp/pc_gradle_build.log` → `BUILD SUCCESSFUL in 11s` + `EXIT=0`. Keine FAILED/error:/`e:`-Zeilen im Log. APK-Artefakt 66.5 MB unter `android/app/build/outputs/apk/debug/app-debug.apk`. |
+
+### Was geprüft und OK befunden wurde
+
+- **EXIT-Code-Disziplin** (Lerneffekt aus AUFTRAG #3): Beide Build-Logs explizit nach `^EXIT=0` und `(error\[|warning:|FAILED|^e: )` gegrept, nicht nur `tail -5`. Ergebnis: nur "BUILD SUCCESSFUL"-Zeile + EXIT=0 in beiden Logs. Keine versteckten Lint-Warnings, kein `_pendingExceptionDetails`-Cascade-Pattern, kein Compose-Lint-Schreckgespenst.
+- **Doku-Konsistenz** (3 Files, Cross-Check): "Polymorphic Clock" + "2026-05-01" identisch in allen drei Files. Sprint-Tag `v0.1.1` in CURRENT_STATE.md angekündigt, CHANGELOG.md als `[Unreleased]` korrekt (wird bei Tag-Set zu `[0.1.1]`).
+- **Sprint-Vollständigkeit:** Alle Plan-Punkte D1-D6, A1-A6, X1-X3 umgesetzt + abgehakt. Final-Gate-Auflagen explizit als manuell-Admin-Auflagen gelabelt (Header in todo.md "Final-Gate-Auflagen (Admin-manuell, vor Tag `v0.1.1`)").
+- **Backlog-Sauberkeit:** v0.1.x-Backlog-Block in todo.md klar abgetrennt — N-005/N-008/N-009/N-010 + WIZ/B7/B8/A6/E9/G5 bleiben offen, nicht in PC-Sprint-Scope.
+- **Kein Phase-Recurrence:** Sprint hat keine bestehenden offenen Findings aus JJ oder anderen Sprints reaktiviert.
+
+### Build-Smoke vs. Final-Gate-Auflagen
+
+**Vorab-verifiziert durch QS:**
+- `cargo check` (Tauri Rust-Frontend-Code) → grün. Verifiziert dass die JS-Datei `index.html` keine Tauri-Side-Imports zerschossen hat (CSP, allowlists), Tauri-Rust-Stack baut.
+- `./gradlew assembleDebug` → grün. Identisch zur Plan-Auflage **PC-A-MAN-5** — Build-Auflage damit faktisch erfüllt. Bleibt formal in todo.md als [ ] stehen, weil Admin-Final-Gate vor Tag-Push die ganze Auflagen-Liste durchgeht.
+
+**Echt offen für Admin-Final-Gate:**
+- PC-D-MAN-4 (`cargo tauri build`) — full Tauri-Bundle-Build, geht weit über `cargo check` hinaus (Frontend-Bundling, Asset-Compression, ggf. Signing). Wird beim v0.1.1-Tag-Push verifiziert.
+- PC-D-MAN-1..3 — Live-Tauri-App-Verifikation auf Desktop-Hardware (Theme-Cycle, OS-Theme-Wechsel, Onboarding-Palette).
+- PC-A-MAN-1..4 — Live-APK-Verifikation auf Pixel (Recompose, Persistenz, System-Theme-Reaktion, Footer auf allen 7 Routes).
+
+### Findings
+
+Keine Blocker. Keine Major. Keine Minor.
+
+Beobachtungen ohne Findings-Status:
+- HANDOVER.md wurde nicht aktualisiert (war auch nicht im Plan-Scope). Falls Admin den Sprint im HANDOVER.md zentral dokumentieren möchte, ist das ein 5-Minuten-Folge-Patch — kein Sprint-Blocker.
+
+### Verdikt
+
+**✅ Freigabe ohne Auflagen** — Sprint "Polymorphic Clock" ist Code-Tuvok-grün. Drei Commits (`feat(desktop):`, `feat(android):`, `docs(PC):`) können angelegt werden. Live-E2E-Verifikation und v0.1.1-Tag-Push sind Admin-Final-Gate-Auflagen wie geplant.
+
+Iteration 1 → grün. Keine Findings, keine Korrektur-Zyklen über alle drei Phasen + Final-Gate.

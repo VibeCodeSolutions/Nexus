@@ -1,5 +1,25 @@
 # NEXUS — Changelog
 
+## [Unreleased] — Sprint "Polymorphic Clock" (2026-05-01)
+
+### Added
+- **Theme-Switcher (Hell / Dunkel / System)** — Desktop und Android. Auf Desktop ein Cycle-Button im Header (`☀️ Hell` → `🌙 Dunkel` → `🎨 System`), persistiert in `localStorage["nexus_theme"]`, reagiert live auf OS-Theme-Wechsel im System-Modus. Auf Android `SingleChoiceSegmentedButtonRow` im neuen "Darstellung"-Block der Settings, persistiert in `SharedPreferences("nexus_ui")`.
+- **Sticky VibeCode-Solutions-Footer** auf jeder NEXUS-Seite — "Powered by **VibeCode Solutions** · NEXUS v0.1.0". Desktop: `<footer class="app-footer">` als sticky Bottom-Element. Android: `NexusFooter`-Composable in `Scaffold.bottomBar` über der NavigationBar.
+- **Material-3-Refresh:** Akzent von Lila auf Indigo (`#3D5AFE` Light / `#8C9EFF` Dark), Sekundär Teal (`#00897B` / `#4DB6AC`). Card-Radius 16px, Btn-Radius 10px, Card-Hover-State mit `translateY` + Primary-Border, Btn-Primary mit `box-shadow`, aktiver Tab mit Primary-Tint-Background.
+- **`UiPreferences`** (Android) — schlanker SharedPreferences-Wrapper für nicht-sensitive UI-Pref (separat von `ConnectionSettings`/EncryptedSharedPreferences).
+- **`NexusFooter`-Composable** (Android, neu) und **`AppearanceCard`** (privat in SettingsScreen.kt).
+
+### Changed
+- **`NexusTheme`-API:** Parameter `themeMode: ThemeMode` (Enum LIGHT/DARK/SYSTEM) statt `darkTheme: Boolean`. **`dynamicColor`-Pfad entfernt** — bewusst, um konsistente Marken-Palette über Desktop+Android zu garantieren.
+- **CSS-Tokens (Desktop):** `--accent` → `--primary`, neue Tokens `--primary-tint`, `--secondary`, `--radius-card`, `--radius-btn`, `--shadow-soft`. Hartcodierte Lila-rgba durch `--primary-tint` ersetzt.
+
+### Hardware-/Build-Auflagen (Final-Gate)
+- Tauri-Build (`cd desktop && cargo tauri build` / `pnpm tauri build`) grün.
+- Android-Build (`cd android && ./gradlew assembleDebug`) grün.
+- Live-Verifikation: Theme-Cycle 3-fach, OS-Theme-Wechsel auf "System", Persistenz über App-Restart, Footer auf allen Routes.
+
+---
+
 ## [Unreleased] — Sprint "🐙 Joyful Jellyfish" (2026-05-01)
 
 ### Added

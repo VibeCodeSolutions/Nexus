@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,7 +39,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vibecode.nexus.data.ConnectionSettings
 import com.vibecode.nexus.data.NexusApiClient
+import com.vibecode.nexus.data.UiPreferences
 import com.vibecode.nexus.speech.SpeechRecognizerManager
+import com.vibecode.nexus.ui.components.NexusFooter
 import com.vibecode.nexus.ui.screen.BrainDumpHistoryScreen
 import com.vibecode.nexus.ui.screen.BrainDumpScreen
 import com.vibecode.nexus.ui.screen.PairScreen
@@ -47,6 +50,7 @@ import com.vibecode.nexus.ui.screen.SettingsScreen
 import com.vibecode.nexus.ui.screen.TasksScreen
 import com.vibecode.nexus.ui.screen.WelcomeScreen
 import com.vibecode.nexus.ui.theme.NexusTheme
+import com.vibecode.nexus.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -77,7 +81,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         consumePairingFromIntent(intent)
         setContent {
-            NexusTheme {
+            val uiPreferences = remember { UiPreferences(this) }
+            var themeMode by remember { mutableStateOf(uiPreferences.themeMode) }
+            NexusTheme(themeMode = themeMode) {
                 val navController = rememberNavController()
                 val connectionSettings = remember { ConnectionSettings(this) }
                 val apiClient = remember { NexusApiClient(connectionSettings) }
@@ -160,25 +166,28 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     bottomBar = {
-                        NavigationBar {
-                            bottomNavItems.forEach { item ->
-                                NavigationBarItem(
-                                    selected = currentRoute == item.route,
-                                    onClick = {
-                                        if (currentRoute != item.route) {
-                                            navController.navigate(item.route) {
-                                                popUpTo(navController.graph.startDestinationId) {
-                                                    saveState = true
+                        Column {
+                            NavigationBar {
+                                bottomNavItems.forEach { item ->
+                                    NavigationBarItem(
+                                        selected = currentRoute == item.route,
+                                        onClick = {
+                                            if (currentRoute != item.route) {
+                                                navController.navigate(item.route) {
+                                                    popUpTo(navController.graph.startDestinationId) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
                                                 }
-                                                launchSingleTop = true
-                                                restoreState = true
                                             }
-                                        }
-                                    },
-                                    icon = { Icon(item.icon, contentDescription = item.label) },
-                                    label = { Text(item.label) }
-                                )
+                                        },
+                                        icon = { Icon(item.icon, contentDescription = item.label) },
+                                        label = { Text(item.label) }
+                                    )
+                                }
                             }
+                            NexusFooter()
                         }
                     }
                 ) { innerPadding ->
@@ -236,6 +245,11 @@ class MainActivity : ComponentActivity() {
                             SettingsScreen(
                                 connectionSettings = connectionSettings,
                                 apiClient = apiClient,
+                                themeMode = themeMode,
+                                onThemeChange = { mode ->
+                                    uiPreferences.themeMode = mode
+                                    themeMode = mode
+                                },
                                 onNavigateBack = {
                                     navController.popBackStack()
                                 },

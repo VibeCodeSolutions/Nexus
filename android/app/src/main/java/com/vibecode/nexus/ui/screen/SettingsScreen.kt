@@ -38,6 +38,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -57,8 +60,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.vibecode.nexus.NexusApplication
+import com.vibecode.nexus.R
 import com.vibecode.nexus.data.ConnectionSettings
 import com.vibecode.nexus.data.NexusApiClient
 import com.vibecode.nexus.data.model.ProviderStatus
@@ -66,6 +71,7 @@ import com.vibecode.nexus.data.model.SetProviderRequest
 import com.vibecode.nexus.diagnostics.DiagCheck
 import com.vibecode.nexus.diagnostics.DiagReport
 import com.vibecode.nexus.diagnostics.DiagStatus
+import com.vibecode.nexus.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -76,6 +82,8 @@ import java.util.Locale
 fun SettingsScreen(
     connectionSettings: ConnectionSettings,
     apiClient: NexusApiClient,
+    themeMode: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
     onNavigateBack: () -> Unit,
     onRestartWizard: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -216,6 +224,12 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            // Darstellung / Theme (Polymorphic Clock)
+            AppearanceCard(
+                themeMode = themeMode,
+                onThemeChange = onThemeChange,
+            )
 
             // LLM-Konfiguration (Phase C)
             if (isPaired) {
@@ -640,4 +654,45 @@ private fun formatTimestamp(unixSeconds: Long?): String {
     if (unixSeconds == null) return "—"
     val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault())
     return fmt.format(Date(unixSeconds * 1000))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppearanceCard(
+    themeMode: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.settings_appearance),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(Modifier.height(12.dp))
+            val options = listOf(
+                ThemeMode.LIGHT to R.string.theme_light,
+                ThemeMode.DARK to R.string.theme_dark,
+                ThemeMode.SYSTEM to R.string.theme_system,
+            )
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                options.forEachIndexed { index, (mode, labelRes) ->
+                    SegmentedButton(
+                        selected = themeMode == mode,
+                        onClick = { onThemeChange(mode) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = options.size,
+                        ),
+                    ) {
+                        Text(stringResource(labelRes))
+                    }
+                }
+            }
+        }
+    }
 }

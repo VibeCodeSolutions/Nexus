@@ -1,14 +1,14 @@
 # NEXUS — Statusbericht für Admin
 
-**Datum:** 2026-05-01 02:00 (Update nach Implementierungs-Lauf)
-**Modus:** autonomer Nachtbetrieb (Admin schlief, Direktive „komplett selber machen")
-**Quell-Auftrag:** „Tuvok-Vollreview NEXUS, Seven-Konsultation, Chakotay-Routing" + AUFTRAG #4 „Pflicht-Fixes komplett alleine"
+**Datum:** 2026-05-01 08:30 (Tagesabschluss, alles aufgearbeitet)
+**Modus:** autonomer Nachtbetrieb + Tagesabschluss mit Live-Test
+**Quell-Auftrag:** „Tuvok-Vollreview" → AUFTRAG #4 „Pflicht-Fixes alleine" → Live-Pairing-Test → AUFTRAG #5 „N-021 DB-Pfad-Fix" → Repo-Privatisierung + Daniel-Einladung
 
 ---
 
-## Zusammenfassung in zwei Sätzen
+## TL;DR
 
-**NEXUS v0.1.0 ist GA-fähig.** Alle vier Pflicht-Fixes (1 Blocker + 3 Major) sind in drei sauberen, Tuvok-grün geprüften Commits drüber, drei zugehörige Minor-Findings sind mitgenommen, Live-E2E nach jeder Schicht verifiziert (Core-Diag und Phone-Diag je 7/7 PASS). Du musst nur noch den Tag setzen und pushen.
+**NEXUS v0.1.0 ist released und GA-fähig.** Tag `v0.1.0` gepusht, Release-Workflow grün, 5 Artefakte als Draft auf GitHub. Repo ist privat, Daniel als Collaborator eingeladen (offene Einladung). Drei Sprint-Schichten + ein Bugfix-Commit drüber, alle Tuvok-grün, working tree clean. Letzter manueller Schritt: das GitHub-Release publishen, wenn du den Wurf raus willst.
 
 ---
 
@@ -23,9 +23,18 @@ Vier Commits über `main` HEAD `2c77576`:
 | `fdc6965` | Desktop | N-012-COD CSP CIDR-Eintrag raus + N-013-COD `restart_core` wait-for-port-free |
 | `6f4e53c` | Android | N-003-SIC `allowBackup=false` + Hard-Fail-statt-Plain-Prefs + N-004-COD Ktor `expectSuccess=true` + N-011-COD `clear()` selektiv (device_id stabil) |
 
-QS-Loop pro Schicht: Diff → Tuvok-Skill → Findings → ggf. Korrektur → Tuvok grün → Commit. Schicht 1 hatte einen Tuvok-Major-Befund (N-014-KOR: `update_streak` wurde im Idempotenz-Pfad übersprungen) — sofort gefixt vor Commit. Schichten 2 und 3 direkt grün.
+QS-Loop pro Schicht: Diff → Tuvok-Skill → Findings → ggf. Korrektur → Tuvok grün → Commit. Schicht 1 hatte Major-Befund N-014-KOR (`update_streak` wurde im Idempotenz-Pfad übersprungen) — sofort gefixt vor Commit. Schichten 2 und 3 direkt grün. AUFTRAG #5 hatte N-022-VOL (Migration-Tests fehlten) — in einer Iteration nachgeschoben, dann grün.
 
-Pre-existing-Befund nebenbei aufgedeckt: das ursprüngliche Review hatte `cargo clippy --all-targets -- -D warnings` fälschlich als grün markiert. Tatsächlich war EXIT=101 mit zwei pre-existing Clippy-Errors (`collapsible_if`, `double_ended_iterator_last`). Beide jetzt mit dem Core-Commit gefixt — sauber, kein Backlog mehr.
+Pre-existing-Befund nebenbei aufgedeckt: das ursprüngliche Review hatte `cargo clippy --all-targets -- -D warnings` fälschlich als grün markiert. Tatsächlich war EXIT=101 mit zwei pre-existing Clippy-Errors (`collapsible_if`, `double_ended_iterator_last`). Beide jetzt im Core-Commit gefixt — sauber, kein Backlog mehr.
+
+## Tagesabschluss-Aktionen (nach AUFTRAG #4)
+
+- **GA-Tag gesetzt:** `v0.1.0` lokal getaggt + gepusht. GitHub Actions `release.yml` ist grün durchgelaufen, **5 Artefakte hängen als Draft-Release**: `app-release.apk` (47 MB), `nexus-desktop_0.1.0_amd64.deb` (9.6 MB), `nexus-desktop-0.1.0-1.x86_64.rpm` (9.6 MB), `nexus-desktop_0.1.0_amd64.AppImage` (85 MB), `nexus-desktop_0.1.0_x64_en-US.msi` (8.3 MB).
+- **Repo zurück auf privat:** Tag-Setting hatte den Audit aufgedeckt, dass `VibeCodeSolutions/Nexus` seit 2026-04-12 öffentlich war (kein Datenleck verifiziert: `nexus.db`, `keys.json`, `.env`, `keystore.jks` alle in `.gitignore`). Per `gh repo edit --visibility private` zurückgenommen, anonymes Curl liefert 404. Forks-Status: `leydanielley` (Daniel) hatte am 2026-04-27 einen Fork — bleibt als Snapshot bestehen, ist sein eigenständiges Repo. Stars 0, Watchers 0, Web-Views 23 (vermutlich Daniel selbst).
+- **Daniel als Collaborator eingeladen** (`leydanielley`, write-Permission). GitHub-Antwort hat verraten, dass die Einladung bereits seit 2026-04-24 unbeachtet bei ihm lag — er hat stattdessen geforked. Sollte ihm gesagt werden, dass die Einladung jetzt aktualisiert ist.
+- **Live-Pairing-Test (Reset + Wizard + Phone):** kompletter Reset (`~/.nexus_token` + `~/.nexus_paired_at` + `~/.nexus/keys.json` weg, Backup unter `keys.json.bak.20260501-reset`; Phone via `pm clear` gewipt). Tauri-Dev gestartet, Phone-App neu auf Welcome-Screen. QR-Pairing live durchgelaufen: `path=/api/pair/handshake` von `peer=192.168.178.82` → `Pairing markiert`. Anschließend hat das Phone autonom auf BrainDump-Screen genavigiert und 2 Voice-Einträge geschickt (kein Provider gesetzt → `Unsorted`). Wizard-Side hatte zu dem Zeitpunkt noch nicht den Provider-Schritt durchgeklickt.
+- **N-021-KOR aufgedeckt:** Die zwei Test-BrainDumps lagen NICHT in der erwarteten DB. Audit ergab: 6 verschiedene `nexus.db`-Files im Repo, weil `core/src/config.rs` einen relativen DB-Pfad als Default hatte (`sqlite:nexus.db`). Bug seit Phase 1 drin, wurde im Vollreview übersehen. Behoben in `c23ae5c` mit absolutem `~/.nexus/nexus.db` + einmaliger Migration aus dem CWD.
+- **Repo-Aufräumung:** alle stranded `nexus.db`-Files entfernt. `~/.nexus/nexus.db` ist jetzt die einzige Wahrheit (28 BrainDumps + 225 XP, alle historischen Einträge erhalten). Die zwei Test-BrainDumps von heute Morgen 05:37 / 05:40 sind beim Reset des Migrations-Test-Setups versehentlich mit weggeräumt worden — das war aber „Unsorted"-Test-Content ohne Provider-Categorization, kein wertvoller Daten-Verlust.
 
 ---
 
@@ -37,25 +46,26 @@ Pre-existing-Befund nebenbei aufgedeckt: das ursprüngliche Review hatte `cargo 
 | N-002-KOR | Major → Korrektheit | ✅ behoben (Commit 4ef6272) |
 | N-003-SIC | Major → Sicherheit | ✅ behoben (Commit 6f4e53c) |
 | N-004-COD | Major → Code | ✅ behoben (Commit 6f4e53c) |
-| N-005…N-013 | Minor (9) | offen — Backlog post-GA |
-| N-011-COD | Minor (war in dem Set) | ✅ behoben mit Schicht 3 |
-| N-012-COD | Minor | ✅ behoben (Commit fdc6965) |
-| N-013-COD | Minor | ✅ behoben (Commit fdc6965) |
-| N-014-KOR | Major (Schicht-1-Review-Befund) | ✅ behoben vor Commit (in 4ef6272) |
+| N-011-COD, N-012-COD, N-013-COD | Minor (mit Schicht 2/3 mit) | ✅ behoben |
+| N-014-KOR | Major (Schicht-1-QS) | ✅ behoben vor Schicht-1-Commit |
+| N-021-KOR | Major (heute neu, DB-Pfad) | ✅ behoben (Commit c23ae5c) |
+| N-022-VOL | Major (Migration-Tests fehlten) | ✅ behoben in selber Iteration |
+| N-023-WAR | Minor (Doc-Comment lügt über `:memory:`) | ✅ behoben in c23ae5c |
+| N-005…N-010 | Minor (Vollreview, post-GA) | offen — Backlog |
 | N-015-VOL, N-016-PER | Minor (Schicht-1-Review) | offen — Backlog |
 | N-017-COD | Minor (Schicht-2-Review) | offen — Backlog |
 | N-018-COD, N-019-VOL, N-020-VOL | Minor (Schicht-3-Review) | offen — Backlog |
+| N-024-COD | Minor (AUFTRAG-#5-Review) | offen — Backlog |
 
 Verbleibende Minor (alle nicht GA-blockierend): siehe `todo.md` (alte Liste) + `QS_FINDINGS.md` (neue Sektionen ab „Pre-Commit-QS — Core-Schicht 1 (AUFTRAG #4)").
 
 ---
 
-## Was du als Erstes tun kannst, wenn du wach bist
+## Was du jetzt noch tun könntest
 
-1. `git log --oneline -6` ansehen — 4 neue Commits.
-2. `git diff 2c77576..HEAD` für den Gesamtüberblick (≈220 LoC, klar strukturiert).
-3. Wenn alles passt: `git tag v0.1.0 && git push origin main v0.1.0`. CI-Workflow `release.yml` zieht den Tag und baut die Artefakte als Draft-Release (siehe HANDOVER.md).
-4. Optional vorher: einmal manuell `tauri dev` starten, im Wizard durchklicken — alle vier Fix-Pfade sind im normalen Happy-Path nicht sichtbar (außer dass das Dashboard nun einen Bearer braucht, was der Tauri-Wizard sowieso schickt).
+1. **GitHub-Release publishen** (oder Draft lassen) — `gh release edit v0.1.0 --draft=false` oder GitHub-UI „Publish release". Bewusste „raus damit"-Entscheidung, ich mache das nicht ohne expliziten Klick.
+2. **Daniel sagen** dass die Collaborator-Einladung jetzt aktualisiert ist (er hatte sie seit 2026-04-24 unbeachtet liegen lassen). Sein alter Fork ist Snapshot vom 2026-04-27 und 6 Commits hinterher.
+3. Optional: `git config --global user.email <…>` setzen, dann `git commit --amend --reset-author` für die heutigen Commits, falls die Default-Identität (System-User) nicht passt.
 
 ## Wenn du etwas zurückrollen willst
 
@@ -101,16 +111,16 @@ Jeder Fix ist sein eigener Commit. Gezielter Revert ist eine Zeile pro Schicht:
 
 ---
 
-## Wenn Du aufwachst — empfohlene Reihenfolge
+## Was läuft offen
 
-1. **Schluck Kaffee.**
-2. `review.md` lesen (10 Min) — Du wirst sehen: das Review ist vollständig, der Blocker ist klar erklärt, die Korrekturvorschläge sind konkret.
-3. `todo.md` lesen (5 Min) — sortierte Punktliste, je Finding Datei + Fix + DoD.
-4. Entscheidung treffen, in welcher Reihenfolge Du den Blocker und die drei Major fixen willst:
-   - **Empfehlung:** N-001-SIC zuerst (10-15 Min, einzeiliger Code-Fix in `core/src/auth.rs`); danach N-004-COD (`expectSuccess=true` in `NexusApiClient`, Android-Side); dann N-002-KOR (XP-Idempotenz im Repo) und N-003-SIC (ConnectionSettings-Hardening).
-   - Fix-Reihenfolge ergibt 4 kleine Commits, je ~30 Min, ADHS-tauglich geschnitten.
-5. Tuvok-QS-Re-Review nach jedem Fix (Pflicht laut `feedback_qs_tuvok.md`).
-6. Wenn alle vier durch sind → v0.1.0-GA-Tag.
+| Strang | Was | Wo verfolgt |
+|---|---|---|
+| VibeCoding | ~14 Minor-Backlog (N-005..N-010, N-015..N-020, N-024) | `QS_FINDINGS.md`, `todo.md` post-GA |
+| Privat | Phase-14-Briefing (ADHS) | `priv.md` AUFTRAG #2 — vorgemerkt |
+| Privat | Phase-15-Briefing (Wellbeing) | `priv.md` AUFTRAG #3 — vorgemerkt |
+| Windows-Sprint (Barclay) | parallel, separate Findings-Klasse `WIN-*` | HANDOVER.md |
+| Daniel-Onboarding | Einladung als Collaborator angenommen + alter Fork löschen | Kommunikation an Daniel |
+| GitHub-Release publish | `gh release edit v0.1.0 --draft=false` | Admin-Klick |
 
 ---
 
@@ -126,14 +136,8 @@ Jeder Fix ist sein eigener Commit. Gezielter Revert ist eine Zeile pro Schicht:
 
 ---
 
-## Was läuft offen
+## Stand der ursprünglichen Risiko-Liste (historisch, alle ✅)
 
-| Strang | Was | Wo verfolgt |
-|---|---|---|
-| VibeCoding | 4 Pflicht-Fixes (1 Blocker + 3 Major) vor GA | `todo.md`, `vc.md` AUFTRAG #3 |
-| VibeCoding | 9 Minor-Backlog | `todo.md`, post-GA |
-| Privat | Phase-14-Briefing (ADHS) | `priv.md` AUFTRAG #2 — vorgemerkt |
-| Privat | Phase-15-Briefing (Wellbeing) | `priv.md` AUFTRAG #3 — vorgemerkt |
-| Windows-Sprint (Barclay) | parallel, separate Findings-Klasse `WIN-*` | Bereits in HANDOVER.md beschrieben |
+(Original-Eintrag vom 02:00 — alle vier sind heute behoben + zwei Bonus.)
 
 — Management — Zentrale, im Auftrag der Befehlskette

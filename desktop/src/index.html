@@ -87,6 +87,11 @@ body {
 .btn-danger { background: var(--danger); color: #fff; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Banner */
+.banner { padding: 10px 14px; border-radius: 6px; margin: 0 auto 12px; max-width: 1200px; font-size: 13px; box-sizing: border-box; }
+.banner.error { background: rgba(220, 53, 69, 0.12); color: var(--danger); border: 1px solid rgba(220, 53, 69, 0.3); }
+.banner.hidden { display: none; }
+
 /* Table */
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -364,6 +369,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   <button class="tab" data-tab="achievements">Achievements</button>
 </div>
 
+<div id="globalBanner" class="banner error hidden" role="alert"></div>
+
 <!-- BrainDumps Tab -->
 <div class="content tab-content" id="tab-braindumps">
   <div class="toolbar">
@@ -372,6 +379,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
       <option value="">All Categories</option>
     </select>
     <button class="btn btn-primary" onclick="refreshBraindumps()">Refresh</button>
+    <button class="btn btn-ghost btn-sm" id="bdUnsortedBadge" onclick="filterUnsorted()" style="display:none;">Unsortiert (0)</button>
     <button class="btn btn-danger" id="bdBulkDelete" onclick="deleteSelectedBraindumps()" disabled>Ausgewählte löschen</button>
   </div>
   <div id="bdTable"></div>
@@ -389,7 +397,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 <div class="content tab-content hidden" id="tab-tasks">
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openNewTask()">+ New Task</button>
-    <button class="btn btn-ghost" onclick="refreshTasks()">Refresh</button>
+    <button class="btn btn-primary" id="taskRefreshBtn" onclick="refreshTasks()">Refresh</button>
     <select id="taskFilterStatus" onchange="renderTasks()">
       <option value="">Alle Status</option>
       <option value="open">Offen</option>
@@ -424,9 +432,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
     <input type="text" id="settingUrl" placeholder="http://127.0.0.1:7777">
     <label>Bearer Token</label>
     <input type="password" id="settingToken" placeholder="Enter your API token">
-    <div class="actions">
-      <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+
+    <h3 style="margin-top: 20px; margin-bottom: 8px; font-size: 14px;">LLM-Konfiguration</h3>
+    <label>Provider</label>
+    <select id="settingProvider"><option value="">(lädt…)</option></select>
+    <label>Modell</label>
+    <select id="settingModel"><option value="">(zuerst Provider wählen)</option></select>
+    <label>API-Key (leer = unverändert)</label>
+    <input type="password" id="settingApiKey" placeholder="">
+    <button class="btn btn-ghost btn-sm" onclick="saveLlmConfig()" style="margin-top: 6px;">LLM speichern</button>
+
+    <div class="actions" style="margin-top: 16px;">
+      <button class="btn btn-ghost" onclick="closeSettings()">Schließen</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Verbindung speichern</button>
     </div>
   </div>
 </div>
@@ -477,18 +495,47 @@ let tasks = [];
 let achievements = [];
 
 // --- API ---
-async function api(path, opts = {}) {
+function showBanner(msg) {
+  const b = document.getElementById('globalBanner');
+  if (!b) return;
+  b.textContent = msg;
+  b.classList.remove('hidden');
+}
+function hideBanner() {
+  const b = document.getElementById('globalBanner');
+  if (!b) return;
+  b.classList.add('hidden');
+  b.textContent = '';
+}
+
+async function api(path, opts = {}, control = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(coreUrl + path, { ...opts, headers });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const silent = !!control.silent;
+  let res;
+  try {
+    res = await fetch(coreUrl + path, { ...opts, headers });
+  } catch (e) {
+    if (!silent) showBanner(`Core nicht erreichbar (${coreUrl}): ${e.message}`);
+    throw e;
+  }
+  if (!res.ok) {
+    if (!silent) {
+      if (res.status === 401) {
+        showBanner('Authentifizierung fehlgeschlagen — bitte Pairing erneuern (Settings → Wizard).');
+      } else {
+        showBanner(`API-Fehler ${res.status}: ${res.statusText} (${path})`);
+      }
+    }
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
 
 async function checkConnection() {
   try {
-    await api('/health');
+    await api('/health', {}, { silent: true });
     document.getElementById('statusDot').classList.add('connected');
     document.getElementById('statusDot').title = 'Connected to ' + coreUrl;
   } catch {
@@ -519,10 +566,36 @@ async function refreshBraindumps() {
     if (!Array.isArray(braindumps)) braindumps = braindumps.data || braindumps.items || [];
     populateCategoryFilter();
     renderBraindumps(braindumps);
+    refreshUnsortedBadge();
   } catch (e) {
     document.getElementById('bdTable').innerHTML =
       '<div class="empty-state"><p>Could not load braindumps: ' + e.message + '</p></div>';
   }
+}
+
+async function refreshUnsortedBadge() {
+  const btn = document.getElementById('bdUnsortedBadge');
+  if (!btn) return;
+  try {
+    const data = await api('/braindump/unsorted/count');
+    const n = data.count || 0;
+    btn.textContent = `Unsortiert (${n})`;
+    btn.style.display = n > 0 ? '' : 'none';
+  } catch {
+    btn.style.display = 'none';
+  }
+}
+
+function filterUnsorted() {
+  const sel = document.getElementById('bdCategory');
+  if (!Array.from(sel.options).some(o => o.value === 'Unsorted')) {
+    const opt = document.createElement('option');
+    opt.value = 'Unsorted';
+    opt.textContent = 'Unsorted';
+    sel.appendChild(opt);
+  }
+  sel.value = 'Unsorted';
+  filterBraindumps();
 }
 
 function populateCategoryFilter() {
@@ -646,6 +719,10 @@ async function deleteProject(id) {
 
 // --- Tasks ---
 async function refreshTasks() {
+  const btn = document.getElementById('taskRefreshBtn');
+  const originalText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Lade…'; }
+  hideBanner();
   try {
     tasks = await api('/tasks');
     if (!Array.isArray(tasks)) tasks = tasks.data || tasks.items || [];
@@ -660,6 +737,8 @@ async function refreshTasks() {
   } catch (e) {
     document.getElementById('taskList').innerHTML =
       '<div class="empty-state"><p>Could not load tasks: ' + e.message + '</p></div>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
   }
 }
 
@@ -832,10 +911,11 @@ function openAchievement(id) {
 function closeAchievement() { document.getElementById('achievementModal').classList.add('hidden'); }
 
 // --- Settings ---
-function openSettings() {
+async function openSettings() {
   document.getElementById('settingUrl').value = coreUrl;
   document.getElementById('settingToken').value = token;
   document.getElementById('settingsModal').classList.remove('hidden');
+  loadLlmProviders();
 }
 function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
 function saveSettings() {
@@ -845,6 +925,58 @@ function saveSettings() {
   localStorage.setItem('nexus_token', token);
   closeSettings();
   checkConnection();
+}
+
+async function loadLlmProviders() {
+  const sel = document.getElementById('settingProvider');
+  const modelSel = document.getElementById('settingModel');
+  try {
+    const data = await api('/api/settings/providers');
+    const providers = data.providers || [];
+    sel.innerHTML = providers.map(p => {
+      const flags = (p.has_key ? ' ✓' : '') + (p.is_default ? ' ★' : '');
+      return `<option value="${p.name}"${p.is_default ? ' selected' : ''}>${p.name}${flags}</option>`;
+    }).join('');
+    sel.onchange = () => loadLlmModels(sel.value);
+    if (sel.value) loadLlmModels(sel.value);
+  } catch (e) {
+    sel.innerHTML = `<option value="">Fehler: ${e.message}</option>`;
+    modelSel.innerHTML = '<option value="">—</option>';
+  }
+}
+
+async function loadLlmModels(provider) {
+  const modelSel = document.getElementById('settingModel');
+  if (!provider) { modelSel.innerHTML = '<option value="">—</option>'; return; }
+  try {
+    const data = await api('/api/settings/models?provider=' + encodeURIComponent(provider));
+    const models = data.models || [];
+    const current = data.current;
+    modelSel.innerHTML = models.map(m =>
+      `<option value="${m}"${m === current ? ' selected' : ''}>${m}</option>`
+    ).join('');
+  } catch (e) {
+    modelSel.innerHTML = `<option value="">Fehler: ${e.message}</option>`;
+  }
+}
+
+async function saveLlmConfig() {
+  const provider = document.getElementById('settingProvider').value;
+  const model = document.getElementById('settingModel').value;
+  const apiKey = document.getElementById('settingApiKey').value;
+  if (!provider) { showBanner('Kein Provider ausgewählt'); return; }
+  const body = { provider, model: model || null };
+  if (apiKey) body.api_key = apiKey;
+  try {
+    await api('/api/settings/provider', { method: 'POST', body: JSON.stringify(body) });
+    document.getElementById('settingApiKey').value = '';
+    hideBanner();
+    showBanner(`LLM gespeichert: ${provider}${model ? ' / ' + model : ''}`);
+    setTimeout(hideBanner, 3000);
+    loadLlmProviders();
+  } catch (e) {
+    // showBanner already triggered by api()
+  }
 }
 
 // --- Util ---

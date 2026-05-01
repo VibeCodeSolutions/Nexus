@@ -8,18 +8,40 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg: #0f0f1a;
-  --bg-card: #1a1a2e;
-  --bg-input: #16162b;
-  --accent: #7c5cbf;
-  --accent-hover: #9b7fd4;
-  --text: #e0e0e0;
-  --text-dim: #888;
-  --border: #2a2a40;
-  --success: #4caf50;
-  --warning: #ff9800;
-  --danger: #ef5350;
+:root, [data-theme="dark"] {
+  --bg: #0F1115;
+  --bg-card: #181B22;
+  --bg-input: #11141A;
+  --primary: #8C9EFF;
+  --primary-hover: #B0BCFF;
+  --primary-tint: rgba(140, 158, 255, 0.14);
+  --secondary: #4DB6AC;
+  --text: #E8EAF0;
+  --text-dim: #8B92A1;
+  --border: #262A33;
+  --success: #66BB6A;
+  --warning: #FFB74D;
+  --danger: #EF5350;
+  --radius-card: 16px;
+  --radius-btn: 10px;
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] {
+  --bg: #F7F8FB;
+  --bg-card: #FFFFFF;
+  --bg-input: #F0F2F7;
+  --primary: #3D5AFE;
+  --primary-hover: #2F46D8;
+  --primary-tint: rgba(61, 90, 254, 0.10);
+  --secondary: #00897B;
+  --text: #0E1116;
+  --text-dim: #5A6172;
+  --border: #E1E5EE;
+  --success: #2E7D32;
+  --warning: #ED6C02;
+  --danger: #C62828;
+  --shadow-soft: 0 1px 2px rgba(61, 90, 254, 0.18);
 }
 
 body {
@@ -28,6 +50,25 @@ body {
   color: var(--text);
   min-height: 100vh;
 }
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.app-shell > .tabs ~ .content,
+.app-shell > .content { flex: 1; }
+.app-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 16px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+}
+.app-footer strong { color: var(--primary); font-weight: 600; }
 
 /* Header */
 .header {
@@ -39,7 +80,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .header h1 { font-size: 20px; font-weight: 600; }
-.header h1 span { color: var(--accent); }
+.header h1 span { color: var(--primary); }
 .header-actions { display: flex; gap: 12px; align-items: center; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); display: inline-block; }
 .status-dot.connected { background: var(--success); }
@@ -64,28 +105,29 @@ body {
   transition: all 0.2s;
 }
 .tab:hover { color: var(--text); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-tint); }
 
 /* Content */
 .content { padding: 24px; max-width: 1200px; margin: 0 auto; }
 
 /* Buttons */
 .btn {
-  padding: 8px 16px;
+  padding: 9px 18px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-btn);
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-primary { background: var(--primary); color: #fff; box-shadow: var(--shadow-soft); }
+.btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
 .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
-.btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
+.btn-ghost:hover { color: var(--text); border-color: var(--primary); background: var(--primary-tint); }
 .btn-danger { background: var(--danger); color: #fff; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
 /* Banner */
 .banner { padding: 10px 14px; border-radius: 6px; margin: 0 auto 12px; max-width: 1200px; font-size: 13px; box-sizing: border-box; }
@@ -104,10 +146,12 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
   padding: 20px;
   position: relative;
+  transition: border-color 0.2s, transform 0.15s;
 }
+.card:hover { border-color: var(--primary); transform: translateY(-1px); }
 .card h3 { font-size: 16px; margin-bottom: 8px; padding-right: 32px; }
 .card p { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
 .card-delete {
@@ -119,7 +163,7 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 
 /* Progress bar */
 .progress-bar { background: var(--bg); border-radius: 4px; height: 8px; overflow: hidden; }
-.progress-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.4s; }
+.progress-fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width 0.4s; }
 
 /* Input */
 input, select, textarea {
@@ -132,7 +176,7 @@ input, select, textarea {
   outline: none;
   width: 100%;
 }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 
 /* Toolbar */
 .toolbar { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
@@ -144,8 +188,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   align-items: center; justify-content: center; z-index: 100;
 }
 .modal {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card);
   padding: 24px; width: 440px; max-width: 90vw;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 }
 .modal h2 { margin-bottom: 16px; font-size: 18px; }
 .modal label { display: block; font-size: 13px; color: var(--text-dim); margin: 12px 0 4px; }
@@ -163,7 +208,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   cursor: pointer; font-size: 12px; color: var(--text-dim);
   padding: 6px 0; user-select: none;
 }
-.task-subgroup summary::-webkit-details-marker { color: var(--accent); }
+.task-subgroup summary::-webkit-details-marker { color: var(--primary); }
 .task-item {
   display: flex; align-items: center; gap: 12px; padding: 12px 16px;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
@@ -174,7 +219,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; transition: all 0.2s;
 }
-.task-item .checkbox.done { background: var(--accent); border-color: var(--accent); }
+.task-item .checkbox.done { background: var(--primary); border-color: var(--primary); }
 .task-item .checkbox.done::after { content: '\2713'; color: #fff; font-size: 13px; }
 .task-item .task-title { flex: 1; font-size: 14px; }
 .task-item .task-title.done { text-decoration: line-through; color: var(--text-dim); }
@@ -184,19 +229,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px;
   font-weight: 600; text-transform: uppercase;
 }
-.badge-category { background: rgba(124,92,191,0.2); color: var(--accent); }
+.badge-category { background: var(--primary-tint); color: var(--primary); }
 .badge-priority-high { background: rgba(239,83,80,0.2); color: var(--danger); }
 .badge-priority-medium { background: rgba(255,152,0,0.2); color: var(--warning); }
 .badge-priority-low { background: rgba(76,175,80,0.2); color: var(--success); }
 
 /* Achievements */
 .achievement-card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card);
   padding: 16px; display: flex; align-items: center; gap: 14px;
   cursor: pointer; transition: transform 0.15s, border-color 0.2s;
 }
-.achievement-card:hover { transform: translateY(-2px); border-color: var(--accent); }
-.achievement-card.unlocked { border-color: var(--accent); }
+.achievement-card:hover { transform: translateY(-2px); border-color: var(--primary); }
+.achievement-card.unlocked { border-color: var(--primary); }
 .achievement-card.locked { opacity: 0.5; }
 .achievement-card .ach-icon {
   font-size: 28px; width: 44px; height: 44px; flex-shrink: 0;
@@ -213,7 +258,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   margin-left: auto; margin-right: auto;
 }
 .modal .ach-modal-status { margin-top: 12px; font-size: 13px; color: var(--text-dim); }
-.modal .ach-modal-status.unlocked { color: var(--accent); }
+.modal .ach-modal-status.unlocked { color: var(--primary); }
 
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
 .empty-state p { font-size: 14px; }
@@ -234,23 +279,24 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .onboarding-screen { display: none; max-width: 640px; width: 100%; text-align: center; }
 .onboarding-screen.active { display: block; }
 .onboarding-screen h1 { font-size: 2rem; margin-bottom: 1rem; color: var(--text); }
-.onboarding-screen h1 .brand { color: var(--accent); }
+.onboarding-screen h1 .brand { color: var(--primary); }
 .onboarding-screen > p { color: var(--text-dim); margin-bottom: 2rem; font-size: 15px; }
 .onboarding-screen .button-row { display: flex; gap: 1rem; justify-content: center; margin-top: 2rem; }
 .onboarding-screen .btn-primary {
-  padding: 12px 28px; border-radius: 8px; border: none; cursor: pointer;
+  padding: 12px 28px; border-radius: var(--radius-btn); border: none; cursor: pointer;
   font-size: 15px; font-weight: 500;
-  background: var(--accent); color: #fff; transition: background 0.2s;
+  background: var(--primary); color: #fff; transition: background 0.2s, transform 0.15s;
+  box-shadow: var(--shadow-soft);
 }
-.onboarding-screen .btn-primary:hover { background: var(--accent-hover); }
-.onboarding-screen .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.onboarding-screen .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.onboarding-screen .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 .onboarding-screen .btn-secondary {
-  padding: 12px 28px; border-radius: 8px; cursor: pointer;
+  padding: 12px 28px; border-radius: var(--radius-btn); cursor: pointer;
   font-size: 15px; font-weight: 500;
   background: transparent; color: var(--text); border: 1px solid var(--border);
   transition: border-color 0.2s;
 }
-.onboarding-screen .btn-secondary:hover { border-color: var(--text-dim); }
+.onboarding-screen .btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
 #qrContainer {
   display: flex; justify-content: center; margin: 2rem auto;
   padding: 1rem; background: #fff; border-radius: 12px;
@@ -264,20 +310,21 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .provider-card {
   padding: 14px;
   border: 2px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
   background: var(--bg-card);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
   text-align: left;
 }
-.provider-card:hover { border-color: var(--accent); }
-.provider-card.selected { border-color: var(--accent); background: rgba(124,92,191,0.12); }
+.provider-card:hover { transform: translateY(-1px); }
+.provider-card:hover { border-color: var(--primary); }
+.provider-card.selected { border-color: var(--primary); background: var(--primary-tint); }
 .provider-card h3 { margin: 0 0 4px; font-size: 14px; color: var(--text); }
 .provider-card .cost { font-size: 12px; color: var(--text-dim); }
 .provider-card .status { font-size: 11px; color: var(--success); margin-top: 6px; font-weight: 600; }
 #providerDetail {
   margin-top: 1.5rem; padding: 1.5rem; background: var(--bg-card);
-  border: 1px solid var(--border); border-radius: 12px; text-align: left;
+  border: 1px solid var(--border); border-radius: var(--radius-card); text-align: left;
 }
 #providerDetail.hidden { display: none !important; }
 #providerDetail p { color: var(--text-dim); margin: 0.5rem 0; font-size: 14px; }
@@ -287,9 +334,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   border-radius: 6px; border: 1px solid var(--border);
   background: var(--bg-input); color: var(--text); font-size: 14px;
 }
-#providerDetail input:focus { border-color: var(--accent); outline: none; }
+#providerDetail input:focus { border-color: var(--primary); outline: none; }
 #providerDetail label { color: var(--text-dim); font-size: 14px; cursor: pointer; }
-#providerDetail a { color: var(--accent); text-decoration: none; }
+#providerDetail a { color: var(--primary); text-decoration: none; }
 #providerDetail a:hover { text-decoration: underline; }
 #providerDetail button.btn-secondary {
   margin-top: 0.75rem; padding: 8px 16px; font-size: 13px;
@@ -302,6 +349,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 </style>
 </head>
 <body>
+<div class="app-shell">
 
 <!-- Onboarding Overlay (First-Run Wizard) -->
 <div id="onboardingOverlay" class="onboarding-overlay">
@@ -358,6 +406,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   <h1><span>NEXUS</span> Dashboard</h1>
   <div class="header-actions">
     <span class="status-dot" id="statusDot" title="Disconnected"></span>
+    <button class="btn btn-ghost btn-sm" id="themeToggle" onclick="cycleTheme()" title="Theme wechseln (Hell / Dunkel / System)">🎨 System</button>
     <button class="btn btn-ghost" onclick="openSettings()">Settings</button>
   </div>
 </div>
@@ -489,10 +538,34 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 // --- State ---
 let coreUrl = localStorage.getItem('nexus_url') || 'http://127.0.0.1:7777';
 let token = localStorage.getItem('nexus_token') || '';
+let currentTheme = localStorage.getItem('nexus_theme') || 'system';
 let braindumps = [];
 let projects = [];
 let tasks = [];
 let achievements = [];
+
+// --- Theme ---
+function applyTheme(t) {
+  const effective = t === 'system'
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : t;
+  document.documentElement.setAttribute('data-theme', effective);
+  const btn = document.getElementById('themeToggle');
+  if (btn) {
+    btn.textContent = t === 'light' ? '☀️ Hell' : t === 'dark' ? '🌙 Dunkel' : '🎨 System';
+  }
+}
+function cycleTheme() {
+  const next = { system: 'light', light: 'dark', dark: 'system' };
+  currentTheme = next[currentTheme] || 'system';
+  localStorage.setItem('nexus_theme', currentTheme);
+  applyTheme(currentTheme);
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (currentTheme === 'system') applyTheme('system');
+});
+// Apply early so the first paint already matches the user's stored choice.
+applyTheme(currentTheme);
 
 // --- API ---
 function showBanner(msg) {
@@ -988,6 +1061,7 @@ function esc(s) {
 
 // --- Dashboard Init (called after onboarding or if already onboarded) ---
 function initDashboard() {
+  applyTheme(currentTheme);
   checkConnection();
   refreshBraindumps();
 }
@@ -1011,6 +1085,7 @@ let setupStatus = null;
 let selectedProvider = null;
 
 async function initOnboarding() {
+  applyTheme(currentTheme);
   // Tauri-invoke falls verfügbar (echter App-Context), sonst Defaults aus localStorage
   if (window.__TAURI__ && window.__TAURI__.core) {
     try {
@@ -1358,5 +1433,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initOnboarding();
 });
 </script>
+
+<footer class="app-footer">
+  Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.0
+</footer>
+
+</div><!-- /.app-shell -->
 </body>
 </html>

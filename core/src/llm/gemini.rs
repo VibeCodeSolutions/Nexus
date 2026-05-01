@@ -2,8 +2,18 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+use crate::keystore;
 use crate::models::BrainDumpEntry;
 use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
+
+const DEFAULT_GEMINI_MODEL: &str = "gemini-1.5-flash";
+
+fn gemini_url() -> String {
+    let model = keystore::get_model("gemini").unwrap_or_else(|| DEFAULT_GEMINI_MODEL.to_string());
+    format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    )
+}
 
 pub struct GeminiProvider {
     api_key: String,
@@ -65,10 +75,7 @@ impl LlmProvider for GeminiProvider {
             }],
         };
 
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
-            self.api_key
-        );
+        let url = format!("{}?key={}", gemini_url(), self.api_key);
 
         let response = self.client
             .post(&url)
@@ -118,10 +125,7 @@ impl LlmProvider for GeminiProvider {
             }],
         };
 
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
-            self.api_key
-        );
+        let url = format!("{}?key={}", gemini_url(), self.api_key);
 
         let response = self.client
             .post(&url)

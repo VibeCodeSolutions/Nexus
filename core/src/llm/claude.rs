@@ -8,6 +8,12 @@ use crate::models::BrainDumpEntry;
 use crate::oauth;
 use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
 
+const DEFAULT_CLAUDE_MODEL: &str = "claude-sonnet-4-20250514";
+
+fn claude_model() -> String {
+    keystore::get_model("claude").unwrap_or_else(|| DEFAULT_CLAUDE_MODEL.to_string())
+}
+
 pub enum Auth {
     ApiKey(String),
     OAuth(RwLock<OAuthTokens>),
@@ -114,7 +120,7 @@ impl ClaudeProvider {
 impl LlmProvider for ClaudeProvider {
     async fn categorize_and_summarize(&self, text: &str) -> Result<Classification, String> {
         let raw = self.call(ClaudeRequest {
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: claude_model(),
             max_tokens: 256,
             system: SYSTEM_PROMPT.to_string(),
             messages: vec![Message { role: "user".into(), content: text.into() }],
@@ -131,7 +137,7 @@ impl LlmProvider for ClaudeProvider {
         }).collect();
 
         let raw = self.call(ClaudeRequest {
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: claude_model(),
             max_tokens: 1024,
             system: PROJECT_SUGGEST_PROMPT.to_string(),
             messages: vec![Message { role: "user".into(), content: entries_text.join("\n\n---\n\n") }],

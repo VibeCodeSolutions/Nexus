@@ -529,22 +529,38 @@ pub async fn dashboard(
     Ok(Html(html))
 }
 
-pub async fn recategorize_unsorted(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+#[derive(Deserialize, Default)]
+pub struct RecategorizeQuery {
+    pub limit: Option<usize>,
+}
+
+pub struct RecategorizeStats {
+    pub total: usize,
+    pub updated: usize,
+    pub failed: usize,
+}
+
+/// Reusable inner function (also called from background task).
+/// `limit` is clamped to [1, 200].
+pub async fn recategorize_unsorted_inner(
+    pool: &sqlx::SqlitePool,
+    llm: &dyn crate::llm::LlmProvider,
+    limit: usize,
+) -> Result<RecategorizeStats, sqlx::Error> {
+    let clamped = limit.clamp(1, 200);
     let entries = sqlx::query_as::<_, crate::models::BrainDumpEntry>(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps WHERE category = 'Unsorted' OR category IS NULL"
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps WHERE category = 'Unsorted' OR category IS NULL LIMIT ?"
     )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .bind(clamped as i64)
+    .fetch_all(pool)
+    .await?;
 
     let total = entries.len();
     let mut updated = 0;
     let mut failed = 0;
 
     for entry in entries {
-        match state.llm.categorize_and_summarize(&entry.raw_text).await {
+        match llm.categorize_and_summarize(&entry.raw_text).await {
             Ok(classification) => {
                 let tags = serde_json::to_string(&classification.tags).unwrap_or_else(|_| "[]".to_string());
                 let result = sqlx::query(
@@ -554,7 +570,7 @@ pub async fn recategorize_unsorted(
                 .bind(&classification.summary)
                 .bind(&tags)
                 .bind(&entry.id)
-                .execute(&state.pool)
+                .execute(pool)
                 .await;
 
                 match result {
@@ -572,11 +588,35 @@ pub async fn recategorize_unsorted(
         }
     }
 
+    Ok(RecategorizeStats { total, updated, failed })
+}
+
+pub async fn recategorize_unsorted(
+    State(state): State<AppState>,
+    Query(q): Query<RecategorizeQuery>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let limit = q.limit.unwrap_or(50);
+    let stats = recategorize_unsorted_inner(&state.pool, state.llm.as_ref(), limit)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
     Ok(Json(json!({
-        "total": total,
-        "updated": updated,
-        "failed": failed
+        "total": stats.total,
+        "updated": stats.updated,
+        "failed": stats.failed
     })))
+}
+
+pub async fn unsorted_count(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM braindumps WHERE category = 'Unsorted' OR category IS NULL"
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("count: {e}")))?;
+    Ok(Json(json!({ "count": count })))
 }
 
 // --- Setup / Onboarding Endpoints ---
@@ -703,6 +743,90 @@ pub async fn pair_uri() -> Result<Json<Value>, (StatusCode, String)> {
     Ok(Json(json!({"uri": uri})))
 }
 
+// --- Settings (Phase C) ---
+
+#[derive(Deserialize)]
+pub struct SettingsModelsQuery {
+    pub provider: String,
+}
+
+#[derive(Deserialize)]
+pub struct SettingsSetProviderRequest {
+    pub provider: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+pub async fn settings_providers() -> Json<Value> {
+    let list = crate::keystore::list_providers_with_status();
+    Json(json!({ "providers": list }))
+}
+
+pub async fn settings_models(
+    Query(q): Query<SettingsModelsQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let models: &[&str] = match q.provider.as_str() {
+        "claude" => &[
+            "claude-sonnet-4-20250514",
+            "claude-opus-4-20250514",
+            "claude-haiku-4-20251001",
+            "claude-3-5-sonnet-20241022",
+        ],
+        "gemini" => &["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+        "openai" => &["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"],
+        "ollama" => &["qwen2.5:3b", "llama3.2:3b", "phi4:latest"],
+        "mistral" => &["mistral-small-latest", "mistral-large-latest"],
+        "groq" => &["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+        "deepseek" => &["deepseek-chat"],
+        "openrouter" => &["openrouter/auto"],
+        "zai" => &["glm-4-plus", "glm-4-flash"],
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Unbekannter Provider: {}", q.provider),
+            ))
+        }
+    };
+    let current = crate::keystore::get_model(&q.provider);
+    Ok(Json(json!({
+        "provider": q.provider,
+        "models": models,
+        "current": current,
+    })))
+}
+
+pub async fn settings_set_provider(
+    Json(payload): Json<SettingsSetProviderRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    if let Some(key) = payload.api_key.as_deref() {
+        if !key.trim().is_empty() {
+            crate::keystore::set_key(&payload.provider, key)
+                .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_key: {}", e)))?;
+        }
+    }
+    if let Some(model) = payload.model.as_deref() {
+        if !model.trim().is_empty() {
+            crate::keystore::set_model(&payload.provider, model)
+                .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_model: {}", e)))?;
+        }
+    }
+    crate::keystore::set_default_provider(&payload.provider)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_default_provider: {}", e)))?;
+    let key_updated = payload
+        .api_key
+        .as_deref()
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false);
+    Ok(Json(json!({
+        "status": "ok",
+        "provider": payload.provider,
+        "model": payload.model,
+        "key_updated": key_updated,
+    })))
+}
+
 use crate::diag::{
     list_reports, run_core_diagnostics, store_report, DiagListQuery, DiagReport,
     DiagReportSubmission,
@@ -770,4 +894,84 @@ pub async fn diag_list(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(reports))
+}
+
+#[cfg(test)]
+mod recategorize_tests {
+    use super::*;
+    use crate::db;
+    use crate::llm::NoOpProvider;
+    use crate::repo;
+
+    #[tokio::test]
+    async fn empty_pool_returns_zero_counts() {
+        let pool = db::init_in_memory().await.unwrap();
+        let llm = NoOpProvider;
+        let stats = recategorize_unsorted_inner(&pool, &llm, 50).await.unwrap();
+        assert_eq!(stats.total, 0);
+        assert_eq!(stats.updated, 0);
+        assert_eq!(stats.failed, 0);
+    }
+
+    #[tokio::test]
+    async fn failing_llm_counts_failures_no_update() {
+        let pool = db::init_in_memory().await.unwrap();
+        repo::insert(&pool, "Erster").await.unwrap();
+        repo::insert(&pool, "Zweiter").await.unwrap();
+        let stats = recategorize_unsorted_inner(&pool, &NoOpProvider, 50).await.unwrap();
+        assert_eq!(stats.total, 2);
+        assert_eq!(stats.updated, 0);
+        assert_eq!(stats.failed, 2);
+    }
+
+    #[tokio::test]
+    async fn limit_clamped_to_max_200_no_panic() {
+        let pool = db::init_in_memory().await.unwrap();
+        // limit=99999 should be clamped to 200 internally without panic
+        let stats = recategorize_unsorted_inner(&pool, &NoOpProvider, 99_999).await.unwrap();
+        assert_eq!(stats.total, 0);
+    }
+
+    #[tokio::test]
+    async fn limit_clamped_to_min_1() {
+        let pool = db::init_in_memory().await.unwrap();
+        repo::insert(&pool, "A").await.unwrap();
+        repo::insert(&pool, "B").await.unwrap();
+        // limit=0 should be clamped to 1
+        let stats = recategorize_unsorted_inner(&pool, &NoOpProvider, 0).await.unwrap();
+        assert_eq!(stats.total, 1);
+        assert_eq!(stats.failed, 1);
+    }
+}
+
+#[cfg(test)]
+mod settings_tests {
+    #[test]
+    fn key_updated_flag_false_for_empty_string() {
+        // Pure logic from settings_set_provider:
+        let api_key: Option<String> = Some("".to_string());
+        let key_updated = api_key.as_deref().map(|k| !k.trim().is_empty()).unwrap_or(false);
+        assert!(!key_updated);
+    }
+
+    #[test]
+    fn key_updated_flag_false_for_whitespace_only() {
+        let api_key: Option<String> = Some("   ".to_string());
+        let key_updated = api_key.as_deref().map(|k| !k.trim().is_empty()).unwrap_or(false);
+        assert!(!key_updated);
+    }
+
+    #[test]
+    fn key_updated_flag_true_for_real_key() {
+        let api_key: Option<String> = Some("sk-ant-123".to_string());
+        let key_updated = api_key.as_deref().map(|k| !k.trim().is_empty()).unwrap_or(false);
+        assert!(key_updated);
+    }
+
+    #[test]
+    fn key_updated_flag_false_for_none() {
+        let api_key: Option<String> = None;
+        let key_updated = api_key.as_deref().map(|k| !k.trim().is_empty()).unwrap_or(false);
+        assert!(!key_updated);
+    }
 }

@@ -135,6 +135,10 @@ async fn main() {
                 started_at: std::time::Instant::now(),
             };
 
+            // Clone für Background-Recategorize-Task (Phase D / JJ-D2) — VOR with_state(state)
+            let bg_pool = state.pool.clone();
+            let bg_llm = state.llm.clone();
+
             let app = Router::new()
                 .route("/", get(handlers::dashboard))
                 .route("/health", get(health_check))
@@ -143,6 +147,7 @@ async fn main() {
                 .route("/braindump/{id}", get(handlers::get_braindump))
                 .route("/braindump/{id}", delete(handlers::delete_braindump))
                 .route("/braindump/recategorize", post(handlers::recategorize_unsorted))
+                .route("/braindump/unsorted/count", get(handlers::unsorted_count))
                 .route("/projects/suggest", post(handlers::suggest_projects))
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))
@@ -159,6 +164,9 @@ async fn main() {
                 .route("/api/setup-status", get(handlers::setup_status))
                 .route("/api/onboard/set-provider", post(handlers::onboard_set_provider))
                 .route("/api/onboard/oauth", post(handlers::onboard_oauth))
+                .route("/api/settings/providers", get(handlers::settings_providers))
+                .route("/api/settings/models", get(handlers::settings_models))
+                .route("/api/settings/provider", post(handlers::settings_set_provider))
                 .route("/api/pair/uri", get(handlers::pair_uri))
                 .route("/api/pair/handshake", post(handlers::pair_handshake))
                 .route("/api/diag/run", post(handlers::diag_run))
@@ -173,11 +181,88 @@ async fn main() {
                 )
                 .with_state(state);
 
+            // Single-Core-Garant: prüfen ob bereits ein Prozess auf diesem Port lauscht.
+            // Verhindert Doppelstart von Sidecar + systemd-Service.
+            let port = config.bind_addr.split(':').next_back().unwrap_or("7777");
+            let probe = tokio::time::timeout(
+                std::time::Duration::from_millis(200),
+                tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")),
+            )
+            .await;
+            if matches!(probe, Ok(Ok(_))) {
+                tracing::error!(
+                    "Port {port} ist bereits belegt — ein anderer NEXUS-Core lauscht. Abbruch (kein Doppelstart)."
+                );
+                eprintln!(
+                    "Fehler: Ein NEXUS-Core läuft bereits auf Port {port}. Bitte den anderen Prozess stoppen, bevor du einen neuen startest."
+                );
+                return;
+            }
+
             let listener = tokio::net::TcpListener::bind(&config.bind_addr)
                 .await
                 .expect("Port konnte nicht gebunden werden");
 
             tracing::info!("NEXUS Core läuft auf http://{}", config.bind_addr);
+            match local_ip_address::local_ip() {
+                Ok(ip) => {
+                    let port = config.bind_addr.split(':').next_back().unwrap_or("7777");
+                    tracing::info!(
+                        "Mobile Pairing erwartet IP http://{}:{} — Pixel muss im selben LAN sein",
+                        ip,
+                        port
+                    );
+                }
+                Err(e) => tracing::warn!(
+                    "LAN-IP konnte nicht ermittelt werden ({}); Pairing-QR fällt auf 127.0.0.1 zurück und ist mobil unbrauchbar",
+                    e
+                ),
+            }
+
+            // Background-Recategorize-Task (Phase D / JJ-D2)
+            // bg_pool und bg_llm wurden bereits vor with_state(state) geklont.
+            let (cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
+            tokio::spawn(async move {
+                let base_delay: u64 = std::env::var("NEXUS_RECATEGORIZE_INTERVAL_SECS")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(300);
+                let max_delay: u64 = 3600;
+                let mut delay_secs = base_delay;
+                loop {
+                    tokio::select! {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(delay_secs)) => {}
+                        _ = cancel_rx.changed() => {
+                            tracing::info!("recategorize-bg: shutdown");
+                            break;
+                        }
+                    }
+                    match handlers::recategorize_unsorted_inner(&bg_pool, bg_llm.as_ref(), 50).await {
+                        Ok(stats) if stats.failed == 0 => {
+                            if stats.updated > 0 || stats.total > 0 {
+                                tracing::info!(
+                                    "recategorize-bg: {}/{} updated",
+                                    stats.updated,
+                                    stats.total
+                                );
+                            }
+                            delay_secs = base_delay;
+                        }
+                        Ok(stats) => {
+                            tracing::warn!(
+                                "recategorize-bg: {} failed of {} — backoff",
+                                stats.failed,
+                                stats.total
+                            );
+                            delay_secs = (delay_secs.saturating_mul(3)).min(max_delay);
+                        }
+                        Err(e) => {
+                            tracing::warn!("recategorize-bg DB error: {e} — backoff");
+                            delay_secs = (delay_secs.saturating_mul(3)).min(max_delay);
+                        }
+                    }
+                }
+            });
 
             axum::serve(
                 listener,
@@ -185,6 +270,8 @@ async fn main() {
             )
             .await
             .expect("Server-Fehler");
+            // Cancel-Token explizit triggern, damit Background-Task sauber endet.
+            let _ = cancel_tx.send(true);
         }
     }
 }

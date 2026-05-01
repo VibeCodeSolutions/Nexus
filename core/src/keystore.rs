@@ -30,6 +30,8 @@ struct Store {
     oauth: HashMap<String, OAuthTokens>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     default_provider: Option<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    models: HashMap<String, String>,
 }
 
 fn store_path() -> PathBuf {
@@ -131,4 +133,45 @@ pub fn clear_default_provider() -> Result<(), String> {
     let mut store = load();
     store.default_provider = None;
     save(&store)
+}
+
+pub fn set_model(provider: &str, model: &str) -> Result<(), String> {
+    if !VALID_PROVIDERS.contains(&provider) {
+        return Err(format!(
+            "Unbekannter Provider: {provider}. Erlaubt: {}",
+            VALID_PROVIDERS.join(", ")
+        ));
+    }
+    if model.trim().is_empty() {
+        return Err("Modell darf nicht leer sein".into());
+    }
+    let mut store = load();
+    store.models.insert(provider.to_string(), model.to_string());
+    save(&store)
+}
+
+pub fn get_model(provider: &str) -> Option<String> {
+    load().models.get(provider).cloned()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderStatus {
+    pub name: String,
+    pub has_key: bool,
+    pub has_model: bool,
+    pub is_default: bool,
+}
+
+pub fn list_providers_with_status() -> Vec<ProviderStatus> {
+    let store = load();
+    let default = store.default_provider.as_deref();
+    VALID_PROVIDERS
+        .iter()
+        .map(|p| ProviderStatus {
+            name: (*p).to_string(),
+            has_key: store.keys.contains_key(*p),
+            has_model: store.models.contains_key(*p),
+            is_default: default == Some(*p),
+        })
+        .collect()
 }

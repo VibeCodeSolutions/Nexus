@@ -1,5 +1,7 @@
 # NEXUS — Übergabeprotokoll v0.1.0-rc3
 
+> **Update 2026-05-01 nachmittag** — Sprint "🐙 Joyful Jellyfish" Code-Tuvok-grün durch Phasen A-E. Aktueller Stand → `CURRENT_STATE.md`. Code-Diffs: Desktop-Banner+Refresh-Fix, Android Diag-Timestamp + Optimistic-Insert, Settings-Endpoints (Bearer-pflichtig) mit Modell-Persistenz, Background-Recategorize-Task mit Backoff, Single-Core-Garant, `docs/SYNC.md` + `docs/VAULT-DESIGN.md`. Phase-F-Auflagen: Admin-Hardware-E2E + lokaler `cargo check`/`gradlew test`.
+
 > **Update 2026-04-28** — Pair-Detection-Fix in Arbeit, Windows-Sprint geplant via Chakotay-Kette, siehe Abschnitt **"Session 2026-04-28"** weiter unten.
 
 **Datum:** 2026-04-25

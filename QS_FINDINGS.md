@@ -1043,3 +1043,150 @@ Geprüft: `core/src/config.rs`, `core/src/db.rs`, `core/src/main.rs`, `core/src/
 N-023 (Doc-Comment-Fix, 2 Zeilen) sollte mit der gleichen Iteration mit erledigt werden — billig.
 N-024 ist Backlog.
 
+---
+
+## Pre-Sprint-Plan-Review — "🐙 Joyful Jellyfish" (AUFTRAG #6) — 2026-05-01
+
+Geprüft: Sprint-Block in `todo.md` (JJ-A1 bis JJ-E1 inkl. Pre-Sprint-Gate) gegen Plan-File `~/.claude/plans/folgende-punkte-sind-joyful-jellyfish.md` und Code-Stand in `core/src/auth.rs`, `core/src/handlers.rs`.
+
+### JJ-PR-001-KOR
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Korrektheit
+- **Prüfgegenstand:** Phase-B-Framing (`pairing_uri()` LAN-IP-Fix)
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Phase B beschreibt einen Fix, der bereits implementiert ist. `core/src/auth.rs:89` ruft `local_ip_address::local_ip()` mit Fallback auf `127.0.0.1`. JJ-B1-COD ("`detect_lan_ip()` Helper, Fallback `127.0.0.1`") würde existierenden Code neu schreiben. Phase-1-Exploration hat den existierenden Pfad übersehen — der reale Bug muss in einer anderen Schicht liegen (Multi-Interface-Wahl, Detection-Failure auf bestimmten Setups, Firewall, Pixel auf 4G/Roaming, Token-Mismatch nach Re-Pair). Wenn der Spezialist Phase B wie geplant umsetzt, ändert sich nichts am Symptom.
+- **Korrekturvorschlag:** Phase B umstrukturieren zu **Debug-First**: (1) Repro-Schritte fixieren (welches WLAN, welche IP wird im QR sichtbar, was loggt der Server beim Start?). (2) `local_ip_address::local_ip()` Verhalten auf Kais Fedora-Maschine prüfen (Multi-Interface? Fall auf `127.0.0.1`?). (3) Erst nach Diagnose Touchpoints definieren. Plan-Diff durch Chakotay vor Sprint-Start.
+- **Status:** offen, Rückgabe an Chakotay
+- **Korrektur-Zyklen:** 0/2
+
+### JJ-PR-002-VOL
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** `docs/SYNC.md` Scope (JJ-B3-DOC)
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Plan erwähnt "Failure-Modi" als Doku-Inhalt, aber ohne klare Out-of-Scope-Markierung für Multi-Network-Setups. LAN-IP-Pairing scheitert systematisch wenn (a) Pixel auf 4G ist, (b) Pixel im Gast-WLAN ohne Routing zum Hauptsegment ist, (c) Desktop hinter VPN sitzt. Ohne explizite Doku werden diese Fälle als "Bug" zurückkommen.
+- **Korrekturvorschlag:** `docs/SYNC.md` muss als DoD enthalten: explizite Liste der unterstützten Netzwerk-Topologien (selbes LAN-Subnetz), explizite Out-of-Scope-Liste (4G, VPN, Gast-WLAN, mDNS/Bonjour, Cloud-Sync), Empfehlung für Tunneling-Workarounds (Tailscale o.ä. als User-Hack, nicht First-Class-Support).
+- **Status:** offen, vor JJ-B3-Abnahme einzupflegen
+- **Korrektur-Zyklen:** 0/2
+
+### JJ-PR-003-SIC
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Sicherheit
+- **Prüfgegenstand:** `POST /api/settings/provider` (JJ-C1-COD)
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Plan beschreibt drei neue Settings-Endpoints, ohne Auth-Status zu definieren. `POST /api/settings/provider` ändert Default-Provider und kann API-Keys setzen — wenn unauthentifiziert exponiert auf `0.0.0.0:7777`, kann jeder LAN-Peer den Provider sabotieren oder Kosten verursachen. Konsistent mit N-001-SIC muss der Endpoint Bearer-pflichtig sein. Auch `GET /api/settings/providers` leakt `has_key`-Status, was Recon-Information ist.
+- **Korrekturvorschlag:** DoD ergänzen: alle drei Endpoints sind in `auth::is_public` NICHT enthalten und werden von der `require_token`-Middleware geprüft. Test: `curl POST /api/settings/provider` ohne Header → 401, mit Bearer → 200.
+- **Status:** offen, vor JJ-C1-Abnahme einzupflegen
+- **Korrektur-Zyklen:** 0/2
+
+### JJ-PR-004-VOL
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** Backlog-Konsolidierung Phase C/D
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** N-006-PER (`recategorize_unsorted` Limit-Param) und N-007-COD (Modell aus Keystore) liegen exakt auf den Code-Pfaden, die JJ-D1 und JJ-C1 anfassen. Wenn JJ-D1 die Funktion zu `recategorize_unsorted_inner` extrahiert ohne Limit, kommt N-006-PER später nochmal auf denselben Pfad. JJ-C1 baut Settings-Endpoints für Provider/Model — wenn das Modell nicht in den Keystore persistiert wird (N-007), ist die Settings-UI ein Placebo (Save schlägt zwar an, aber Restart vergisst die Wahl).
+- **Korrekturvorschlag:** Beide Findings als Pflicht-Bestandteil von JJ-D1 (Limit-Param, default 50, clamp 200) und JJ-C1 (Model-Persistenz via `keystore::set_model(provider, model)`) in den Plan einarbeiten. Touchpoints aktualisieren.
+- **Status:** offen, vor JJ-C1/JJ-D1-Start einzupflegen
+- **Korrektur-Zyklen:** 0/2
+
+### JJ-PR-005-KOR
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Korrektheit (Lerneffekt aus N-021)
+- **Prüfgegenstand:** Multi-CWD-Audit für JJ-D2 Background-Task
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Background-Task läuft im Sidecar-, CLI- und (potentiell) Service-Mode. DB-Pfad ist nach N-021 absolut, aber Backoff-State ist In-Memory (`AtomicU64` o.ä.) und damit pro-Prozess. Wenn zwei Cores gleichzeitig laufen (Sidecar + Service), beide racen die LLM-Quota. Kein Drift wenn nur EIN Core läuft (was Plan voraussetzt), aber JJ-B verspricht expliziten Service-Mode-Pfad.
+- **Korrekturvorschlag:** Tuvok-Gate-D-Schritt: "Single-Core-Garant geprüft" — Beim Start prüfen ob bereits ein Core auf 7777 lauscht und sauber abbrechen statt einen zweiten zu starten (oder Lock-File in `~/.nexus/`).
+- **Status:** offen, Auflage in laufender Phase D
+- **Korrektur-Zyklen:** 0/2
+
+### JJ-PR-006-VOL
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** JJ-A2 DoD (Diag-Timestamp)
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Phase A2 hat keinen Android-Unit-Test als DoD. Phase F sammelt alle Tests, aber bis dahin ist JJ-A2 ungetestet — Regressions-Risiko. `DiagnosticRunnerTest` lässt sich mit Mock-Server in <30 Zeilen schreiben.
+- **Korrekturvorschlag:** DoD-Punkt in JJ-A2 ergänzen: "Unit-Test in `android/app/src/test/.../DiagnosticRunnerTest.kt` der `runAndUpload`-Roundtrip mit Mock-Ack verifiziert".
+- **Status:** offen, Auflage in JJ-A2-Implementierung
+- **Korrektur-Zyklen:** 0/2
+
+### JJ-PR-007-KON
+- **Schweregrad:** 🟢 Minor (Eskalation an Chef)
+- **Kategorie:** Konsistenz (Skill-Architektur)
+- **Prüfgegenstand:** Phase-E Tuvok-Gate (Trio-Review)
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Plan ruft `nexus-rust-qa` als eigenständige Review-Instanz neben Tuvok+Seven auf. Verhältnis ist unklar — ist `nexus-rust-qa` Tuvoks Werkzeug (dann wäre Trio-Review eigentlich Duo + Tool-Use) oder eigenständiges Pendant (dann braucht es eigene Persona-Notiz und Befehlskette)? Bookmark aus Tuvok-Persona seit AUFTRAG #5.
+- **Korrekturvorschlag:** B'Elanna/Chakotay klären, vor Phase-E-Start. Bis dahin als Tool-Use durch Tuvok behandeln.
+- **Status:** offen, Eskalation
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- **Phase A1/A3** Touchpoints sind präzise und reuse-fokussiert. `.btn-ghost`-Diagnose ist tragfähig; Optimistic-Insert-Pattern in JJ-A3 ist Standard-Lösung für das beschriebene Symptom.
+- **Phase A2** Diagnose ist exakt: `DiagnosticRunner.kt`-`createdAt=null`-Pfad + Server-Ack-Loop sind die richtige Stellschraube. Server-seitig (`handlers.rs:737`) ist `created_at` bereits gesetzt — nur Client-Loop fehlt.
+- **Phase C2-C4** UI-Erweiterung im Settings-Screen ist sauber gegliedert; Wizard-Reset über `connectionSettings.clear()` mit erhaltener Device-ID via N-011-COD-Verweis ist konsistent.
+- **Phase D2** Backoff-Strategie (5→15→60min, reset bei Erfolg, Cancel-Token) ist defensiv und erinnert sich an N-014-Pattern (sauberer Idempotenz-Pfad ohne Side-Effect-Verlust).
+- **Phase F1** Test-Pakete decken alle Phasen-Hotspots ab.
+- **Phase E1** Vault-Design-Doku als reine Doku-Phase nach F ist korrekt sequenziert — kein Code, kein Risiko, sinnvolle Vorbereitung.
+- **Workflow-Struktur**: Pre-Sprint-Gate + Phasen-Gates + Eskalation an Chakotay sind sauber abgebildet.
+- **Tuvok-Gates A/C/D** sind konkret, reproduzierbar und decken die DoDs.
+
+### Verdikt
+
+**❌ Rückgabe an Chakotay (Plan-Diff erforderlich).**
+
+Vier Major-Findings müssen in den Plan eingepflegt werden, bevor Re-Review möglich ist:
+
+- **JJ-PR-001** — Phase B umstrukturieren zu Debug-First (existierender Code übersehen)
+- **JJ-PR-002** — `docs/SYNC.md` muss Out-of-Scope-Markierungen als DoD haben
+- **JJ-PR-003** — `POST /api/settings/provider` muss Bearer-pflichtig sein (DoD)
+- **JJ-PR-004** — N-006-PER und N-007-COD in JJ-D1/JJ-C1 verheiraten
+
+Drei Minor-Findings (JJ-PR-005 CWD-Audit, JJ-PR-006 A2-Unit-Test, JJ-PR-007 Skill-Klärung) sind Auflagen während der Phasen, **nicht Re-Review-Blocker**.
+
+Empfehlung: Chakotay nimmt Plan-Diff vor (oder lässt Hauptsession), dann zweite Tuvok-Runde + Seven-Review. Erst nach beidem grün startet Phase A.
+
+---
+
+## Phase-A-Final-Gate (AUFTRAG #6, Joyful Jellyfish) — 2026-05-01
+
+Geprüft: JJ-A1 (`desktop/src/index.html` — Banner + Refresh-Style + api-Integration), JJ-A2 (`DiagnosticRunner.kt::applyAck` + `DiagnosticRunnerTest.kt` + Build-Diff), JJ-A3 (`TasksScreen.kt::fetchData` + `onCreate` Optimistic-Insert).
+
+### JJ-A4-PER
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Performance / UX
+- **Prüfgegenstand:** `desktop/src/index.html::api()` + `checkConnection()`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** `api()` zeigt jetzt sichtbaren Banner bei jedem Network-Error oder Non-2xx. `checkConnection()` ruft `api('/health')` und nutzt das Failure als legitimes Signal für `statusDot` (Disconnect-Anzeige im Header), catched die Exception still. Banner wird trotzdem angezeigt, weil `showBanner` vor `throw` läuft. Konsequenz: bei Server-Disconnect erscheint Banner UND statusDot rot — Doppel-Information, nicht kritisch, aber visueller Noise. Hauptfälle (Tasks-Refresh-Fail) bleiben korrekt.
+- **Korrekturvorschlag:** Optional-Param `{ silent: true }` in `api(path, opts, control = {})` einführen; `checkConnection()` ruft mit `silent: true` auf; `api()` skipt `showBanner` wenn `silent`. ~5 Zeilen.
+- **Status:** offen (post-Phase-A erlaubt, in Phase F bündelbar)
+- **Korrektur-Zyklen:** 0/2
+
+### Manuelle Verifikations-Auflagen für Phase F
+
+| ID | Test | Verantwortlich |
+|---|---|---|
+| JJ-A-MAN-1 | Token-Test: localStorage-Token in DevTools überschreiben → Refresh-Click → Banner zeigt 401-Text | Admin auf Desktop |
+| JJ-A-MAN-2 | Diag-Stand-Test: Diag laufen → SettingsScreen-Card zeigt aktuellen Server-Timestamp | Admin auf Pixel |
+| JJ-A-MAN-3 | Airplane-Test: Task erstellen → unmittelbar Airplane-Mode → Task bleibt sichtbar (kein Verschwinden bei `loadData()`-Failure) | Admin auf Pixel |
+| JJ-A-MAN-4 | `./gradlew test` lokal grün (3 Unit-Tests in DiagnosticRunnerTest) | Admin lokal |
+
+### Was geprüft und OK befunden wurde
+
+- **JJ-A1 Banner-Pattern**: globaler DOM-Slot, CSS-Variants (.error/.hidden), zwei Helper-Funktionen, klar wiederverwendbar.
+- **JJ-A1 Refresh-Style**: `.btn-ghost` → `.btn-primary` ist konsistent mit allen anderen Refresh-Buttons im Dashboard (Braindumps/Projects/Achievements).
+- **JJ-A1 Loading-State**: `taskRefreshBtn.disabled = true` + Text "Lade…" + finally-Block für Reset — defensiv geschrieben (auch bei Exception zurückgesetzt).
+- **JJ-A2 applyAck**: pure function, internal scope, data-class.copy idiomatisch, separat testbar.
+- **JJ-A2 Test-Setup**: junit 4.13.2 als testImplementation, Test-Verzeichnis korrekt unter `src/test/java/`, 3 Tests decken Happy-Path/Immutability/Overwrite.
+- **JJ-A2 Caller-Update**: `NexusApplication.runDiagnostics()` nutzt `result.getOrNull()?.let { _latestDiag.value = it }` — bekommt das gemappte Report mit Server-Timestamp.
+- **JJ-A3 Optimistic-Insert**: `tasks = tasks + newTask` erzeugt neue Liste (Compose-State-konform), `loadData()` reconciliert.
+- **JJ-A3 Sanity-Check**: `if (serverTasks.isNotEmpty() || tasks.isEmpty())` — schützt vor Network-Race-Condition wo Server leere Liste liefert während lokal noch Tasks sind. Plan-DoD "Liste nicht überschreiben wenn Response leer" erfüllt.
+- **DoD-Mapping JJ-A1**: Refresh-Button visuell prominent ✓, Banner bei API-Fehler ✓.
+- **DoD-Mapping JJ-A2**: Server-Timestamp-Roundtrip ✓, Unit-Test (JJ-PR-006) ✓.
+- **DoD-Mapping JJ-A3**: Task bleibt sichtbar bei Fail ✓.
+
+### Verdikt
+
+**⚠️ Freigabe mit Auflagen** — 1 Minor (JJ-A4-PER, post-Phase-A erlaubt) + 4 manuelle Verifikations-Auflagen (in Phase F gebündelt). Phase B (Debug-First) kann unmittelbar starten — die Hardware-Tests blockieren nicht die nächste Implementierungs-Phase.
+
+Hauptsession beginnt mit B.1: Repro auf Kais Fedora-Setup (welches WLAN, welche IP zeigt der QR, Server-Logs beim Start).
+

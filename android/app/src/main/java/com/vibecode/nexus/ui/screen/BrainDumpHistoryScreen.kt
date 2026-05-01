@@ -25,6 +25,7 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
     var entries by remember { mutableStateOf<List<BrainDumpResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    var showOnlyUnsorted by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     fun load() {
@@ -37,6 +38,11 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
     }
 
     LaunchedEffect(Unit) { load() }
+
+    val unsortedCount = entries.count { it.category.isNullOrBlank() || it.category == "Unsorted" }
+    val visibleEntries = if (showOnlyUnsorted) {
+        entries.filter { it.category.isNullOrBlank() || it.category == "Unsorted" }
+    } else entries
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(
@@ -52,14 +58,27 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
                 modifier = Modifier.padding(vertical = 16.dp)
             )
 
+            if (unsortedCount > 0) {
+                FilterChip(
+                    selected = showOnlyUnsorted,
+                    onClick = { showOnlyUnsorted = !showOnlyUnsorted },
+                    label = { Text("Unsortiert ($unsortedCount)") },
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
             when {
                 isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
                 errorMsg != null -> Text("Fehler: $errorMsg", color = MaterialTheme.colorScheme.error)
-                entries.isEmpty() -> Text("Keine BrainDumps vorhanden.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                visibleEntries.isEmpty() -> Text(
+                    if (showOnlyUnsorted) "Keine unsortierten Einträge."
+                    else "Keine BrainDumps vorhanden.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(entries, key = { it.id }) { entry ->
+                    items(visibleEntries, key = { it.id }) { entry ->
                         SwipeToDismissItem(
                             entry = entry,
                             onDelete = {

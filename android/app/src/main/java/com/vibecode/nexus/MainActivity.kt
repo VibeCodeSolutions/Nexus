@@ -238,6 +238,12 @@ class MainActivity : ComponentActivity() {
                                 apiClient = apiClient,
                                 onNavigateBack = {
                                     navController.popBackStack()
+                                },
+                                onRestartWizard = {
+                                    navController.popBackStack(
+                                        route = navController.graph.startDestinationRoute ?: "tasks",
+                                        inclusive = false,
+                                    )
                                 }
                             )
                         }

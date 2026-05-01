@@ -24,9 +24,13 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +42,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -56,6 +61,8 @@ import androidx.compose.ui.unit.dp
 import com.vibecode.nexus.NexusApplication
 import com.vibecode.nexus.data.ConnectionSettings
 import com.vibecode.nexus.data.NexusApiClient
+import com.vibecode.nexus.data.model.ProviderStatus
+import com.vibecode.nexus.data.model.SetProviderRequest
 import com.vibecode.nexus.diagnostics.DiagCheck
 import com.vibecode.nexus.diagnostics.DiagReport
 import com.vibecode.nexus.diagnostics.DiagStatus
@@ -70,6 +77,7 @@ fun SettingsScreen(
     connectionSettings: ConnectionSettings,
     apiClient: NexusApiClient,
     onNavigateBack: () -> Unit,
+    onRestartWizard: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -209,6 +217,14 @@ fun SettingsScreen(
                 }
             }
 
+            // LLM-Konfiguration (Phase C)
+            if (isPaired) {
+                LlmConfigCard(
+                    apiClient = apiClient,
+                    snackbarHostState = snackbarHostState,
+                )
+            }
+
             // Self-Diagnostics card
             DiagnosticsCard(
                 report = effectiveDiag,
@@ -303,6 +319,175 @@ fun SettingsScreen(
                     )
                     Text("Kopplung aufheben")
                 }
+
+                // Wizard neustarten (Phase C / JJ-C3)
+                OutlinedButton(
+                    onClick = {
+                        connectionSettings.clear()
+                        isPaired = false
+                        coreUrl = ""
+                        isConnected = null
+                        onRestartWizard?.invoke()
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Wizard neustarten")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LlmConfigCard(
+    apiClient: NexusApiClient,
+    snackbarHostState: SnackbarHostState,
+) {
+    val scope = rememberCoroutineScope()
+    var providers by remember { mutableStateOf<List<ProviderStatus>>(emptyList()) }
+    var selectedProvider by remember { mutableStateOf<String?>(null) }
+    var models by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedModel by remember { mutableStateOf<String?>(null) }
+    var apiKey by remember { mutableStateOf("") }
+    var providerExpanded by remember { mutableStateOf(false) }
+    var modelExpanded by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        apiClient.getProviders().onSuccess { resp ->
+            providers = resp.providers
+            selectedProvider = resp.providers.firstOrNull { it.isDefault }?.name
+                ?: resp.providers.firstOrNull()?.name
+        }
+    }
+
+    LaunchedEffect(selectedProvider) {
+        val p = selectedProvider ?: return@LaunchedEffect
+        apiClient.getModels(p).onSuccess { resp ->
+            models = resp.models
+            selectedModel = resp.current ?: resp.models.firstOrNull()
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("LLM-Konfiguration", style = MaterialTheme.typography.titleMedium)
+
+            ExposedDropdownMenuBox(
+                expanded = providerExpanded,
+                onExpandedChange = { providerExpanded = !providerExpanded },
+            ) {
+                OutlinedTextField(
+                    value = selectedProvider ?: "Kein Provider",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Provider") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerExpanded)
+                    },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = providerExpanded,
+                    onDismissRequest = { providerExpanded = false }
+                ) {
+                    providers.forEach { p ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "${p.name}${if (p.hasKey) " ✓" else ""}${if (p.isDefault) " ★" else ""}"
+                                )
+                            },
+                            onClick = {
+                                selectedProvider = p.name
+                                providerExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            ExposedDropdownMenuBox(
+                expanded = modelExpanded,
+                onExpandedChange = { modelExpanded = !modelExpanded },
+            ) {
+                OutlinedTextField(
+                    value = selectedModel ?: "Standard",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Modell") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelExpanded)
+                    },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = modelExpanded,
+                    onDismissRequest = { modelExpanded = false }
+                ) {
+                    models.forEach { m ->
+                        DropdownMenuItem(
+                            text = { Text(m) },
+                            onClick = {
+                                selectedModel = m
+                                modelExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = { Text("API-Key (leer = unverändert)") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Button(
+                onClick = {
+                    val provider = selectedProvider ?: return@Button
+                    saving = true
+                    scope.launch {
+                        val req = SetProviderRequest(
+                            provider = provider,
+                            apiKey = apiKey.takeIf { it.isNotBlank() },
+                            model = selectedModel,
+                        )
+                        apiClient.setProvider(req)
+                            .onSuccess {
+                                snackbarHostState.showSnackbar("LLM-Konfiguration gespeichert")
+                                apiKey = ""
+                                apiClient.getProviders().onSuccess { resp -> providers = resp.providers }
+                            }
+                            .onFailure { e ->
+                                snackbarHostState.showSnackbar("Fehler: ${e.message ?: "unbekannt"}")
+                            }
+                        saving = false
+                    }
+                },
+                enabled = !saving && selectedProvider != null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (saving) "Speichere…" else "Speichern")
             }
         }
     }

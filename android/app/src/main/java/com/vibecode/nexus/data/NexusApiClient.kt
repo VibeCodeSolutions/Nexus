@@ -3,8 +3,11 @@ package com.vibecode.nexus.data
 import com.vibecode.nexus.data.model.BrainDumpRequest
 import com.vibecode.nexus.data.model.BrainDumpResponse
 import com.vibecode.nexus.data.model.HealthResponse
+import com.vibecode.nexus.data.model.ModelsResponse
 import com.vibecode.nexus.data.model.ProjectProgress
 import com.vibecode.nexus.data.model.ProjectResponse
+import com.vibecode.nexus.data.model.ProvidersResponse
+import com.vibecode.nexus.data.model.SetProviderRequest
 import com.vibecode.nexus.data.model.TaskCreateRequest
 import com.vibecode.nexus.data.model.TaskResponse
 import com.vibecode.nexus.data.model.TaskUpdateRequest
@@ -174,6 +177,29 @@ class NexusApiClient(private val settings: ConnectionSettings) {
             bearerAuth(token!!)
             setBody(report)
         }.body()
+    }
+
+    // Settings (Phase C)
+    suspend fun getProviders(): Result<ProvidersResponse> = authedRequest {
+        client.get("$baseUrl/api/settings/providers") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun getModels(provider: String): Result<ModelsResponse> = authedRequest {
+        client.get("$baseUrl/api/settings/models") {
+            bearerAuth(token!!)
+            parameter("provider", provider)
+        }.body()
+    }
+
+    suspend fun setProvider(request: SetProviderRequest): Result<Unit> = authedRequest {
+        client.post("$baseUrl/api/settings/provider") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token!!)
+            setBody(request)
+        }
+        Unit
     }
 
     suspend fun listDiagReports(

@@ -72,7 +72,11 @@ fun TasksScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
 
     suspend fun fetchData() {
-        apiClient.getTasks().onSuccess { tasks = it }
+        apiClient.getTasks().onSuccess { serverTasks ->
+            if (serverTasks.isNotEmpty() || tasks.isEmpty()) {
+                tasks = serverTasks
+            }
+        }
         apiClient.getProjects().onSuccess { projects = it }
     }
 
@@ -97,7 +101,8 @@ fun TasksScreen(
                 scope.launch {
                     apiClient.createTask(
                         TaskCreateRequest(title, projectId, priority)
-                    ).onSuccess {
+                    ).onSuccess { newTask ->
+                        tasks = tasks + newTask
                         loadData()
                     }.onFailure { e ->
                         snackbarHostState.showSnackbar("Fehler: ${e.message}")

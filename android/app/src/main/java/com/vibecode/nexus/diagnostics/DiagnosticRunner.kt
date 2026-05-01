@@ -23,6 +23,9 @@ private const val LOG_TAG_JSON = "NEXUS_DIAG_JSON"
 private const val DIAG_PREFS_NAME = "nexus_diag"
 private const val SENTINEL_KEY = "roundtrip_sentinel"
 
+internal fun applyAck(report: DiagReport, ack: DiagReportAck): DiagReport =
+    report.copy(createdAt = ack.createdAt)
+
 class DiagnosticRunner(
     private val context: Context,
     private val settings: ConnectionSettings,
@@ -109,7 +112,7 @@ class DiagnosticRunner(
         if (!settings.isPaired) {
             return Result.success(report)
         }
-        return apiClient.submitDiagReport(report).map { report }
+        return apiClient.submitDiagReport(report).map { ack -> applyAck(report, ack) }
     }
 
     private suspend inline fun runCheck(

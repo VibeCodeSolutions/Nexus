@@ -116,7 +116,7 @@ async fn main() {
                 Err(e) => tracing::warn!("Token konnte nicht erstellt werden: {e}"),
             }
 
-            let pool = db::init_pool(&config.db_url)
+            let pool = db::init_pool(&config.db_path)
                 .await
                 .expect("Datenbank konnte nicht initialisiert werden");
 
@@ -291,7 +291,7 @@ fn print_status() {
     println!("\n📊 NEXUS Status\n");
     println!("Default-Provider: {}", cfg.default_provider);
     println!("Bind:             {}", cfg.bind_addr);
-    println!("DB:               {}", cfg.db_url);
+    println!("DB:               {}", cfg.db_path.display());
     println!("Logs:             {}\n", cfg.log_dir.display());
 
     println!("Auth-Status:");

@@ -988,3 +988,58 @@ Geprüft: `AndroidManifest.xml`, `data/ConnectionSettings.kt`, `data/NexusApiCli
 
 **Damit ist NEXUS v0.1.0 GA-fähig:** 1 Blocker + 3 Major + 4 Minor aus AUFTRAG #3 sind in drei sauberen Commits behoben, alle Schichten Tuvok-grün, Live-E2E nach jedem Commit verifiziert.
 
+
+---
+
+## Pre-Commit-QS — N-021-KOR Bugfix DB-Pfad (AUFTRAG #5) — 2026-05-01
+
+Geprüft: `core/src/config.rs`, `core/src/db.rs`, `core/src/main.rs`, `core/src/repo.rs`.
+
+### N-022-VOL
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** `core/src/db.rs::migrate_legacy_cwd_db`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Eine Datenmigrations-Funktion mit `rename`/`copy` von User-Daten ist eingeführt — und hat keine Unit-Tests. Live-Migration heute auf einem System ist verifiziert (28 BrainDumps + 225 XP), aber das deckt nur den Happy-Path ab. Vier Verzweigungen sind ungetestet: (a) target-existiert-no-op, (b) legacy-fehlt-no-op, (c) parent-create_dir_all-fail, (d) rename-fail-mit-copy-fallback. Bei Bugfix in 6 Monaten könnte ein Refactor stille Regression einführen, weil die Funktion sicher aussieht aber kein Sicherheitsnetz hat.
+- **Korrekturvorschlag:** `#[cfg(test)] mod migration_tests` mit `tempfile`-Crate. Vier Cases via `tempdir`-Setup: target-exists, legacy-missing, fresh-rename, cross-mount-fallback (letzteres simulierbar via OS-Mount-Trick oder skip mit Comment).
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### N-023-WAR
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Wartbarkeit
+- **Prüfgegenstand:** `core/src/config.rs:25-30` (Doc-Kommentar zu db_path)
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Der Doc-Kommentar sagt: „Override via NEXUS_DB_URL bleibt erhalten — wer dort `sqlite::memory:` setzt, bekommt das." Stimmt nach dem Refactor nicht mehr. Die neue Strip-Prefix-Logik reduziert `sqlite::memory:` auf `:memory:`, was dann als Filesystem-Pfad interpretiert wird (Datei mit Namen `:memory:` würde versucht). In-Memory funktioniert nur noch über `init_in_memory()` im Test-Code. In-Memory-DB ist Edge-Case, dokumentiert nirgendwo, kein User-Risiko — aber der Kommentar lügt.
+- **Korrekturvorschlag:** Comment ändern zu „Override via NEXUS_DB_URL nimmt einen Filesystem-Pfad. In-Memory-DB ist nur über die Test-Helper verfügbar." ODER zusätzlich `:memory:` als Sonderfall vor dem strip_prefix erkennen und an init_pool durchreichen — komplexer, vermutlich nicht nötig.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### N-024-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität
+- **Prüfgegenstand:** `core/src/db.rs::migrate_legacy_cwd_db`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Die Funktion migriert nur `./nexus.db`. Bei Cleanup-Audit heute wurden 6 verstreute `nexus.db`-Files im Repo gefunden (CWD-relative Bug-Spuren). Die Migration kümmert sich nur um eine Quelle. Andere stranded Files (z.B. `desktop/src-tauri/nexus.db` mit den heutigen 3 BrainDumps) bleiben liegen.
+- **Korrekturvorschlag:** Ein Hinweis-Log nach der Migration, z.B. auf `tracing::info!`-Ebene: „Falls weitere `nexus.db`-Dateien aus alten Builds existieren (typisch in `desktop/src-tauri/`), diese manuell sichten und löschen." Auf Production-Linux-Installationen unrelevant (User hat keine zwei CWDs), aber im Dev-Repo nützlich. Backlog.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- **N-021-KOR Hauptlogik** in `config.rs::Config::load`: korrekte Default-Path-Konstruktion via `dirs::home_dir()`, korrekter Strip-Prefix für backward-kompatible URL-Form, fallback auf `.` falls home_dir None.
+- **`init_pool` Path-Signatur**: `SqliteConnectOptions::new().filename(path)` umgeht URL-Parsing und ist Windows-Backslash-safe. `create_dir_all` für Parent vor connect, Edge-Case Empty-Parent ist über `as_os_str().is_empty()`-Check gehandhabt.
+- **Permissions Unix 0o600**: nach connect, analog zu `keys.json` und `.nexus_token`. Konsistent mit bestehenden Patterns.
+- **`migrate_legacy_cwd_db`-Logik** (Code-Read, ungetestet — siehe N-022): early-return-Reihenfolge target.exists / legacy.exists korrekt; rename-vor-copy ist atomic; Fehlerbehandlung mit warn statt panic ist defensiv.
+- **`init_in_memory`** Test-Helper: `#[cfg(test)]`-gated, klare Trennung zu Production-init_pool.
+- **Live-Migration**: 28 BrainDumps + 225 XP auf echtem System rüber, source-File entfernt, Permissions 0o600 — keine Daten verloren.
+- **Plattform-Check**: Phase-0-Windows-Portability-Status aus HANDOVER konsistent eingehalten (`dirs::home_dir`, `#[cfg(unix)]` für Permissions).
+- **Cargo**: `clippy --all-targets -- -D warnings` clean, `test --release` 5/5 grün inkl. Idempotenz-Test über neuen Test-Helper.
+
+### Verdikt
+
+**⚠️ Freigabe mit Auflage** — eine Major-Auflage (N-022-VOL): Unit-Tests für `migrate_legacy_cwd_db` vor dem Commit, ~30 Zeilen mit `tempfile`-Crate. Datenmigrations-Code ohne Tests ist bei einem GA-Bugfix nicht akzeptabel.
+
+N-023 (Doc-Comment-Fix, 2 Zeilen) sollte mit der gleichen Iteration mit erledigt werden — billig.
+N-024 ist Backlog.
+

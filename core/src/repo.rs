@@ -396,7 +396,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_retrieve() {
-        let pool = db::init_pool("sqlite::memory:").await.unwrap();
+        let pool = db::init_in_memory().await.unwrap();
 
         let entry = insert(&pool, "Ich muss noch Milch kaufen").await.unwrap();
         assert_eq!(entry.raw_text, "Ich muss noch Milch kaufen");
@@ -409,7 +409,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list() {
-        let pool = db::init_pool("sqlite::memory:").await.unwrap();
+        let pool = db::init_in_memory().await.unwrap();
 
         insert(&pool, "Erster Gedanke").await.unwrap();
         insert(&pool, "Zweiter Gedanke").await.unwrap();
@@ -420,7 +420,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_gamification_xp_and_achievements() {
-        let pool = db::init_pool("sqlite::memory:").await.unwrap();
+        let pool = db::init_in_memory().await.unwrap();
 
         // Initial stats
         let stats = get_user_stats(&pool).await.unwrap();
@@ -455,7 +455,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_task_done_xp_is_idempotent() {
-        let pool = db::init_pool("sqlite::memory:").await.unwrap();
+        let pool = db::init_in_memory().await.unwrap();
 
         let task = create_task(&pool, "Idempotenz", None, None).await.unwrap();
 
@@ -495,7 +495,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_task_create_and_list() {
-        let pool = db::init_pool("sqlite::memory:").await.unwrap();
+        let pool = db::init_in_memory().await.unwrap();
 
         let task = create_task(&pool, "Einkaufen gehen", None, Some("high")).await.unwrap();
         assert_eq!(task.title, "Einkaufen gehen");

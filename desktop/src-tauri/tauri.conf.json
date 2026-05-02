@@ -1,6 +1,6 @@
 {
   "productName": "nexus-desktop",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "identifier": "com.nexus.desktop",
   "build": {
     "frontendDist": "../src",

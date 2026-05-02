@@ -139,7 +139,7 @@ pub async fn run_core_diagnostics(state: &AppState) -> DiagReport {
             .map_err(|e| e.to_string())?;
             match row {
                 Some((v, desc)) => Ok((DiagStatus::Pass, Some(format!("v{} {}", v, desc)))),
-                None => Ok((DiagStatus::Fail, Some("no migrations applied".to_string()))),
+                None => Ok((DiagStatus::Fail, Some("keine Migrationen angewendet".to_string()))),
             }
         })
         .await,
@@ -171,7 +171,7 @@ pub async fn run_core_diagnostics(state: &AppState) -> DiagReport {
                 .unwrap_or("?")
                 .to_string();
             match std::fs::metadata(&path) {
-                Err(_) => Ok((DiagStatus::Fail, Some(format!("{} missing", basename)))),
+                Err(_) => Ok((DiagStatus::Fail, Some(format!("{} fehlt", basename)))),
                 Ok(meta) => {
                     #[cfg(unix)]
                     {
@@ -187,7 +187,7 @@ pub async fn run_core_diagnostics(state: &AppState) -> DiagReport {
                     #[cfg(not(unix))]
                     {
                         let _ = meta;
-                        Ok((DiagStatus::Pass, Some(format!("{} present", basename))))
+                        Ok((DiagStatus::Pass, Some(format!("{} vorhanden", basename))))
                     }
                 }
             }
@@ -228,7 +228,7 @@ pub async fn run_core_diagnostics(state: &AppState) -> DiagReport {
             } else {
                 Ok((
                     DiagStatus::Warn,
-                    Some(format!("{} not configured", default)),
+                    Some(format!("{} nicht konfiguriert", default)),
                 ))
             }
         })

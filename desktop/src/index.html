@@ -405,17 +405,17 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <div class="header">
   <h1><span>NEXUS</span> Dashboard</h1>
   <div class="header-actions">
-    <span class="status-dot" id="statusDot" title="Disconnected"></span>
+    <span class="status-dot" id="statusDot" title="Nicht verbunden"></span>
     <button class="btn btn-ghost btn-sm" id="themeToggle" onclick="cycleTheme()" title="Theme wechseln (Hell / Dunkel / System)">🎨 System</button>
-    <button class="btn btn-ghost" onclick="openSettings()">Settings</button>
+    <button class="btn btn-ghost" onclick="openSettings()">Einstellungen</button>
   </div>
 </div>
 
 <div class="tabs">
   <button class="tab active" data-tab="braindumps">BrainDumps</button>
-  <button class="tab" data-tab="projects">Projects</button>
-  <button class="tab" data-tab="tasks">Tasks</button>
-  <button class="tab" data-tab="achievements">Achievements</button>
+  <button class="tab" data-tab="projects">Projekte</button>
+  <button class="tab" data-tab="tasks">Aufgaben</button>
+  <button class="tab" data-tab="achievements">Erfolge</button>
 </div>
 
 <div id="globalBanner" class="banner error hidden" role="alert"></div>
@@ -423,11 +423,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- BrainDumps Tab -->
 <div class="content tab-content" id="tab-braindumps">
   <div class="toolbar">
-    <input type="text" id="bdSearch" placeholder="Search braindumps..." oninput="filterBraindumps()">
+    <input type="text" id="bdSearch" placeholder="BrainDumps suchen…" oninput="filterBraindumps()">
     <select id="bdCategory" onchange="filterBraindumps()">
-      <option value="">All Categories</option>
+      <option value="">Alle Kategorien</option>
     </select>
-    <button class="btn btn-primary" onclick="refreshBraindumps()">Refresh</button>
+    <button class="btn btn-primary" onclick="refreshBraindumps()">Aktualisieren</button>
     <button class="btn btn-ghost btn-sm" id="bdUnsortedBadge" onclick="filterUnsorted()" style="display:none;">Unsortiert (0)</button>
     <button class="btn btn-danger" id="bdBulkDelete" onclick="deleteSelectedBraindumps()" disabled>Ausgewählte löschen</button>
   </div>
@@ -437,7 +437,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- Projects Tab -->
 <div class="content tab-content hidden" id="tab-projects">
   <div class="toolbar">
-    <button class="btn btn-primary" onclick="refreshProjects()">Refresh</button>
+    <button class="btn btn-primary" onclick="refreshProjects()">Aktualisieren</button>
   </div>
   <div class="card-grid" id="projectCards"></div>
 </div>
@@ -445,8 +445,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- Tasks Tab -->
 <div class="content tab-content hidden" id="tab-tasks">
   <div class="toolbar">
-    <button class="btn btn-primary" onclick="openNewTask()">+ New Task</button>
-    <button class="btn btn-primary" id="taskRefreshBtn" onclick="refreshTasks()">Refresh</button>
+    <button class="btn btn-primary" onclick="openNewTask()">+ Neue Aufgabe</button>
+    <button class="btn btn-primary" id="taskRefreshBtn" onclick="refreshTasks()">Aktualisieren</button>
     <select id="taskFilterStatus" onchange="renderTasks()">
       <option value="">Alle Status</option>
       <option value="open">Offen</option>
@@ -468,7 +468,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- Achievements Tab -->
 <div class="content tab-content hidden" id="tab-achievements">
   <div class="toolbar">
-    <button class="btn btn-primary" onclick="refreshAchievements()">Refresh</button>
+    <button class="btn btn-primary" onclick="refreshAchievements()">Aktualisieren</button>
   </div>
   <div class="card-grid" id="achievementGrid"></div>
 </div>
@@ -476,11 +476,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- Settings Modal -->
 <div class="modal-overlay hidden" id="settingsModal">
   <div class="modal">
-    <h2>Settings</h2>
-    <label>Core Server URL</label>
+    <h2>Einstellungen</h2>
+    <label>Core-Server-URL</label>
     <input type="text" id="settingUrl" placeholder="http://127.0.0.1:7777">
-    <label>Bearer Token</label>
-    <input type="password" id="settingToken" placeholder="Enter your API token">
+    <label>Bearer-Token</label>
+    <input type="password" id="settingToken" placeholder="API-Token eingeben">
 
     <h3 style="margin-top: 20px; margin-bottom: 8px; font-size: 14px;">LLM-Konfiguration</h3>
     <label>Provider</label>
@@ -501,22 +501,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- New Task Modal -->
 <div class="modal-overlay hidden" id="newTaskModal">
   <div class="modal">
-    <h2>New Task</h2>
-    <label>Title</label>
-    <input type="text" id="newTaskTitle" placeholder="Task title">
-    <label>Project (optional)</label>
+    <h2>Neue Aufgabe</h2>
+    <label>Titel</label>
+    <input type="text" id="newTaskTitle" placeholder="Aufgabentitel">
+    <label>Projekt (optional)</label>
     <select id="newTaskProject">
       <option value="">— kein Projekt —</option>
     </select>
-    <label>Priority</label>
+    <label>Priorität</label>
     <select id="newTaskPriority">
-      <option value="low">Low</option>
-      <option value="medium" selected>Medium</option>
-      <option value="high">High</option>
+      <option value="low">Niedrig</option>
+      <option value="medium" selected>Mittel</option>
+      <option value="high">Hoch</option>
     </select>
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeNewTask()">Cancel</button>
-      <button class="btn btn-primary" onclick="createTask()">Create</button>
+      <button class="btn btn-ghost" onclick="closeNewTask()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="createTask()">Erstellen</button>
     </div>
   </div>
 </div>
@@ -610,10 +610,10 @@ async function checkConnection() {
   try {
     await api('/health', {}, { silent: true });
     document.getElementById('statusDot').classList.add('connected');
-    document.getElementById('statusDot').title = 'Connected to ' + coreUrl;
+    document.getElementById('statusDot').title = 'Verbunden mit ' + coreUrl;
   } catch {
     document.getElementById('statusDot').classList.remove('connected');
-    document.getElementById('statusDot').title = 'Disconnected';
+    document.getElementById('statusDot').title = 'Nicht verbunden';
   }
 }
 
@@ -675,7 +675,7 @@ function populateCategoryFilter() {
   const cats = [...new Set(braindumps.map(b => b.category).filter(Boolean))];
   const sel = document.getElementById('bdCategory');
   const cur = sel.value;
-  sel.innerHTML = '<option value="">All Categories</option>' +
+  sel.innerHTML = '<option value="">Alle Kategorien</option>' +
     cats.map(c => `<option value="${c}">${c}</option>`).join('');
   sel.value = cur;
 }

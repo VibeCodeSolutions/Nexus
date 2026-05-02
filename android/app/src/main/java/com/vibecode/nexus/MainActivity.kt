@@ -66,9 +66,9 @@ class MainActivity : ComponentActivity() {
     private val bottomNavItems = listOf(
         BottomNavItem("braindump", "BrainDump", Icons.Default.Mic),
         BottomNavItem("history", "Verlauf", Icons.Default.History),
-        BottomNavItem("tasks", "Tasks", Icons.Default.Checklist),
+        BottomNavItem("tasks", "Aufgaben", Icons.Default.Checklist),
         BottomNavItem("projects", "Projekte", Icons.AutoMirrored.Filled.TrendingUp),
-        BottomNavItem("settings", "Settings", Icons.Default.Settings),
+        BottomNavItem("settings", "Einstellungen", Icons.Default.Settings),
     )
 
     // Holds a raw pairing URI that needs to be consumed by the UI layer.

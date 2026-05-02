@@ -133,7 +133,7 @@ fun TasksScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Text(
-                text = "Tasks",
+                text = "Aufgaben",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -326,12 +326,21 @@ private fun TaskCard(task: TaskResponse) {
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = task.status.replace("_", " "),
+                        text = when (task.status) {
+                            "open" -> "Offen"
+                            "done" -> "Erledigt"
+                            else -> task.status.replace("_", " ")
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = task.priority,
+                        text = when (task.priority) {
+                            "low" -> "Niedrig"
+                            "medium" -> "Mittel"
+                            "high" -> "Hoch"
+                            else -> task.priority
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = priorityColor
                     )

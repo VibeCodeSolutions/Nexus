@@ -1,6 +1,113 @@
 # NEXUS — Übergabeprotokoll v0.1.0-rc3
 
-> **Update 2026-05-02 vormittag** — Sprint "Synaptic Mosaic" (v0.1.2-Bump): Phase F + B + U Desktop + X (Desktop-Anteil) Tuvok-grün und committed (`a640837` / `2b45fcd` / `c1ce54d` / `5eff289` + Phase-X-Commit). Knowledge-Graph (BrainDump↔Projekt-Verknüpfungen + Auto-Projekt-Vorschläge) im Backend live, Desktop-UI mit BrainDump-Detail-Modal + Suggestions-Banner + Material-3-Polish. **Cross-CLI offen:** AS-CLI muss Phase-U-Android implementieren (`BrainDumpHistoryScreen` Bottom-Sheet + `ProjectsScreen` Top-Banner + `NexusApiClient` 4 Funktionen + Link/Suggestion DTOs) und APK bauen, danach Cross-CLI Tuvok-Final-Live (curl + adb-Screenshots) vor Tag-Push. Aktueller Stand → `CURRENT_STATE.md`. Doku → `docs/LINKS.md`.
+> **Update 2026-05-02 vormittag** — Sprint "Synaptic Mosaic" (v0.1.2-Bump): Phase F + B + U Desktop + X (Desktop-Anteil) Tuvok-grün und committed (`a640837` / `2b45fcd` / `c1ce54d` / `5eff289` + `1f68852`). Knowledge-Graph (BrainDump↔Projekt-Verknüpfungen + Auto-Projekt-Vorschläge) im Backend live, Desktop-UI mit BrainDump-Detail-Modal + Suggestions-Banner + Material-3-Polish. **Cross-CLI offen:** AS-CLI muss Phase-U-Android implementieren (`BrainDumpHistoryScreen` Bottom-Sheet + `ProjectsScreen` Top-Banner + `NexusApiClient` 4 Funktionen + Link/Suggestion DTOs) und APK bauen, danach Cross-CLI Tuvok-Final-Live (curl + adb-Screenshots) vor Tag-Push. Aktueller Stand → `CURRENT_STATE.md`. Doku → `docs/LINKS.md`. **Arbeitsweise für die AS-CLI-Session siehe Block "AS-CLI-Anlauf — Arbeitsweise" unten.**
+
+---
+
+## AS-CLI-Anlauf — Arbeitsweise
+
+> Pflicht-Lektüre für die fremde Session in der Android-Studio-CLI (oder anderem Cross-CLI-Anlauf), bevor Phase-U-Android implementiert wird.
+
+### Sprint-Steuerung — Skill-Kette + Auto-Pilot
+
+NEXUS-Sprints laufen im Auto-Pilot ohne Admin-Prompt zwischen grünen Gates. Die Skill-Kette ist:
+
+```
+Admin → mgr-zentrale (Chakotay) → vc-chef (B'Elanna) → Hauptsession (Implementer)
+                                       ↓
+                                  vc-qualitaet (Tuvok)  — vor jedem Commit
+```
+
+**Wichtig:** Skills triggern Skills via `Skill('<name>')`-Tool. Hauptsession (= die Konversation, in der die Implementierung passiert) bewegt den Loop weiter — nach jedem Skill-Return sofort der nächste Schritt, **kein Admin-Prompt** dazwischen.
+
+### Sprint-Plan + WORKLOG (Pflicht-Anlaufstellen)
+
+| Pfad | Inhalt |
+|---|---|
+| `~/.claude/plans/synaptic-mosaic.md` | Sprint-Plan mit Phasen-DoDs, SM-PR-Auflagen, Final-Live-Test-Setup |
+| `~/.claude/projects/-home-kaik-Projekte-Apps-Nexus/worklogs/vc.md` | WORKLOG aller Aufträge — neuer Eintrag bei jedem Auftrag (nächste freie `AUFTRAG #<n>`) |
+| `QS_FINDINGS.md` | Tuvok-Findings, ID-Schema `SM-<phase>-<nr>-<KOR/VOL/SIC/COD/KON/WAR/PER>` |
+| `todo.md` SM-Block | Phasen-Status mit `[x]`-Checkmarks, offene Items für AS-CLI: `SM-U-AND-1..4` |
+| `docs/LINKS.md` | Datenmodell, Endpoints, env-Vars, bekannte Limitationen — Pflichtreferenz für API-Calls |
+
+### Tuvok-vor-Commit (NICHT verhandelbar)
+
+**Memory-Regel `feedback_qs_tuvok.md`:** Keine NEXUS-Commits ohne vorherige Tuvok-Runde.
+
+Konkret für AS-CLI:
+1. Phase-U-Android implementieren (4 Files, siehe `todo.md` SM-U-AND-1..4)
+2. `cd android && ./gradlew assembleDebug` EXIT=0 sicherstellen
+3. `Skill('vc-qualitaet')` mit Diff-Review-Auftrag triggern
+4. Bei ✅ → Commit. Bei ❌ → Iter-2-Diff-Fokus, Re-Tuvok. Bei ⚠️ → Auflagen mitfixen, Commit ohne Re-Tuvok wenn trivial.
+
+### Loop-Disziplin
+
+- **Max 3 Iterationen pro Gate.** Bei Iter-3-Rot → Hard-Stop, Eskalation an Admin via mgr-zentrale.
+- **Iter-2-Diff-Fokus**: nicht das Gesamtwerk re-reviewen, nur die korrigierten Stellen mit Bezug auf Iter-1-Finding-IDs.
+- Pattern dieses Sprints (Phase F + B): Iter-1-Major → Iter-2-Korrektur in einem Zyklus geheilt. Hat 2× funktioniert, ist tauglich.
+
+### Tuvok-Rot-Routing
+
+Bei Tuvok ❌ (Major+ findings) eskaliert vc-chef an mgr-zentrale (Chakotay). Chakotay hat Decision-Authority von Admin — **kein Admin-Prompt nötig** für:
+- Re-Implementer-Routing (Hauptsession bekommt Auflagen-Bündel)
+- Skill-Lücken-Triagen (neue Spezialisten anfordern via `vc-personal`)
+- Auflagen-Bündelung (welche Minor mitgefixt, welche als Bookmarks)
+
+Eskalation an Admin nur bei Hard-Stop (>3 Iterationen) oder Architektur-Entscheidungen mit dauerhaften Konsequenzen.
+
+### Cross-CLI-Trennung (Memory-Regel `feedback_workflow_split.md`)
+
+- **Hauptsession-CLI** (diese hier): nur `core/` + `desktop/` + Doku am Repo-Root
+- **AS-CLI** (Android-Studio): nur `android/`
+
+Beide CLIs committen unabhängig. Bei einem Cross-CLI-Sprint übernimmt die zweite CLI den Stab nach dem Closure-Bericht. **Tag-Push (`v0.1.2`) erst nach Cross-CLI-Final-Live-Gate** — nicht früher.
+
+### Persona-Memory (Pflicht für jeden Skill)
+
+Jeder Skill hat eine Persona-Notiz im XBrain-Vault:
+- `/home/kaik/Projekte/XBrain/50_Personen/<Name>.md` (Tuvok, Chakotay, B'Elanna, Seven, Harry Kim …)
+
+Pflicht:
+1. Session-Start: Persona-Notiz lesen (Erfahrungswerte + offene Bookmarks)
+2. Session-Ende: Case-Log + Lerneffekte + Bookmarks aktualisieren, `updated:` im Frontmatter setzen
+
+### Bash-Guard
+
+PreToolUse-Hook blockt unter YOLO-Mode:
+- `rm -rf` (außer mit explizitem User-Confirm)
+- `--no-verify` bei git
+- `--no-gpg-sign`
+- Force-Push auf main/master
+
+Bei Hook-Fail nicht umgehen — Root-Cause fixen.
+
+### Final-Live-Test-Setup für AS-CLI
+
+Nach Phase-U-Android + APK-Build kommt der Cross-CLI-Tuvok-Final-Live-Gate. Setup laut Sprint-Plan `~/.claude/plans/synaptic-mosaic.md` Sektion "Tuvok-Final-Live-Test":
+
+- **Setup**: Core neu starten (Release-Binary), APK reinstallieren auf Pixel, Tauri-Bundle ist bereits gebaut (Hauptsession-CLI hat DEB+RPM)
+- **Desktop-Smokes** (curl): `/health` → 200, `/api/setup-status` → JSON, `GET /braindump/{id}/links` → 200, Tauri-Bundle-Frontend grep auf `cycleTheme + app-footer + Verknüpft mit + suggestionsBanner`
+- **Android-Smokes** (adb): install -r, force-stop + start, Screenshot 1 (BrainDump-Tab), Screenshot 2 (BrainDump-Detail-Sheet mit Verknüpfungen), Screenshot 3 (Projects-Tab mit Suggestions-Banner falls pending), logcat-Tail nach `FATAL\|AndroidRuntime` muss leer sein
+- **End-to-End**: Echo-BrainDump via curl POST → Response unverändert dünn (kein `suggested_links`-Feld, extract_links läuft im Background — SM-PR-004), `recategorize_unsorted` triggern → Logs zeigen `extract_links_for_recent` + ggf. `suggest_auto_projects`-Aufruf, `GET /projects/suggestions` → Liste
+
+Findings als QS_FINDINGS.md-Sektion `## Synaptic Mosaic — Final-Live-Gate (Cross-CLI)`. Bei Major/Blocker → zurück zu Chakotay. **Max 2 Live-Test-Iterationen**, dann Eskalation.
+
+### Was die AS-CLI-Session konkret tut (Reihenfolge)
+
+1. **Persona-Notizen lesen**: Tuvok + Chakotay + B'Elanna sind aktuell — heutiges Datum, Sprint-Lerneffekte drin.
+2. **Sprint-Plan + WORKLOG + todo.md SM-Block überfliegen** für Stand.
+3. **Phase-U-Android implementieren** in 4 Files (siehe `todo.md` SM-U-AND-1..4):
+   - `data/model/Link.kt` + `ProjectSuggestion.kt` (DTOs)
+   - `data/NexusApiClient.kt` (4 Funktionen: `getBraindumpLinks`, `acceptSuggestion`, `dismissSuggestion`, `listSuggestions`)
+   - `ui/screen/BrainDumpHistoryScreen.kt` (Bottom-Sheet auf Detail-Klick mit Verknüpft-mit-Block)
+   - `ui/screen/ProjectsScreen.kt` (Top-Banner für pending Suggestions)
+4. **Build**: `cd android && ./gradlew assembleDebug` EXIT=0
+5. **`Skill('vc-qualitaet')`** triggern für Phase-U-Android-Diff-Review (mit adb-Live-Smoke)
+6. Bei grün: **Phase-U-Android-Commit** anlegen (analog Hauptsession-CLI-Stil)
+7. **Cross-CLI Tuvok-Final-Live-Gate** (Skill triggern mit komplettem Setup oben)
+8. Bei grün: **`v0.1.2`-Tag** + GitHub-Release-Workflow
+
+Auto-Pilot rollt analog zur Hauptsession-CLI — die fremde Session bewegt den Loop, kein Admin-Prompt zwischen grünen Gates.
 
 > **Update 2026-05-01 nachmittag** — Sprint "🐙 Joyful Jellyfish" Code-Tuvok-grün durch Phasen A-E. Aktueller Stand → `CURRENT_STATE.md`. Code-Diffs: Desktop-Banner+Refresh-Fix, Android Diag-Timestamp + Optimistic-Insert, Settings-Endpoints (Bearer-pflichtig) mit Modell-Persistenz, Background-Recategorize-Task mit Backoff, Single-Core-Garant, `docs/SYNC.md` + `docs/VAULT-DESIGN.md`. Phase-F-Auflagen: Admin-Hardware-E2E + lokaler `cargo check`/`gradlew test`.
 

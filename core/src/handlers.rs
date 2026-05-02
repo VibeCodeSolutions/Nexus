@@ -5,9 +5,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::config::Config;
-use crate::llm::ProjectSuggestion;
+use crate::links::{self, LinkInput};
+use crate::llm::{LlmProvider, NodeRef, ProjectSuggestion};
 use crate::repo;
+use crate::suggestions::{self, ProjectSuggestionInput};
 use crate::AppState;
+use sqlx::SqlitePool;
 
 const MAX_TEXT_LENGTH: usize = 10_000;
 
@@ -944,6 +947,331 @@ mod recategorize_tests {
     }
 }
 
+// ============================================================
+// Synaptic Mosaic — Phase B: Links + Auto-Project-Suggestions
+// ============================================================
+
+fn err500<E: std::fmt::Display>(e: E) -> (StatusCode, Json<Value>) {
+    (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+}
+
+fn err400(msg: &str) -> (StatusCode, Json<Value>) {
+    (StatusCode::BAD_REQUEST, Json(json!({"error": msg})))
+}
+
+fn validate_node_type(t: &str) -> Result<(), (StatusCode, Json<Value>)> {
+    if t == "braindump" || t == "project" {
+        Ok(())
+    } else {
+        Err(err400("source_type/target_type muss 'braindump' oder 'project' sein"))
+    }
+}
+
+// --- Links Endpoints ---
+
+pub async fn create_link(
+    State(state): State<AppState>,
+    Json(input): Json<LinkInput>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    validate_node_type(&input.source_type)?;
+    validate_node_type(&input.target_type)?;
+    // SM-B-002: created_by ist server-controlled. POST /links ist immer User-Action.
+    // 'llm' setzt ausschließlich der Background-Task (extract_links_for_recent).
+    let mut input = input;
+    input.created_by = "user".to_string();
+    let link = links::insert(&state.pool, &input).await.map_err(err500)?;
+    Ok(Json(json!(link)))
+}
+
+pub async fn get_braindump_links(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let outgoing = links::list_for_source(&state.pool, "braindump", &id).await.map_err(err500)?;
+    let incoming = links::list_for_target(&state.pool, "braindump", &id).await.map_err(err500)?;
+    Ok(Json(json!({ "outgoing": outgoing, "incoming": incoming })))
+}
+
+pub async fn get_project_links(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let outgoing = links::list_for_source(&state.pool, "project", &id).await.map_err(err500)?;
+    let incoming = links::list_for_target(&state.pool, "project", &id).await.map_err(err500)?;
+    Ok(Json(json!({ "outgoing": outgoing, "incoming": incoming })))
+}
+
+pub async fn delete_link(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<Value>)> {
+    links::delete_by_id(&state.pool, &id).await.map_err(err500)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// --- Project-Suggestions Endpoints ---
+
+pub async fn list_project_suggestions(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let pending = suggestions::list_pending(&state.pool).await.map_err(err500)?;
+    let enriched: Vec<Value> = pending.into_iter().map(|row| {
+        let ids = suggestions::parse_member_ids(&row.member_braindump_ids);
+        json!({
+            "id": row.id,
+            "name": row.name,
+            "description": row.description,
+            "member_braindump_ids": ids,
+            "confidence": row.confidence,
+            "reason": row.reason,
+            "created_at": row.created_at,
+            "status": row.status,
+        })
+    }).collect();
+    Ok(Json(json!(enriched)))
+}
+
+pub async fn accept_project_suggestion(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let suggestion = suggestions::get_by_id(&state.pool, &id)
+        .await
+        .map_err(err500)?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "suggestion nicht gefunden"}))))?;
+    if suggestion.status != "pending" {
+        return Err(err400("Suggestion ist nicht mehr pending"));
+    }
+    let project = repo::create_project(&state.pool, &suggestion.name, &suggestion.description)
+        .await
+        .map_err(err500)?;
+    let bd_ids = suggestions::parse_member_ids(&suggestion.member_braindump_ids);
+    // SM-B-006: Erfolgs-Counter — assign-Failures werden geschluckt, aber nicht mehr mitgezählt.
+    let mut linked = 0_usize;
+    for bd_id in &bd_ids {
+        if repo::assign_braindump_to_project(&state.pool, bd_id, &project.id).await.is_ok() {
+            linked += 1;
+        }
+    }
+    suggestions::set_status(&state.pool, &id, "accepted").await.map_err(err500)?;
+    let partial = linked < bd_ids.len();
+    Ok(Json(json!({
+        "project_id": project.id,
+        "name": project.name,
+        "linked_braindumps": linked,
+        "requested_braindumps": bd_ids.len(),
+        "partial": partial,
+    })))
+}
+
+pub async fn dismiss_project_suggestion(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<Value>)> {
+    suggestions::set_status(&state.pool, &id, "dismissed").await.map_err(err500)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// --- Background-Helper für SM-PR-004 (sequenziell im Recategorize-Task) ---
+
+#[derive(Debug, Default)]
+pub struct LinkExtractStats {
+    pub processed: usize,
+    pub links_created: usize,
+    pub failed: usize,
+}
+
+/// Holt die n neuesten BrainDumps ohne LLM-erzeugte Links und lässt den Provider
+/// Verknüpfungen zu den jüngeren Geschwistern + allen Projekten extrahieren.
+/// Confidence-Schwelle env-konfigurierbar via NEXUS_LINK_CONFIDENCE_MIN (default 0.7).
+pub async fn extract_links_for_recent(
+    pool: &SqlitePool,
+    llm: &dyn LlmProvider,
+    limit: usize,
+) -> Result<LinkExtractStats, sqlx::Error> {
+    let limit = limit.clamp(1, 50) as i64;
+    let confidence_min: f64 = std::env::var("NEXUS_LINK_CONFIDENCE_MIN")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.7);
+    let mut stats = LinkExtractStats::default();
+
+    // Hole BrainDumps, die noch keine LLM-erzeugten Links als source haben
+    let candidates: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
+        "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, b.tags_json \
+         FROM braindumps b \
+         WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.source_type='braindump' AND l.source_id=b.id AND l.created_by='llm') \
+         ORDER BY b.created_at DESC \
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    if candidates.is_empty() {
+        return Ok(stats);
+    }
+
+    // Kontext: alle Projekte + die letzten 30 BrainDumps insgesamt
+    let projects: Vec<crate::models::Project> = sqlx::query_as(
+        "SELECT id, name, description, created_at, status FROM projects ORDER BY created_at DESC LIMIT 50",
+    )
+    .fetch_all(pool)
+    .await?;
+    let recent_bds: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps ORDER BY created_at DESC LIMIT 30",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for bd in &candidates {
+        stats.processed += 1;
+        // Kandidaten sind alle anderen recent BrainDumps + alle Projekte
+        let mut nodes: Vec<NodeRef> = recent_bds.iter()
+            .filter(|c| c.id != bd.id)
+            .map(|c| NodeRef {
+                node_type: "braindump".into(),
+                id: c.id.clone(),
+                label: c.summary.clone().unwrap_or_else(|| c.raw_text.chars().take(80).collect()),
+            })
+            .collect();
+        nodes.extend(projects.iter().map(|p| NodeRef {
+            node_type: "project".into(),
+            id: p.id.clone(),
+            label: p.name.clone(),
+        }));
+
+        match llm.extract_links(&bd.raw_text, &nodes).await {
+            Ok(suggestions) => {
+                let mut wrote_any = false;
+                for sug in suggestions.into_iter().filter(|s| s.confidence >= confidence_min) {
+                    let input = LinkInput {
+                        source_type: "braindump".into(),
+                        source_id: bd.id.clone(),
+                        target_type: sug.target_type,
+                        target_id: sug.target_id,
+                        relation: sug.relation,
+                        confidence: sug.confidence,
+                        reason: sug.reason,
+                        created_by: "llm".into(),
+                    };
+                    if links::insert(pool, &input).await.is_ok() {
+                        stats.links_created += 1;
+                        wrote_any = true;
+                    }
+                }
+                // SM-B-001: Sentinel bei 0 LLM-Treffern — der NOT-EXISTS-Filter überspringt
+                // den BrainDump beim nächsten Cycle, sonst Cost-Loop bei API-LLMs.
+                // Nur bei Ok(...), nicht bei Err — temporäre LLM-Fehler dürfen retryen.
+                if !wrote_any {
+                    let sentinel = LinkInput {
+                        source_type: "braindump".into(),
+                        source_id: bd.id.clone(),
+                        target_type: "braindump".into(),
+                        target_id: bd.id.clone(),
+                        relation: "noop-marker".into(),
+                        confidence: 0.0,
+                        reason: None,
+                        created_by: "llm".into(),
+                    };
+                    let _ = links::insert(pool, &sentinel).await;
+                }
+            }
+            Err(e) => {
+                tracing::warn!("extract_links für {} fehlgeschlagen: {}", bd.id, e);
+                stats.failed += 1;
+            }
+        }
+    }
+    Ok(stats)
+}
+
+#[derive(Debug, Default)]
+pub struct AutoProjectStats {
+    pub considered: usize,
+    pub auto_created: usize,
+    pub members_linked: usize,
+    pub suggestions_added: usize,
+    pub dropped: usize,
+    pub failed: usize,
+}
+
+/// Lädt n unkategorisierte/Random BrainDumps + leitet sie an den LLM-Provider.
+/// Confidence >= AUTO_PROJECT_CONFIDENCE_MIN (default 0.8) → direkt erstellen.
+/// Confidence im Bereich [LINK_CONFIDENCE_MIN, AUTO) → in project_suggestions persistieren.
+pub async fn suggest_auto_projects(
+    pool: &SqlitePool,
+    llm: &dyn LlmProvider,
+) -> Result<AutoProjectStats, sqlx::Error> {
+    let auto_min: f64 = std::env::var("NEXUS_AUTO_PROJECT_CONFIDENCE_MIN")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.8);
+    let suggest_min: f64 = std::env::var("NEXUS_LINK_CONFIDENCE_MIN")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.5);
+    let mut stats = AutoProjectStats::default();
+
+    let entries: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps \
+         WHERE category IN ('Random', 'Unsorted') OR category IS NULL \
+         ORDER BY created_at DESC LIMIT 20",
+    )
+    .fetch_all(pool)
+    .await?;
+    stats.considered = entries.len();
+    if entries.len() < 3 {
+        return Ok(stats);
+    }
+
+    match llm.suggest_projects(&entries).await {
+        Ok(proposals) => {
+            for proposal in proposals {
+                if proposal.braindump_ids.len() < 2 {
+                    continue;
+                }
+                if proposal.confidence >= auto_min {
+                    if let Ok(project) = repo::create_project(pool, &proposal.name, &proposal.description).await {
+                        // SM-B-007: Erfolgs-Counter — assign-Failures werden geschluckt, aber nicht mehr mitgezählt.
+                        let mut linked = 0_usize;
+                        for bd_id in &proposal.braindump_ids {
+                            if repo::assign_braindump_to_project(pool, bd_id, &project.id).await.is_ok() {
+                                linked += 1;
+                            }
+                        }
+                        stats.auto_created += 1;
+                        stats.members_linked += linked;
+                    }
+                } else if proposal.confidence >= suggest_min {
+                    let input = ProjectSuggestionInput {
+                        name: proposal.name,
+                        description: proposal.description,
+                        member_braindump_ids: proposal.braindump_ids,
+                        confidence: proposal.confidence,
+                        reason: proposal.reason,
+                    };
+                    if suggestions::insert(pool, &input).await.is_ok() {
+                        stats.suggestions_added += 1;
+                    }
+                } else {
+                    // SM-B-007: Confidence<suggest_min wird silent gedropt — jetzt mit Trace + Counter.
+                    tracing::debug!(
+                        "auto-project: dropped proposal '{}' confidence={:.2} below {:.2}",
+                        proposal.name, proposal.confidence, suggest_min
+                    );
+                    stats.dropped += 1;
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("suggest_auto_projects LLM-Fehler: {}", e);
+            stats.failed += 1;
+        }
+    }
+    Ok(stats)
+}
+
 #[cfg(test)]
 mod settings_tests {
     #[test]
@@ -973,5 +1301,272 @@ mod settings_tests {
         let api_key: Option<String> = None;
         let key_updated = api_key.as_deref().map(|k| !k.trim().is_empty()).unwrap_or(false);
         assert!(!key_updated);
+    }
+}
+
+// ============================================================
+// SM-B-003: Phase-B-Tests (Mock-LLM + Server-Override + Sentinel + Confidence-Branching)
+// ============================================================
+
+#[cfg(test)]
+mod synaptic_phase_b_tests {
+    use super::*;
+    use crate::llm::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion};
+    use crate::models::BrainDumpEntry;
+    use std::sync::Arc;
+
+    struct MockLlm {
+        suggestions: Vec<LinkSuggestion>,
+        proposals: Vec<ProjectSuggestion>,
+        fail_links: bool,
+        fail_projects: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl LlmProvider for MockLlm {
+        async fn categorize_and_summarize(&self, _text: &str) -> Result<Classification, String> {
+            unimplemented!("MockLlm: categorize_and_summarize ist nicht im Phase-B-Testpfad");
+        }
+        async fn suggest_projects(&self, _entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String> {
+            if self.fail_projects { Err("mock-fail-projects".into()) } else { Ok(self.proposals.clone()) }
+        }
+        async fn extract_links(&self, _src: &str, _cands: &[NodeRef]) -> Result<Vec<LinkSuggestion>, String> {
+            if self.fail_links { Err("mock-fail-links".into()) } else { Ok(self.suggestions.clone()) }
+        }
+    }
+
+    async fn setup_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query(
+            "CREATE TABLE braindumps (
+                id TEXT PRIMARY KEY NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                raw_text TEXT NOT NULL,
+                transcript TEXT,
+                category TEXT NOT NULL DEFAULT 'Unsorted',
+                summary TEXT,
+                tags_json TEXT NOT NULL DEFAULT '[]'
+            )",
+        ).execute(&pool).await.unwrap();
+        sqlx::query(
+            "CREATE TABLE projects (
+                id TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                status TEXT NOT NULL DEFAULT 'active'
+            )",
+        ).execute(&pool).await.unwrap();
+        sqlx::query(
+            "CREATE TABLE braindump_projects (
+                braindump_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                PRIMARY KEY (braindump_id, project_id)
+            )",
+        ).execute(&pool).await.unwrap();
+        sqlx::query(
+            "CREATE TABLE links (
+                id TEXT PRIMARY KEY,
+                source_type TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                relation TEXT NOT NULL DEFAULT 'related',
+                confidence REAL NOT NULL DEFAULT 1.0,
+                reason TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_by TEXT NOT NULL DEFAULT 'user'
+            )",
+        ).execute(&pool).await.unwrap();
+        sqlx::query(
+            "CREATE TABLE project_suggestions (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                member_braindump_ids TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                reason TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                status TEXT NOT NULL DEFAULT 'pending'
+            )",
+        ).execute(&pool).await.unwrap();
+        pool
+    }
+
+    async fn insert_bd(pool: &SqlitePool, id: &str, text: &str, category: &str) {
+        sqlx::query("INSERT INTO braindumps (id, raw_text, summary, category) VALUES (?, ?, ?, ?)")
+            .bind(id).bind(text).bind(format!("Summary {id}")).bind(category)
+            .execute(pool).await.unwrap();
+    }
+
+    fn make_state(pool: SqlitePool, llm: Arc<dyn LlmProvider>) -> AppState {
+        AppState { pool, llm, started_at: std::time::Instant::now() }
+    }
+
+    /// SM-B-002: POST /links überschreibt client-controllable created_by auf "user".
+    /// Verhindert dass User den Background-Task-Filter (created_by='llm') unterläuft.
+    #[tokio::test]
+    async fn create_link_overrides_created_by_to_user() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "src", "source", "Random").await;
+        insert_bd(&pool, "tgt", "target", "Random").await;
+        let llm = Arc::new(MockLlm { suggestions: vec![], proposals: vec![], fail_links: false, fail_projects: false });
+        let state = make_state(pool.clone(), llm);
+        let input = LinkInput {
+            source_type: "braindump".into(),
+            source_id: "src".into(),
+            target_type: "braindump".into(),
+            target_id: "tgt".into(),
+            relation: "related".into(),
+            confidence: 1.0,
+            reason: None,
+            created_by: "llm".into(), // Client versucht "llm" zu setzen
+        };
+        let result = create_link(State(state), Json(input)).await;
+        assert!(result.is_ok(), "create_link sollte 200 zurückgeben");
+        let row: (String,) = sqlx::query_as("SELECT created_by FROM links WHERE source_id='src'")
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(row.0, "user", "Server muss created_by='user' forcen, auch wenn Client 'llm' sendet");
+    }
+
+    /// SM-B-001: extract_links_for_recent — Confidence-Filter, Suggestions unter min werden gedropt.
+    #[tokio::test]
+    async fn extract_links_filters_by_confidence_min() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "src", "Quelle", "Random").await;
+        insert_bd(&pool, "ka", "Kandidat A", "Random").await;
+        insert_bd(&pool, "kb", "Kandidat B", "Random").await;
+        // Pre-Marker für ka und kb, sodass nur src als Source-Kandidat geladen wird
+        sqlx::query("INSERT INTO links (id, source_type, source_id, target_type, target_id, relation, confidence, created_by) VALUES ('s_ka','braindump','ka','braindump','ka','noop-marker',0.0,'llm')")
+            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO links (id, source_type, source_id, target_type, target_id, relation, confidence, created_by) VALUES ('s_kb','braindump','kb','braindump','kb','noop-marker',0.0,'llm')")
+            .execute(&pool).await.unwrap();
+        let llm = MockLlm {
+            suggestions: vec![
+                LinkSuggestion { target_type: "braindump".into(), target_id: "ka".into(), relation: "related".into(), confidence: 0.9, reason: None },
+                LinkSuggestion { target_type: "braindump".into(), target_id: "kb".into(), relation: "related".into(), confidence: 0.6, reason: None },
+            ],
+            proposals: vec![],
+            fail_links: false,
+            fail_projects: false,
+        };
+        let stats = extract_links_for_recent(&pool, &llm, 10).await.unwrap();
+        assert_eq!(stats.processed, 1, "nur src ist Source-Kandidat");
+        assert_eq!(stats.links_created, 1, "nur conf>=0.7 (default min) wird geschrieben");
+        let real: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM links WHERE source_id='src' AND relation='related'")
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(real.0, 1);
+        let noop: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM links WHERE source_id='src' AND relation='noop-marker'")
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(noop.0, 0, "kein Sentinel weil ein echter Link geschrieben wurde");
+    }
+
+    /// SM-B-001: Sentinel-Marker bei 0 LLM-Treffern verhindert Re-Query-Loop.
+    #[tokio::test]
+    async fn extract_links_writes_sentinel_on_empty_result() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "bd1", "isoliert", "Random").await;
+        let llm = MockLlm {
+            suggestions: vec![],
+            proposals: vec![],
+            fail_links: false,
+            fail_projects: false,
+        };
+        let stats = extract_links_for_recent(&pool, &llm, 10).await.unwrap();
+        assert_eq!(stats.processed, 1);
+        assert_eq!(stats.links_created, 0);
+        let row: (String, String, f64) = sqlx::query_as(
+            "SELECT relation, created_by, confidence FROM links WHERE source_id='bd1'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(row.0, "noop-marker", "Sentinel-Marker geschrieben");
+        assert_eq!(row.1, "llm");
+        assert_eq!(row.2, 0.0);
+        // Cycle 2: bd1 ist nicht mehr Kandidat — Cost-Loop verhindert
+        let stats2 = extract_links_for_recent(&pool, &llm, 10).await.unwrap();
+        assert_eq!(stats2.processed, 0, "Sentinel verhindert Re-Query in Cycle 2");
+    }
+
+    /// SM-B-001: Bei LLM-Err KEIN Sentinel — temporäre Fehler dürfen retryen.
+    #[tokio::test]
+    async fn extract_links_handles_llm_error_without_sentinel() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "bd1", "text", "Random").await;
+        let llm = MockLlm {
+            suggestions: vec![],
+            proposals: vec![],
+            fail_links: true,
+            fail_projects: false,
+        };
+        let stats = extract_links_for_recent(&pool, &llm, 10).await.unwrap();
+        assert_eq!(stats.processed, 1);
+        assert_eq!(stats.links_created, 0);
+        assert_eq!(stats.failed, 1);
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM links WHERE source_id='bd1'")
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(count.0, 0, "kein Sentinel bei Err — bd1 bleibt Kandidat für Retry");
+    }
+
+    /// SM-B-007: suggest_auto_projects — Auto-Create bei Confidence >= auto_min (default 0.8).
+    #[tokio::test]
+    async fn suggest_auto_projects_auto_create_high_confidence() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "bd1", "Idee 1", "Random").await;
+        insert_bd(&pool, "bd2", "Idee 2", "Random").await;
+        insert_bd(&pool, "bd3", "Idee 3", "Random").await;
+        let llm = MockLlm {
+            suggestions: vec![],
+            proposals: vec![ProjectSuggestion {
+                name: "Auto-Projekt".into(),
+                description: "Test".into(),
+                braindump_ids: vec!["bd1".into(), "bd2".into(), "bd3".into()],
+                confidence: 0.85,
+                reason: Some("Mock".into()),
+            }],
+            fail_links: false,
+            fail_projects: false,
+        };
+        let stats = suggest_auto_projects(&pool, &llm).await.unwrap();
+        assert_eq!(stats.auto_created, 1);
+        assert_eq!(stats.members_linked, 3, "alle 3 Member sollten verknüpft sein");
+        assert_eq!(stats.suggestions_added, 0);
+        assert_eq!(stats.dropped, 0);
+        let projects: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM projects WHERE name='Auto-Projekt'")
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(projects.0, 1);
+        let assigns: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM braindump_projects")
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(assigns.0, 3);
+    }
+
+    /// SM-B-007: suggest_auto_projects — Suggestion-Pfad bei mittlerer Confidence (>=0.5, <0.8).
+    #[tokio::test]
+    async fn suggest_auto_projects_persists_suggestion_mid_confidence() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "bd1", "Idee 1", "Random").await;
+        insert_bd(&pool, "bd2", "Idee 2", "Random").await;
+        insert_bd(&pool, "bd3", "Idee 3", "Random").await;
+        let llm = MockLlm {
+            suggestions: vec![],
+            proposals: vec![ProjectSuggestion {
+                name: "Maybe-Projekt".into(),
+                description: "Test".into(),
+                braindump_ids: vec!["bd1".into(), "bd2".into()],
+                confidence: 0.65,
+                reason: Some("Mock".into()),
+            }],
+            fail_links: false,
+            fail_projects: false,
+        };
+        let stats = suggest_auto_projects(&pool, &llm).await.unwrap();
+        assert_eq!(stats.auto_created, 0);
+        assert_eq!(stats.suggestions_added, 1);
+        assert_eq!(stats.dropped, 0);
+        let row: (String, f64) = sqlx::query_as(
+            "SELECT name, confidence FROM project_suggestions WHERE name='Maybe-Projekt'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(row.0, "Maybe-Projekt");
+        assert_eq!(row.1, 0.65);
+        let projects: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM projects").fetch_one(&pool).await.unwrap();
+        assert_eq!(projects.0, 0, "kein Auto-Project bei conf<0.8");
     }
 }

@@ -22,12 +22,50 @@ pub struct ProjectSuggestion {
     pub name: String,
     pub description: String,
     pub braindump_ids: Vec<String>,
+    #[serde(default = "default_suggestion_confidence")]
+    pub confidence: f64,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+fn default_suggestion_confidence() -> f64 { 0.85 }
+
+/// LLM-Vorschlag für eine Verknüpfung zwischen einem source-Knoten und target-Knoten.
+/// Wird vom Background-Task `extract_links_for_recent` konsumiert.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkSuggestion {
+    pub target_type: String,    // 'braindump' | 'project'
+    pub target_id: String,
+    #[serde(default = "default_link_relation")]
+    pub relation: String,       // 'related' | 'mentions'
+    pub confidence: f64,
+    pub reason: Option<String>,
+}
+
+fn default_link_relation() -> String { "related".to_string() }
+
+/// Knoten-Beschreibung für den LLM-extract_links-Prompt-Kontext.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeRef {
+    pub node_type: String,      // 'braindump' | 'project'
+    pub id: String,
+    pub label: String,          // BrainDump.summary oder Project.name
 }
 
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
     async fn categorize_and_summarize(&self, text: &str) -> Result<Classification, String>;
     async fn suggest_projects(&self, entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String>;
+
+    /// SM-PR-002: Default-Impl liefert leere Liste — Provider können opt-in overriden.
+    /// Pflicht-Override in claude.rs + ollama.rs (zwei Default-Provider). Andere optional.
+    async fn extract_links(
+        &self,
+        _source_text: &str,
+        _candidates: &[NodeRef],
+    ) -> Result<Vec<LinkSuggestion>, String> {
+        Ok(Vec::new())
+    }
 }
 
 pub const SYSTEM_PROMPT: &str = r#"Du bist ein Kategorisierungs-Assistent für ein persönliches Notiz-System.
@@ -46,10 +84,29 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
   {
     "name": "<Projektname>",
     "description": "<kurze Beschreibung des Projekts>",
-    "braindump_ids": ["<id1>", "<id2>"]
+    "braindump_ids": ["<id1>", "<id2>"],
+    "confidence": <0.0-1.0>,
+    "reason": "<warum diese Gruppierung>"
   }
 ]
 Nur Einträge gruppieren, die wirklich zusammengehören. Nicht jeder Eintrag muss einem Projekt zugeordnet werden.
+confidence sollte ehrlich 0.5-1.0 sein, je sicherer du bist desto höher.
+Keine zusätzliche Erklärung, nur das JSON-Array."#;
+
+pub const EXTRACT_LINKS_PROMPT: &str = r#"Du analysierst Verknüpfungen zwischen Notizen.
+Gegeben ist ein Quell-Text und eine Liste von Kandidaten-Knoten (BrainDumps/Projekte).
+Gib eine Liste von Verknüpfungen zurück, die thematisch sinnvoll sind.
+Antworte AUSSCHLIESSLICH mit validem JSON-Array:
+[
+  {
+    "target_type": "braindump" | "project",
+    "target_id": "<id aus Kandidatenliste>",
+    "relation": "related" | "mentions",
+    "confidence": <0.0-1.0>,
+    "reason": "<warum diese Verknüpfung>"
+  }
+]
+Nur Verknüpfungen, die wirklich zusammenpassen. Lieber wenige hoch-Confidence als viele schwache.
 Keine zusätzliche Erklärung, nur das JSON-Array."#;
 
 pub struct NoOpProvider;

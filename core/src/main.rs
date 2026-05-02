@@ -5,10 +5,12 @@ mod db;
 mod diag;
 mod handlers;
 mod keystore;
+mod links;
 mod llm;
 mod models;
 mod oauth;
 mod repo;
+mod suggestions;
 
 use axum::middleware;
 use axum::routing::{delete, get, post, put};
@@ -172,6 +174,14 @@ async fn main() {
                 .route("/api/diag/run", post(handlers::diag_run))
                 .route("/api/diag/report", post(handlers::diag_report))
                 .route("/api/diag/reports", get(handlers::diag_list))
+                // Synaptic Mosaic Phase B
+                .route("/links", post(handlers::create_link))
+                .route("/links/{id}", delete(handlers::delete_link))
+                .route("/braindump/{id}/links", get(handlers::get_braindump_links))
+                .route("/projects/{id}/links", get(handlers::get_project_links))
+                .route("/projects/suggestions", get(handlers::list_project_suggestions))
+                .route("/projects/suggestions/{id}/accept", post(handlers::accept_project_suggestion))
+                .route("/projects/suggestions/{id}/dismiss", post(handlers::dismiss_project_suggestion))
                 .layer(middleware::from_fn(auth::require_token))
                 .layer(
                     CorsLayer::new()
@@ -219,7 +229,7 @@ async fn main() {
                 ),
             }
 
-            // Background-Recategorize-Task (Phase D / JJ-D2)
+            // Background-Recategorize-Task (Phase D / JJ-D2 + SM Phase B)
             // bg_pool und bg_llm wurden bereits vor with_state(state) geklont.
             let (cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
             tokio::spawn(async move {
@@ -229,6 +239,12 @@ async fn main() {
                     .unwrap_or(300);
                 let max_delay: u64 = 3600;
                 let mut delay_secs = base_delay;
+                // SM-PR-004: Auto-Projekt-Trigger alle N Recategorize-Cycles (default 6 ≈ 30min)
+                let auto_project_every: u64 = std::env::var("NEXUS_AUTO_PROJECT_INTERVAL_CYCLES")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(6);
+                let mut cycle: u64 = 0;
                 loop {
                     tokio::select! {
                         _ = tokio::time::sleep(std::time::Duration::from_secs(delay_secs)) => {}
@@ -237,6 +253,8 @@ async fn main() {
                             break;
                         }
                     }
+                    cycle = cycle.wrapping_add(1);
+                    let mut had_failure = false;
                     match handlers::recategorize_unsorted_inner(&bg_pool, bg_llm.as_ref(), 50).await {
                         Ok(stats) if stats.failed == 0 => {
                             if stats.updated > 0 || stats.total > 0 {
@@ -246,7 +264,6 @@ async fn main() {
                                     stats.total
                                 );
                             }
-                            delay_secs = base_delay;
                         }
                         Ok(stats) => {
                             tracing::warn!(
@@ -254,12 +271,54 @@ async fn main() {
                                 stats.failed,
                                 stats.total
                             );
-                            delay_secs = (delay_secs.saturating_mul(3)).min(max_delay);
+                            had_failure = true;
                         }
                         Err(e) => {
                             tracing::warn!("recategorize-bg DB error: {e} — backoff");
-                            delay_secs = (delay_secs.saturating_mul(3)).min(max_delay);
+                            had_failure = true;
                         }
+                    }
+
+                    // SM Phase B-6a: extract_links_for_recent jeden Cycle
+                    match handlers::extract_links_for_recent(&bg_pool, bg_llm.as_ref(), 10).await {
+                        Ok(stats) => {
+                            if stats.links_created > 0 || stats.failed > 0 {
+                                tracing::info!(
+                                    "extract-links-bg: {} links_created, {} processed, {} failed",
+                                    stats.links_created, stats.processed, stats.failed
+                                );
+                            }
+                            if stats.failed > 0 { had_failure = true; }
+                        }
+                        Err(e) => {
+                            tracing::warn!("extract-links-bg DB error: {e}");
+                            had_failure = true;
+                        }
+                    }
+
+                    // SM Phase B-6b: suggest_auto_projects nur jeden N-ten Cycle
+                    if cycle.is_multiple_of(auto_project_every) {
+                        match handlers::suggest_auto_projects(&bg_pool, bg_llm.as_ref()).await {
+                            Ok(stats) => {
+                                if stats.auto_created > 0 || stats.suggestions_added > 0 {
+                                    tracing::info!(
+                                        "auto-project-bg: {} auto_created, {} suggestions, {} considered",
+                                        stats.auto_created, stats.suggestions_added, stats.considered
+                                    );
+                                }
+                                if stats.failed > 0 { had_failure = true; }
+                            }
+                            Err(e) => {
+                                tracing::warn!("auto-project-bg DB error: {e}");
+                                had_failure = true;
+                            }
+                        }
+                    }
+
+                    if had_failure {
+                        delay_secs = (delay_secs.saturating_mul(3)).min(max_delay);
+                    } else {
+                        delay_secs = base_delay;
                     }
                 }
             });

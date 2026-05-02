@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 use crate::keystore::{self, OAuthTokens};
 use crate::models::BrainDumpEntry;
 use crate::oauth;
-use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
+use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, PROJECT_SUGGEST_PROMPT, SYSTEM_PROMPT};
 
 const DEFAULT_CLAUDE_MODEL: &str = "claude-sonnet-4-20250514";
 
@@ -144,6 +144,43 @@ impl LlmProvider for ClaudeProvider {
         }).await?;
 
         serde_json::from_str(&raw)
+            .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw}"))
+    }
+
+    /// SM-PR-002: Override für Default-Provider. Sendet Source+Kandidaten an Claude,
+    /// erwartet JSON-Array von LinkSuggestions zurück.
+    async fn extract_links(
+        &self,
+        source_text: &str,
+        candidates: &[NodeRef],
+    ) -> Result<Vec<LinkSuggestion>, String> {
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let candidates_text = candidates.iter()
+            .map(|n| format!("- {} (id={}, type={})", n.label, n.id, n.node_type))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let user = format!(
+            "Quell-Text:\n{}\n\nKandidaten:\n{}",
+            source_text, candidates_text
+        );
+
+        let raw = self.call(ClaudeRequest {
+            model: claude_model(),
+            max_tokens: 1024,
+            system: EXTRACT_LINKS_PROMPT.to_string(),
+            messages: vec![Message { role: "user".into(), content: user }],
+        }).await?;
+
+        // Robust gegen extra Text vor/nach dem JSON-Array
+        let trimmed = raw.trim();
+        let json = if let (Some(start), Some(end)) = (trimmed.find('['), trimmed.rfind(']')) {
+            &trimmed[start..=end]
+        } else {
+            trimmed
+        };
+        serde_json::from_str(json)
             .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw}"))
     }
 }

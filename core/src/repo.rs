@@ -63,7 +63,10 @@ pub async fn delete_project(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Err
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    tx.commit().await
+    tx.commit().await?;
+    // SM-PR-005: polymorphe Links cleanup nach erfolgreichem TX-Commit
+    let _ = crate::links::delete_for_node(pool, "project", id).await?;
+    Ok(())
 }
 
 pub async fn assign_braindump_to_project(pool: &SqlitePool, braindump_id: &str, project_id: &str) -> Result<(), sqlx::Error> {
@@ -173,6 +176,8 @@ pub async fn delete_braindump(pool: &SqlitePool, id: &str) -> Result<(), sqlx::E
         .bind(id)
         .execute(pool)
         .await?;
+    // SM-PR-005: polymorphe Links cleanup nach Delete (kein FK in SQLite)
+    let _ = crate::links::delete_for_node(pool, "braindump", id).await?;
     Ok(())
 }
 

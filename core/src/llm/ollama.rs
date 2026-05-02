@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::models::BrainDumpEntry;
-use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
+use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, PROJECT_SUGGEST_PROMPT, SYSTEM_PROMPT};
 
 const ENDPOINT: &str = "http://localhost:11434/api/chat";
 
@@ -104,6 +104,30 @@ impl LlmProvider for OllamaProvider {
             .join("\n\n");
 
         let raw = chat(&self.client, &self.model, PROJECT_SUGGEST_PROMPT, &entries_text).await?;
+        let json = extract_json_array(&raw);
+        serde_json::from_str(json)
+            .map_err(|e| format!("JSON Parse Fehler: {e} — Antwort: {raw}"))
+    }
+
+    /// SM-PR-002: Override für Default-Provider. Sendet Source+Kandidaten an Ollama,
+    /// erwartet JSON-Array von LinkSuggestions zurück.
+    async fn extract_links(
+        &self,
+        source_text: &str,
+        candidates: &[NodeRef],
+    ) -> Result<Vec<LinkSuggestion>, String> {
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let candidates_text = candidates.iter()
+            .map(|n| format!("- {} (id={}, type={})", n.label, n.id, n.node_type))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let user = format!(
+            "Quell-Text:\n{}\n\nKandidaten:\n{}",
+            source_text, candidates_text
+        );
+        let raw = chat(&self.client, &self.model, EXTRACT_LINKS_PROMPT, &user).await?;
         let json = extract_json_array(&raw);
         serde_json::from_str(json)
             .map_err(|e| format!("JSON Parse Fehler: {e} — Antwort: {raw}"))

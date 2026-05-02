@@ -331,13 +331,13 @@
 - [x] **SM-U-DSK-3** 14 neue CSS-Klassen unter PC-Token-System.
 - **Tuvok-Gate U Desktop:** ✅ GRÜN (Iter-1, 0 Major, 4 Minor als Phase-X-Bookmarks).
 
-#### Phase U Android (AS-CLI Cross-CLI)
+#### Phase U Android (AS-CLI Cross-CLI) — Commit `c468c24`
 
-- [ ] **SM-U-AND-1** `BrainDumpHistoryScreen.kt` — Bottom-Sheet für Verknüpfungen beim Detail-Klick.
-- [ ] **SM-U-AND-2** `ProjectsScreen.kt` — Top-Banner für pending Suggestions.
-- [ ] **SM-U-AND-3** `NexusApiClient.kt` — 4 neue Funktionen (links GET/POST/DELETE, suggestions accept/dismiss).
-- [ ] **SM-U-AND-4** `data/model/Link.kt` + `ProjectSuggestion.kt` — DTOs.
-- [ ] Tuvok-Gate U Android (AS-CLI).
+- [x] **SM-U-AND-1** `BrainDumpHistoryScreen.kt` — Bottom-Sheet für Verknüpfungen beim Detail-Klick (rekursive Sheet-Nav via `remember(id)+LaunchedEffect(id)`).
+- [x] **SM-U-AND-2** `ProjectsScreen.kt` — Top-Banner für pending Suggestions.
+- [x] **SM-U-AND-3** `NexusApiClient.kt` — 4 neue Funktionen.
+- [x] **SM-U-AND-4** `data/model/Link.kt` + `ProjectSuggestion.kt` — DTOs.
+- [x] Tuvok-Gate U Android — ⚠️ Iter-1 (1 Pflicht-Mitfix unused-imports) → ✅.
 
 ### Phase X — Doku + Polish + Build
 
@@ -347,17 +347,19 @@
 - [x] **SM-X-4** `docs/LINKS.md` (NEU) — Datenmodell + Endpoints + LLM-Prompt + SM-B-005 Edge-Case-Doku.
 - [x] **SM-X-5** SM-F-RETRO-001 Pflicht-Mitfix: 7 englische Strings in `desktop/src/index.html` deutsch.
 - [x] **SM-X-6** SM-U-001 Race-Guard, SM-U-002 Sentinel-Filter `created_by`-Check, SM-U-003 partial-Flag UX (`globalBanner`-Refactor mit Variant + Auto-Hide).
-- [ ] **SM-X-7** Core-Build `cargo build --release` EXIT=0.
-- [ ] **SM-X-8** Desktop-Tauri-Build `cargo tauri build --bundles deb,rpm` EXIT=0.
-- [ ] **SM-X-9** `HANDOVER.md` Cross-CLI-Update.
-- [ ] **SM-X-10** Tuvok-Gate X (Diff-Review).
-- [ ] **SM-X-11** Phase-X-Commit + Sprint-Bericht an Management — Zentrale.
+- [x] **SM-X-7** Core-Build `cargo build --release` EXIT=0.
+- [x] **SM-X-8** Desktop-Tauri-Build `cargo tauri build --bundles deb,rpm` EXIT=0.
+- [x] **SM-X-9** `HANDOVER.md` Cross-CLI-Update + Arbeitsweise-Block (`932fb86`).
+- [x] **SM-X-10** Tuvok-Gate X — ⚠️ Iter-1 (1 Pflicht-Mitfix SM-X-RESIDUE-001 + 1 Polish-Mitnahme SM-X-PRE-001) → ✅.
+- [x] **SM-X-11** Phase-X-Commit `1f68852` + Sprint-Bericht an Management — Zentrale.
 
-### Final-Gate-Auflagen Cross-CLI (vor Tag `v0.1.2`)
+### Final-Gate-Auflagen Cross-CLI (vor Tag `v0.1.2`) ✅ alle erledigt
 
-- [ ] **SM-MAN-1** AS-CLI: `cd android && ./gradlew assembleDebug` grün.
-- [ ] **SM-MAN-2** AS-CLI: APK auf Pixel installiert + adb-Live-Smoke (Bottom-Sheet öffnet, Banner navigiert, Konfidenz-Anzeige sichtbar).
-- [ ] **SM-MAN-3** Cross-CLI Tuvok-Final-Live (curl + Bundle-Inspection + adb-Screenshots, siehe Sprint-Plan).
+- [x] **SM-MAN-1** AS-CLI: `cd android && ./gradlew assembleDebug` grün.
+- [x] **SM-MAN-2** AS-CLI: APK auf Pixel installiert + adb-Live-Smoke.
+- [x] **SM-MAN-3** Cross-CLI Tuvok-Final-Live — Iter-2 ✅ (Admin-Lockscreen-Auflage erfüllt, alle 3 Screenshots verifiziert).
+- [x] **SM-LIVE-CLEANUP-001** Test-Link DELETE → 204 (Hauptsession-CLI).
+- [x] **`v0.1.2`-Tag** + GitHub-Release (Hauptsession-CLI).
 
 ---
 

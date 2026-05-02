@@ -1,8 +1,8 @@
 # NEXUS — Current State
 
-**Stand:** 2026-05-02 (vormittag)
-**Aktuelle Phase:** Sprint "Synaptic Mosaic" — Phase F + B + U Desktop committed (Tuvok-grün), Phase X läuft (Doku + Polish + Builds), Phase-U-Android über AS-CLI separat
-**Phase-Status:** v0.1.0 GA-fähig, JJ-Sprint Code-Tuvok-grün, PC-Sprint Code-Tuvok-grün, **SM-Sprint** v0.1.2-Tag steht nach AS-CLI-Phase-U-AND + Cross-CLI-Final-Gate
+**Stand:** 2026-05-02 (nachmittag)
+**Aktuelle Phase:** Sprint "Synaptic Mosaic" — ✅ Cross-CLI abgeschlossen (Phase F + B + U Desktop + X auf Hauptsession-CLI, Phase U Android auf AS-CLI, Cross-CLI Tuvok-Final-Live-Gate Iter-2 grün, SM-LIVE-CLEANUP-001 erledigt). **`v0.1.2` getaggt + gepusht.**
+**Phase-Status:** v0.1.0 GA-fähig, v0.1.1 PC implizit überholt, **v0.1.2 Synaptic Mosaic released**.
 
 ---
 
@@ -13,7 +13,10 @@ Auslöser: Knowledge-Graph-Scope (Wikilinks zwischen BrainDumps/Projekten + Auto
 - ✅ **Phase F — Frontend-Bugs + i18n** (`a640837 feat(synaptic): Phase F`): Desktop alle UI-Strings deutsch (Header/Tabs/Toolbars/Modals/JS-Banner + JS-dynamisch "Alle Kategorien"-Fix), `core/src/diag.rs` 4 deutsche Backend-Strings (SM-PR-006), Android Bottom-Nav + SettingsScreen + TasksScreen status/priority-Mappings (Offen/Erledigt, Niedrig/Mittel/Hoch). `docs/i18n-strings-de.md` (NEU) als Working-Doc + Lerneffekt-Sammlung für Variable-basierte/JS-dynamische Strings. Iter-2 mit SM-F-1 + SM-F-2 in 1 Korrektur-Zyklus geheilt.
 - ✅ **Phase B — Backend Links + Auto-Projekt** (`2b45fcd feat(synaptic): Phase B`): 2 neue Migrations (`links` + `project_suggestions`), 2 neue Module (`core/src/links.rs` + `core/src/suggestions.rs`), 7 Bearer-pflichtige Endpoints, `LlmProvider::extract_links`-Trait-Default-Impl + Override für Claude+Ollama, `EXTRACT_LINKS_PROMPT` (deutsch), Background-Task-Erweiterung mit Sentinel-Marker (Cost-Loop-Schutz SM-B-001), Cleanup-Cascade in `delete_braindump`/`delete_project`, 6 Mock-LLM-Tests + 5 Inline-CRUD-Tests (= 11 Tests Plan-DoD-übererfüllt). Iter-2 hat 3 Major (SM-B-001 Sentinel, SM-B-002 Server-Override `created_by`, SM-B-003 Mock-LLM-Tests) + 2 Counter-Drift-Minors + Bonus-Discovery `transcript`-Spalte in 1 Zyklus geheilt. SM-B-004 (Migration-Rename per Plan) als Plan-Bug zurückgenommen — sqlx-migrate-Version-Kollision.
 - ✅ **Phase U Desktop — Verknüpfungen + Suggestions-Banner** (`5eff289 feat(synaptic): Phase U Desktop`): Neuer BrainDump-Detail-Modal (analog `settingsModal`-Pattern, +192 LoC) mit Volltext+Tags+Summary+Verknüpft-mit-Section, Tabellen-Zeilen clickable mit dual-defense (`event.stopPropagation` auf inner-cells + Tag-Check), `renderLinks` filtert noop-marker-Sentinels, `wikiLabelFor` mit 📁/📝-Icons, `openLinkTarget` rekursiv für BrainDumps und Tab-Switch für Projects. Suggestions-Banner im Projects-Tab mit Confidence-Badge + Member-Count + Übernehmen/Verwerfen-Buttons, `partial`-Flag-Konsumption. 14 neue CSS-Klassen unter Material-3-Token-System aus PC-Sprint. Tuvok-Iter-1 ✅ (0 Major, 4 Minor als Phase-X-Bookmarks).
-- ⏳ **Phase X (Desktop-Anteil) — in Arbeit:** `CHANGELOG.md` SM-Block, dieser Block, `todo.md`-Sync, `docs/LINKS.md` (NEU), Phase-F-Restbestand (SM-F-RETRO-001: 7 englische Strings), SM-U-001/002/003 Polish-Quick-Fixes, Core+Tauri-Builds, `HANDOVER.md`-Update für AS-CLI-Cross-CLI-Sprint-Closure.
+- ✅ **Phase X (Desktop-Anteil)** (`1f68852 docs(synaptic): Phase X` + `932fb86 docs(handover): Arbeitsweise-Block`): CHANGELOG SM-Block, CURRENT_STATE Sprint-Block, todo SM-Block, `docs/LINKS.md` NEU, HANDOVER Cross-CLI-Bookmark + Arbeitsweise-Block, Phase-F-Restbestand (8 englische Strings) gefixt, SM-U-001/002/003 Polish (Race-Guard + Sentinel-`created_by`-Check + showBanner-Refactor mit success/suggestion/error-Variants). Tuvok ⚠️ Iter-1 → 1-Edit-Mitfix → ✅.
+- ✅ **Phase U Android (AS-CLI, Cross-CLI)** (`c468c24 feat(synaptic): Phase U Android`): BrainDumpHistoryScreen Bottom-Sheet mit Verknüpft-mit-Block (rekursive Sheet-Nav via remember(id)+LaunchedEffect(id)), ProjectsScreen Suggestions-Banner, NexusApiClient 4 Funktionen, Link/ProjectSuggestion DTOs. Tuvok Iter-1 ⚠️ → 2 unused-imports-Mitfix → ✅. 4 Polish-Bookmarks für Folge-Sprints.
+- ✅ **Cross-CLI Tuvok-Final-Live-Gate** (AS-CLI, Iter-2): Tauri-Bundle-Frontend-Inspection 4/4 SM-Patterns, daten-gefüllter Backend-Pfad (POST /links Server-Override + Background-Task hat live einen LLM-Link mit conf=0.95+reason erzeugt), 3 adb-Live-Screenshots verifiziert (BrainDump-Tab + Bottom-Sheet mit Verknüpft-mit + Projects-Empty-State), logcat clean. SM-LIVE-CLEANUP-001 (Test-Link DELETE → 204) durch Hauptsession-CLI erledigt vor Tag.
+- ✅ **`v0.1.2`-Tag** + GitHub-Actions-Release-Pipeline.
 
 **Bookmarks für Folge-Sprint (Vault):**
 - Links-Tabelle ist 80% des Edges-Schemas in `docs/VAULT-DESIGN.md`
@@ -21,13 +24,18 @@ Auslöser: Knowledge-Graph-Scope (Wikilinks zwischen BrainDumps/Projekten + Auto
 - SM-B-005 Race-Window in `repo::delete_project` (Multi-User-Szenarien)
 - Provider-Coverage `extract_links` für gemini/openai/mistral/groq/deepseek/openrouter/zai
 
-**Final-Gate-Auflagen (Cross-CLI):**
-- Tauri-Build `cd desktop && cargo tauri build --bundles deb,rpm` EXIT=0 (mit Phase-X-Stand)
-- Core-Build `cd core && cargo build --release` EXIT=0
-- AS-CLI: Phase-U-Android (`BrainDumpHistoryScreen` Bottom-Sheet, `ProjectsScreen` Top-Banner, `NexusApiClient`-Funktionen, Link/Suggestion DTOs) + APK-Build + adb-Live-Smoke
-- Cross-CLI Tuvok-Final-Live nach AS-CLI-Done
+**Final-Gate-Auflagen (Cross-CLI):** ✅ alle erledigt — Builds grün, AS-CLI Phase-U-Android implementiert + Tuvok-grün, Cross-CLI Final-Live-Gate Iter-2 ✅, SM-LIVE-CLEANUP-001 erledigt.
 
-**Sprint-Tag:** `v0.1.2` als nächster Bump nach Cross-CLI-Final-Gate.
+**Sprint-Tag:** ✅ `v0.1.2` getaggt + gepusht.
+
+**Folge-Sprint-Bookmarks:**
+- SM-U-AND-001 stale-Wikilink-no-op, SM-U-AND-002 AssistChip-as-Label-Smell, SM-U-AND-004 kein programmatic Tab-Switch, SM-U-AND-005 kein Hide-Animation
+- SM-LIVE-002-COD Multi-Instance-Drift bei Backend-Updates explizit als Closure-Auflage in HANDOVER.md aufnehmen (Lerneffekt aus Final-Live)
+- SM-LIVE-003-PER Konfidenz-% Layout-Wrap im Wikilink-Chip
+- SM-U-001..004 Desktop-Polish (Race-Guard zwar drin, aber weitere Polish-Bookmarks)
+- SM-B-005 Race-Window in `repo::delete_project` (Multi-User-Szenarien)
+- Provider-Coverage-Sprint (7 LLM-Provider No-Op-Default extract_links)
+- Vault-Sprint (`docs/VAULT-DESIGN.md`) — Links-Tabelle ist 80% des Edges-Schemas
 
 ---
 

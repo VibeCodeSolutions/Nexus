@@ -2206,3 +2206,155 @@ Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Fina
 **Empfehlung an vc-chef:** Beide Imports entfernen (1 Edit pro Zeile, sicherer Pflicht-Mitfix), dann Phase-U-Android-Commit (`feat(synaptic): Phase U Android — BrainDump-Bottom-Sheet + Suggestions-Banner`). Anschließend Cross-CLI-Final-Live-Gate (SM-MAN-2 + SM-MAN-3): adb-Live-Smoke + Tuvok-Final-Live-Test (curl + Bundle + adb-Screenshots) bevor `v0.1.2`-Tag. 4 Bookmarks in den Sprint-Bericht / `todo.md`-Backlog aufnehmen.
 
 **WORKLOG-Ref:** AUFTRAG #15
+
+---
+
+## Synaptic Mosaic — Final-Live-Gate (Cross-CLI) — Iteration 1
+
+> **Datum:** 2026-05-02 — **Auftrag:** Cross-CLI Tuvok-Final-Live-Gate für Sprint-Closure v0.1.2. Lauf in der AS-CLI nach Phase-U-Android-Commit `c468c24`. Test-Items: (1) Tauri-Bundle-Frontend-Inspection, (2) Daten-gefüllter Backend-Pfad via POST /links, (3) adb-Live-Smoke Pixel mit Screenshots, (4) logcat-Audit, (5) Verdikt für `v0.1.2`-Tag-Freigabe.
+
+### Setup-Status (Implementer-Pre-Smoke übernommen)
+
+- ✅ **Core neu gestartet** mit Release-Binary `core/target/release/nexus-core` (mtime 10:20, Phase-B inklusive). Pre-Restart-Detection: Vorinstanz war pre-Phase-B (404 für `/braindump/{id}/links`, 405 mit `Allow: DELETE` für `/projects/suggestions`) — klassischer Multi-Instance-Drift, der ohne diesen Test durchgerutscht wäre. Neu-Start log: `/tmp/sm-mosaic-and-core.log`.
+- ✅ **APK installiert** auf Pixel RFCX20J1PEX (`adb install -r app-debug.apk` → Success).
+- ✅ **App force-stop + start** clean (state=1, Activity Hist #0 vorhanden, kein FATAL/AndroidRuntime).
+- ✅ **Pre-Smokes curl:** /health, /api/setup-status, /braindump/{id}/links (200 mit `{"incoming":[],"outgoing":[]}`), /projects/suggestions (200 mit `[]`), /braindump/recategorize (200 mit `{"failed":0,"total":0,"updated":0}`) alle grün.
+
+### Test-Items
+
+#### Item 1 — Tauri-Bundle-Frontend-Inspection
+
+- **Bundle-mtime-Audit:** Source `desktop/src/index.html` mtime `2026-05-02 10:26:05` < DEB-Bundle mtime `2026-05-02 10:26:25` (20s Bundle-Build-Delta). Bundle ist garantiert frisch nach Source — Phase-X-Build `1f68852` korrekt eingebaut.
+- **Hinweis Tauri-2-Asset-Compression:** `strings`-grep im Binary findet keine Frontend-Strings (Brotli-komprimierte Embedded-Assets), darum wird Source-Grep + mtime-Audit als äquivalente Verifikation genutzt (Phase-F-Iter-2-Pattern).
+- **SM-Pattern-Counts (Source):**
+  - `cycleTheme`: 2 ✅ (PC Theme-Cycle)
+  - `app-footer`: 3 ✅ (Footer)
+  - `suggestionsBanner`: 2 ✅ (Phase-U-Desktop)
+  - `Verknüpft mit`: 1 ✅ (BD-Detail-Modal)
+- **Phase-F-i18n-Re-Grep:** 1 echter Treffer Z. 430 `<button class="tab active" data-tab="braindumps">BrainDumps</button>`. Keine Phase-F-Drift, sondern bewusste Domain-Term-Entscheidung — andere 3 Tabs (Z. 431-433) sind deutsch (Projekte/Aufgaben/Erfolge); BrainDumps konsistent zu Android `BrainDumpHistoryScreen.kt` Z. 64. Phase-F-Tuvok-Gate hatte das durchgewunken. Z. 517 `<!-- New Task Modal -->` ist HTML-Kommentar (false-positive).
+- **Verdikt Item 1:** ✅ grün.
+
+#### Item 2 — Daten-gefüllter Backend-Pfad
+
+- **`POST /links` mit `created_by="llm"` Test (SM-B-002 Server-Override):**
+  - Request-Body: `{"source_type":"braindump","source_id":"<bd1>","target_type":"braindump","target_id":"<bd2>","relation":"related","confidence":0.9,"created_by":"llm"}`
+  - Response: 200 mit `created_by: "user"` ✅ — Server-Override greift wie spec.
+  - Link-ID: `ccd1cdac-352b-4dec-b5b4-d3b7ea0c26b3`
+- **`GET /braindump/<bd1>/links` Re-Verifikation:** 2 outgoing-Links + 0 incoming.
+  - Link 1 (User-erzeugt): `id=ccd1cdac, confidence=0.9, created_by="user", relation="related"` — mein Test-Link.
+  - Link 2 (LLM-erzeugt, **Bonus-Befund**): `id=1347b520, confidence=0.95, created_by="llm", relation="mentions", reason="Der Quelltext bezieht sich auf das Thema 'Essen und Kochen' …"`. Background-Task hat während der Pre-Smoke-Phase seinen ersten Cycle ausgeführt und einen echten LLM-Link erzeugt — Phase-B `extract_links_for_recent` live verifiziert mit Production-Konfidenz, sauber strukturierter Reason, und Domain-Daten aus dem Vault.
+- **DTO-Konformität für Android:** Alle Felder gemäß `Link`-Kotlin-DTO vorhanden (id/source_type/source_id/target_type/target_id/relation/confidence/reason/created_at/created_by). Confidence als REAL (Double in Kotlin), reason nullable wenn fehlt. ✅
+- **Cleanup:** Test-Link `ccd1cdac` verbleibt absichtlich in der DB für die Iter-2-Screenshot-Phase nach Admin-Entsperrung — User-erzeugte Verknüpfung ergibt einen sichtbaren Wikilink-Chip im Sheet.
+- **Verdikt Item 2:** ✅ grün — Phase-B-Pfade live, Server-Override verifiziert, DTO-Vertrag stimmt mit echten Daten.
+
+#### Item 3 — adb-Live-Smoke
+
+- **Lockscreen-Status:** `mFocusedWindow=Bouncer`, `mDreamingLockscreen=true` — PIN-Eingabe vor Display-Render. `adb shell input swipe`/`keyevent` haben keine Wirkung (PIN-secured Lockscreen).
+- **App-Lebenszeichen:** `dumpsys activity activities` zeigt `Task #36 visible=true visibleRequested=false ... MainActivity` — App ist im Process-Stack korrekt registriert, hat Boot durchlaufen, wartet auf Display-Frontgrund.
+- **Geforderte Screenshots gemäß Sprint-Plan + HANDOVER.md (offen):**
+  - Screenshot 1: BrainDump-Tab (App-Boot-Ansicht)
+  - Screenshot 2: BrainDump-Detail-Sheet (Tap auf BD-Card mit ID `6ce04e1d-...` → Bottom-Sheet öffnet, "Verknüpft mit"-Block zeigt 2 Wikilink-Chips für die in Item 2 erzeugten Links — User-Link mit 90% + LLM-Link mit 95%)
+  - Screenshot 3: Projects-Tab (Suggestions-Banner ist aktuell `[]`, also nur Project-Cards sichtbar — Empty-State der Suggestions ist akzeptables Outcome, weil noch keine `suggest_auto_projects`-Cycle gelaufen ist; Test der Banner-Sichtbarkeit erst bei mid-confidence-Suggestion möglich)
+- **Auflage an Admin:** Pixel einmal entsperren (PIN), dann Iter-2-Screenshots in der gleichen Session anhängen.
+- **Verdikt Item 3:** ⏸️ offen — Auflage SM-LIVE-001-MAN.
+
+#### Item 4 — logcat-Audit
+
+- **Grep:** `adb logcat -d | grep -E "FATAL|AndroidRuntime|com\.vibecode\.nexus.*Exception"` → leer (EOF). ✅
+- App-Boot vollständig stabil, keine Runtime-Exceptions, keine Native-Crashes.
+- **Verdikt Item 4:** ✅ grün.
+
+### Findings
+
+#### SM-LIVE-001-MAN
+- **Schweregrad:** ⚠️ Auflage (nicht Code-Block)
+- **Kategorie:** Vollständigkeit (Live-Verifikation)
+- **Befund:** Lockscreen-PIN auf Pixel RFCX20J1PEX blockt UI-Render. Die 3 in HANDOVER.md "Final-Live-Test-Setup für AS-CLI" geforderten Screenshots können ohne Admin-Entsperrung nicht angefertigt werden. Backend-Pfade + Build + DTO + logcat sind technisch alle verifiziert; Mobile-UI-Visual ist die letzte fehlende Live-Bestätigung.
+- **Korrekturvorschlag:** Admin entsperrt Pixel einmal, danach Iter-2-Run dieser QS-Session: 3 `adb shell screencap -p`-Calls (BrainDump-Tab → Tap auf BD `6ce04e1d` → Bottom-Sheet-Screenshot mit 2 Wikilink-Chips → Projects-Tab-Screenshot). Bei grünen Screenshots → ✅ Final-Freigabe für `v0.1.2`-Tag.
+- **Status:** offen — Admin-Auflage
+
+#### SM-LIVE-002-COD (Lerneffekt — kein Finding für diesen Sprint)
+- **Schweregrad:** 🟢 Minor (rein dokumentarisch)
+- **Kategorie:** Code-Qualität
+- **Befund:** Während des Final-Live-Setups wurde die Multi-Instance-Drift (alte Core-Instanz vor Phase B noch lebendig) erst durch den Cross-CLI-Smoke aufgespürt. Hauptsession-CLI hat Core-Build sauber gemacht, aber den laufenden Prozess nicht neu gestartet. Sprint-Plan "Setup: Core neu starten" wurde von der Hauptsession-CLI implizit übersehen, weil sie keinen direkten Cross-CLI-Smoke macht.
+- **Korrekturvorschlag:** Bei Sprint-Closure-Auflagen für künftige NEXUS-Sprints einen expliziten "Core-Process-Restart"-Schritt nach jedem Backend-Commit dokumentieren, idealerweise als Pre-Final-Live-Auflage in HANDOVER.md aufnehmen. Bookmark für ZUKÜNFTIGE Tuvok-Plan-Reviews.
+- **Status:** offen — Persona-Lerneffekt aufgenommen, kein Sprint-Blocker
+
+### Was geprüft und in Ordnung
+
+- ✅ **Backend-Endpoints alle Live-grün:** /health, /api/setup-status, /braindump/{id}/links, /projects/suggestions, /braindump/recategorize, /links (POST), /braindump/{id}/links (GET). Bearer-Auth-Pflicht respektiert (auth-DEBUG-Logs zeigen `bearer_valid=true` für POST /links und GET /braindump/recategorize).
+- ✅ **SM-B-002 Server-Override `created_by`:** verifiziert mit Live-Request — Client `"llm"` → Server `"user"`. SM-B-Pattern aus Phase-B-Iter-2 ist in Production wirksam.
+- ✅ **Phase-B Background-Task läuft live:** `extract_links_for_recent` hat während dieses Final-Live-Tests einen echten LLM-Link mit confidence=0.95 erzeugt — Bonus-Verifikation des `extract_links`-Trait-Overrides in `claude.rs` oder `ollama.rs`. Reason-String ist deutsch und thematisch sinnvoll.
+- ✅ **DTO-Konformität End-to-End:** Backend-JSON für Link enthält alle 10 Felder, die der Kotlin `Link`-DTO erwartet. Confidence als REAL → Double, reason als Option<String> → String?, alle anderen TEXT-Felder als String.
+- ✅ **Tauri-Bundle-Frontend-Inspection:** mtime-Audit + Source-Grep liefert 4/4 SM-Patterns vorhanden, Phase-F-DoD wahrt domänenspezifischen Term "BrainDumps" konsistent zu Android.
+- ✅ **logcat clean:** App-Boot ohne FATAL/AndroidRuntime/Exception nach `am force-stop` + `am start`. Kein Native-Crash, keine Runtime-Exception.
+- ✅ **Cross-CLI-Repo-Konsistenz:** HEAD `c468c24` (Phase-U-Android), bezogen auf Hauptsession-CLI-Vorgänger `1f68852` (Phase X). Branch main, working tree nur mit `?? .claude/` außerhalb des Sprints.
+
+### Verdikt
+
+**⚠️ Freigabe mit Auflage — Cross-CLI Final-Live-Gate**
+
+1 Auflage (SM-LIVE-001-MAN): Admin entsperrt Pixel, danach Iter-2-Screenshots durch denselben QS-Lauf.
+
+Alle technischen Pfade (Build/Bundle/Backend/DTO/logcat) sind verifiziert grün. Phase-B Background-Pfad zeigt sich live wirkend. Der einzige offene Test-Item ist die Mobile-UI-Visual-Bestätigung — kein Code-Issue.
+
+**Empfehlung an vc-chef:** Admin-Auflage formulieren ("Pixel kurz entsperren, dann ist Final-Live in 2 Min durch"). Nach Screenshot-Iter-2 → Tag-Push `v0.1.2` durch Hauptsession-CLI freigegeben. Persona-Bookmark für künftige NEXUS-Sprint-Plan-Reviews: Multi-Instance-Drift bei Backend-Updates explizit als Closure-Auflage aufnehmen (SM-LIVE-002-COD).
+
+**WORKLOG-Ref:** AUFTRAG #16
+
+---
+
+## Synaptic Mosaic — Final-Live-Gate (Cross-CLI) — Iteration 2
+
+> **Datum:** 2026-05-02 — **Auftrag:** Iter-2-Verifikation der SM-LIVE-001-MAN-Auflage nach Admin-Lockscreen-Entsperrung. AUFTRAG #16 fortgesetzt.
+
+### Auflagen-Erfüllung
+
+#### SM-LIVE-001-MAN — ✅ erledigt
+
+Admin hat Pixel RFCX20J1PEX entsperrt (`mFocusedWindow=MainActivity`, `mDreamingLockscreen=false`). Alle 3 geforderten Screenshots + 1 Übergangs-Screenshot verifiziert:
+
+| Screenshot | Datei | Befund |
+|---|---|---|
+| 1 — BrainDump-Tab (App-Boot) | `/tmp/sm-live-1-braindumps.png` | ✅ Recording-Tab mit Mic, Bottom-Nav komplett deutsch (BrainDump\|Verlauf\|Aufgaben\|Projekte\|Einstellungen), Footer "Powered by VibeCode Solutions · NEXUS v0.1.0", grüner Connection-Dot |
+| Verlauf-Tab | `/tmp/sm-live-2-verlauf.png` | ✅ Card-Liste mit 4 Cards (Random/Question/Worry/Task), alle deutsch lokalisiert, BD `6ce04e1d` als erste Card |
+| 2 — BrainDump-Detail-Sheet | `/tmp/sm-live-14-original-correct-tap.png` | ✅ ModalBottomSheet öffnet, Drag-Handle, Header "BrainDump", Category-Chip "Random" (AssistChip-Pattern aus SM-U-AND-002-WAR), Datum, Volltext, Zusammenfassungs-Block (Surface), HorizontalDivider, **"Verknüpft mit"-Section** mit 📝-Wikilink-Chip "Notiz zum Thema Essen und Kochen speichern" 95% (LLM-Link aus Phase-B Background-Task) + 📝-Chip "Erkundigung nach dem Warum Clippy..." (User-Link aus Iter-1 POST), **"Rückverweise"-Section** mit 📝-Chip "Asking for confirmation of presence and availability." Sentinel-Filter sichtbar funktional (kein noop-marker) |
+| 3 — Projects-Tab | `/tmp/sm-live-4-projects.png` | ✅ Header "Projekte", Empty-State "Keine Projekte vorhanden" — DB hat keine Projekte und keine pending Suggestions, beide Empty-States akzeptabel |
+
+**logcat-Re-Check:** `FATAL\|AndroidRuntime\|Exception` weiterhin leer nach App-Restart-Cycle.
+
+### Befunde Iter-2
+
+#### SM-LIVE-003-PER (NEU)
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Performance / UX-Polish
+- **Befund:** Im Bottom-Sheet "Verknüpft mit"-Block wird die Konfidenz-Anzeige (z.B. "95%") bei langen Wikilink-Labels in `FlowRow`-Surface-Chips senkrecht umgebrochen — beim ersten Chip ist "9" auf einer Zeile und "5%" auf der nächsten sichtbar, beim zweiten Chip ist die Konfidenz-% gar nicht sichtbar (vermutlich vom Layout abgeschnitten). Funktional korrekt (Confidence-Wert wird gerendert), aber Lesbarkeit leidet bei langen Labels.
+- **Korrekturvorschlag:** Surface-Chip mit `widthIn(max = 280.dp)` constrainen und Confidence-% ans Ende des Labels appendieren (z.B. `"📝 Notiz... · 95%"` einzeilig) statt als separate Text-Komponente. Alternative: Konfidenz als Material-3-`Badge` über/unter dem Chip rendern.
+- **Status:** offen — Folge-Sprint-Polish-Bookmark
+
+#### SM-LIVE-CLEANUP-001 (Cleanup-Auflage)
+- **Schweregrad:** ⚠️ Auflage (kein Code-Bug)
+- **Kategorie:** Daten-Hygiene
+- **Befund:** Test-Link `ccd1cdac-352b-4dec-b5b4-d3b7ea0c26b3` (User-Link, BD `6ce04e1d` → `2720ef68`, conf=0.9, relation=related) wurde in Iter-1 absichtlich in der DB belassen für Iter-2-Screenshot-Verifikation. Nun sichtbar in der App als Wikilink-Chip mit Test-Reason — gehört nicht in Production-Daten.
+- **Korrekturvorschlag:** Implementer (Hauptsession-CLI nach Memory-Regel `feedback_workflow_split.md`) führt vor `v0.1.2`-Tag-Push aus: `curl -X DELETE -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7777/links/ccd1cdac-352b-4dec-b5b4-d3b7ea0c26b3` (erwartet 204 No Content).
+- **Status:** ✅ erledigt 2026-05-02 durch Hauptsession-CLI — DELETE_HTTP=204 verifiziert, danach `GET /braindump/.../links` liefert leere Listen für Test-BD. Sprint v0.1.2 tag-bereit.
+
+### Was geprüft und in Ordnung
+
+- ✅ **Phase-U-Android-DoD live erfüllt:** SM-U-AND-1 (Bottom-Sheet öffnet bei Card-Tap, Verknüpft-mit-Block + Wikilinks + Konfidenz sichtbar), SM-U-AND-3 (NexusApiClient ruft `/braindump/{id}/links` korrekt, liefert outgoing+incoming-Listen), SM-U-AND-4 (DTOs Backend-konform). SM-U-AND-2 (Suggestions-Banner) konnte nicht visuell verifiziert werden (DB hat `[]` Suggestions), Code-Pfad in AUFTRAG #15 statisch verifiziert — akzeptabel weil Empty-State-Code-Pfad korrekt rendert.
+- ✅ **Backend-Daten-Pfad live:** LLM-Link aus Phase-B Background-Task (`extract_links_for_recent` mit confidence=0.95) sichtbar im Sheet; User-Link aus Iter-1-POST sichtbar; Rückverweis (incoming-Link) sichtbar.
+- ✅ **Cross-CLI-Repo-Konsistenz:** HEAD `c468c24` Phase-U-Android steht unverändert nach Iter-2. `git restore` hat Implementer-Refactor-Versuch sauber zurückgerollt — working tree zeigt nur `M QS_FINDINGS.md` (meine Sektionen) + `?? .claude/`.
+- ✅ **Logcat clean:** App-Boot-Cycle ohne FATAL/AndroidRuntime/Exception, auch nach Force-Stop+Re-Start.
+- ✅ **Test-Methoden-Lerneffekt aufgenommen:** `screencap`-Bilder werden im Read-Tool down-skaliert von 1080x2340 → ~932x2000, visuelle Y-Schätzung war daneben. `uiautomator dump` → `bounds=[x1,y1][x2,y2]` ist die verlässliche Source für Tap-Koordinaten.
+
+### Verdikt
+
+**✅ Freigabe — Cross-CLI Final-Live-Gate**
+
+Phase-U-Android-Funktionalität live verifiziert. Sprint "Synaptic Mosaic" v0.1.2 ist nach Erfüllung der Cleanup-Auflage SM-LIVE-CLEANUP-001 (Test-Link DELETE) tag-bereit.
+
+**Empfehlung an vc-chef:** Implementer (AS-CLI Hauptsession) führt SM-LIVE-CLEANUP-001 aus (1 curl-Command), danach `v0.1.2`-Tag durch Hauptsession-CLI nach Memory-Regel `feedback_workflow_split.md` (Hauptsession-CLI macht Repo-Operations am Root, AS-CLI nur `android/`). 2 Folge-Sprint-Bookmarks: SM-LIVE-002-COD (Multi-Instance-Drift bei Backend-Updates als Closure-Auflage in HANDOVER.md), SM-LIVE-003-PER (Konfidenz-% Layout-Wrap im Wikilink-Chip).
+
+**Sprint Synaptic Mosaic auf Cross-CLI-Ebene abgeschlossen.**
+
+**WORKLOG-Ref:** AUFTRAG #16 (Iter-2 schließt)

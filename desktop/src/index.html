@@ -133,6 +133,20 @@ body {
 .banner { padding: 10px 14px; border-radius: 6px; margin: 0 auto 12px; max-width: 1200px; font-size: 13px; box-sizing: border-box; }
 .banner.error { background: rgba(220, 53, 69, 0.12); color: var(--danger); border: 1px solid rgba(220, 53, 69, 0.3); }
 .banner.hidden { display: none; }
+.banner.suggestion { background: rgba(255,152,0,0.10); color: var(--text); border: 1px solid rgba(255,152,0,0.35); margin-bottom: 16px; }
+.suggestion-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.suggestion-card .meta { flex: 1; min-width: 220px; }
+.suggestion-card .meta h4 { margin: 0 0 4px; font-size: 14px; }
+.suggestion-card .meta p { margin: 0 0 6px; font-size: 12px; color: var(--text-dim); }
+.suggestion-card .actions { display: flex; gap: 8px; align-items: center; }
+.confidence-badge { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 12px; background: rgba(255,152,0,0.15); color: var(--warning); margin-right: 6px; }
+.wiki-link { color: var(--primary); cursor: pointer; text-decoration: none; padding: 2px 6px; border-radius: 4px; background: var(--primary-tint); display: inline-block; margin: 2px 4px 2px 0; font-size: 12px; }
+.wiki-link:hover { background: var(--primary); color: white; }
+.bd-row-clickable { cursor: pointer; }
+.bd-row-clickable:hover { background: var(--primary-tint); }
+.links-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.links-section h3 { font-size: 13px; color: var(--text-dim); margin: 0 0 8px; }
+.links-section .empty { font-size: 12px; color: var(--text-dim); font-style: italic; }
 
 /* Table */
 table { width: 100%; border-collapse: collapse; }
@@ -439,6 +453,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   <div class="toolbar">
     <button class="btn btn-primary" onclick="refreshProjects()">Aktualisieren</button>
   </div>
+  <div id="suggestionsBanner" class="banner suggestion hidden"></div>
   <div class="card-grid" id="projectCards"></div>
 </div>
 
@@ -530,6 +545,25 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <div class="ach-modal-status" id="achModalStatus" style="text-align:center;"></div>
     <div class="actions">
       <button class="btn btn-primary" onclick="closeAchievement()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- BrainDump Detail Modal (Synaptic Mosaic Phase U) -->
+<div class="modal-overlay hidden" id="bdDetailModal">
+  <div class="modal" style="max-width: 640px;">
+    <h2>BrainDump</h2>
+    <div id="bdDetailMeta" style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;"></div>
+    <div id="bdDetailText" style="white-space: pre-wrap; font-size: 14px; line-height: 1.5; padding: 10px; background: var(--surface); border-radius: 6px; border: 1px solid var(--border);"></div>
+    <div id="bdDetailSummary" style="margin-top: 12px;"></div>
+    <div id="bdDetailTags" style="margin-top: 8px;"></div>
+    <div class="links-section">
+      <h3>Verknüpft mit</h3>
+      <div id="bdDetailLinks"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-danger" onclick="deleteBraindumpFromDetail()">Löschen</button>
+      <button class="btn btn-primary" onclick="closeBraindumpDetail()">Schließen</button>
     </div>
   </div>
 </div>
@@ -697,12 +731,12 @@ function renderBraindumps(items) {
     updateBulkButtonState();
     return;
   }
-  const rows = items.map(b => `<tr>
-    <td><input type="checkbox" class="bd-select" data-id="${esc(b.id)}" onchange="updateBulkButtonState()"></td>
+  const rows = items.map(b => `<tr class="bd-row-clickable" onclick="openBraindumpDetail('${esc(b.id)}', event)">
+    <td onclick="event.stopPropagation()"><input type="checkbox" class="bd-select" data-id="${esc(b.id)}" onchange="updateBulkButtonState()"></td>
     <td>${b.category ? '<span class="badge badge-category">' + esc(b.category) + '</span>' : '-'}</td>
     <td>${esc((b.raw_text || '').substring(0, 120))}${(b.raw_text || '').length > 120 ? '...' : ''}</td>
     <td>${b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
-    <td><button class="btn btn-sm btn-danger" onclick="deleteBraindump('${esc(b.id)}')">Delete</button></td>
+    <td onclick="event.stopPropagation()"><button class="btn btn-sm btn-danger" onclick="deleteBraindump('${esc(b.id)}')">Löschen</button></td>
   </tr>`).join('');
   document.getElementById('bdTable').innerHTML = `<table>
     <thead><tr><th style="width:40px;"></th><th>Category</th><th>Content</th><th>Date</th><th style="width:90px;">Actions</th></tr></thead>
@@ -742,6 +776,7 @@ async function refreshProjects() {
     if (!Array.isArray(projects)) projects = projects.data || projects.items || [];
     renderProjects();
     populateProjectSelects();
+    refreshSuggestionsBanner();
   } catch (e) {
     document.getElementById('projectCards').innerHTML =
       '<div class="empty-state"><p>Could not load projects: ' + e.message + '</p></div>';
@@ -1432,6 +1467,160 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   initOnboarding();
 });
+
+// ============================================================
+// Synaptic Mosaic Phase U — BrainDump-Detail-Modal + Links-Block + Project-Suggestions-Banner
+// ============================================================
+
+let currentBdDetailId = null;
+
+async function openBraindumpDetail(id, evt) {
+  if (evt && evt.target && evt.target.tagName === 'INPUT') return;
+  currentBdDetailId = id;
+  const bd = braindumps.find(b => b.id === id);
+  if (!bd) return;
+  document.getElementById('bdDetailMeta').textContent =
+    (bd.category ? bd.category + ' · ' : '') +
+    (bd.created_at ? new Date(bd.created_at).toLocaleString() : '');
+  document.getElementById('bdDetailText').textContent = bd.raw_text || '';
+  const summaryEl = document.getElementById('bdDetailSummary');
+  summaryEl.innerHTML = bd.summary
+    ? '<strong style="font-size: 12px; color: var(--text-dim);">Zusammenfassung:</strong> ' + esc(bd.summary)
+    : '';
+  const tagsEl = document.getElementById('bdDetailTags');
+  let tags = [];
+  try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
+  tagsEl.innerHTML = tags.length
+    ? tags.map(t => '<span class="badge badge-category" style="margin-right: 4px;">' + esc(t) + '</span>').join('')
+    : '';
+  const linksEl = document.getElementById('bdDetailLinks');
+  linksEl.innerHTML = '<span class="empty">Lade…</span>';
+  document.getElementById('bdDetailModal').classList.remove('hidden');
+  try {
+    const data = await api(`/braindump/${encodeURIComponent(id)}/links`, {}, { silent: true });
+    renderLinks(linksEl, data);
+  } catch (e) {
+    linksEl.innerHTML = '<span class="empty">Verknüpfungen konnten nicht geladen werden.</span>';
+  }
+}
+
+function renderLinks(container, data) {
+  // Filter Sentinel-Marker raus (noop-marker = Cost-Loop-Schutz, nicht User-relevant)
+  const out = (data.outgoing || []).filter(l => l.relation !== 'noop-marker');
+  const inc = (data.incoming || []).filter(l => l.relation !== 'noop-marker');
+  if (out.length === 0 && inc.length === 0) {
+    container.innerHTML = '<span class="empty">Keine Verknüpfungen — werden im Background extrahiert, sobald genug Kontext vorhanden ist.</span>';
+    return;
+  }
+  const renderTarget = (link, dir) => {
+    const targetType = dir === 'out' ? link.target_type : link.source_type;
+    const targetId = dir === 'out' ? link.target_id : link.source_id;
+    const label = wikiLabelFor(targetType, targetId);
+    const conf = link.confidence != null ? Math.round(link.confidence * 100) + '%' : '';
+    const reason = link.reason ? ' title="' + esc(link.reason) + '"' : '';
+    return `<span class="wiki-link" onclick="openLinkTarget('${esc(targetType)}', '${esc(targetId)}')"${reason}>${esc(label)}${conf ? ' · ' + conf : ''}</span>`;
+  };
+  let html = '';
+  if (out.length) html += '<div style="margin-bottom: 6px;">' + out.map(l => renderTarget(l, 'out')).join('') + '</div>';
+  if (inc.length) html += '<div><strong style="font-size: 11px; color: var(--text-dim);">Rückverweise:</strong><br>' + inc.map(l => renderTarget(l, 'in')).join('') + '</div>';
+  container.innerHTML = html;
+}
+
+function wikiLabelFor(type, id) {
+  if (type === 'project') {
+    const p = projects.find(x => x.id === id);
+    return p ? '📁 ' + (p.name || p.title || id) : '📁 ' + id;
+  }
+  const bd = braindumps.find(x => x.id === id);
+  if (bd) return '📝 ' + (bd.summary || (bd.raw_text || '').substring(0, 60));
+  return '📝 ' + id;
+}
+
+function openLinkTarget(type, id) {
+  if (type === 'project') {
+    closeBraindumpDetail();
+    document.querySelector('.tab[data-tab="projects"]').click();
+    return;
+  }
+  // Re-Open BrainDump-Detail mit dem Target
+  openBraindumpDetail(id);
+}
+
+function closeBraindumpDetail() {
+  document.getElementById('bdDetailModal').classList.add('hidden');
+  currentBdDetailId = null;
+}
+
+async function deleteBraindumpFromDetail() {
+  if (!currentBdDetailId) return;
+  if (!confirm('BrainDump löschen?')) return;
+  try {
+    await api(`/braindump/${encodeURIComponent(currentBdDetailId)}`, { method: 'DELETE' });
+    closeBraindumpDetail();
+    refreshBraindumps();
+  } catch (e) { alert('Fehler: ' + e.message); }
+}
+
+async function refreshSuggestionsBanner() {
+  const banner = document.getElementById('suggestionsBanner');
+  if (!banner) return;
+  let pending = [];
+  try {
+    pending = await api('/projects/suggestions', {}, { silent: true });
+    if (!Array.isArray(pending)) pending = pending.data || [];
+  } catch {
+    banner.classList.add('hidden');
+    return;
+  }
+  if (!pending.length) {
+    banner.classList.add('hidden');
+    banner.innerHTML = '';
+    return;
+  }
+  const cards = pending.map(s => {
+    const conf = s.confidence != null ? Math.round(s.confidence * 100) + '%' : '';
+    const memberCount = (s.member_braindump_ids || []).length;
+    const reason = s.reason ? '<p>' + esc(s.reason) + '</p>' : '';
+    return `<div class="suggestion-card">
+      <div class="meta">
+        <h4>${esc(s.name || 'Vorschlag')}</h4>
+        <p>${esc(s.description || '')}</p>
+        ${reason}
+        <div>
+          <span class="confidence-badge">Konfidenz ${conf}</span>
+          <span style="font-size: 12px; color: var(--text-dim);">${memberCount} Notizen</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-sm btn-primary" onclick="acceptSuggestion('${esc(s.id)}')">Übernehmen</button>
+        <button class="btn btn-sm btn-ghost" onclick="dismissSuggestion('${esc(s.id)}')">Verwerfen</button>
+      </div>
+    </div>`;
+  }).join('');
+  banner.innerHTML = '<strong>Projekt-Vorschläge (' + pending.length + ')</strong>' + cards;
+  banner.classList.remove('hidden');
+}
+
+async function acceptSuggestion(id) {
+  try {
+    const res = await api(`/projects/suggestions/${encodeURIComponent(id)}/accept`, { method: 'POST' });
+    if (res && res.partial) {
+      alert(`Projekt erstellt — ${res.linked_braindumps} von ${res.requested_braindumps} Notizen verknüpft (Rest übersprungen).`);
+    }
+    refreshProjects();
+  } catch (e) {
+    alert('Fehler beim Übernehmen: ' + e.message);
+  }
+}
+
+async function dismissSuggestion(id) {
+  try {
+    await api(`/projects/suggestions/${encodeURIComponent(id)}/dismiss`, { method: 'POST' });
+    refreshSuggestionsBanner();
+  } catch (e) {
+    alert('Fehler beim Verwerfen: ' + e.message);
+  }
+}
 </script>
 
 <footer class="app-footer">

@@ -1915,3 +1915,201 @@ Iter-2-Diff-Fokus hat alle 3 Major + 2 Counter-Drift-Minors aus Iter-1 sauber ad
 **Empfehlung an Persona-Memory:** Lerneffekt — bei Iter-1-Verifikation immer `cargo test` global laufen lassen, sonst bleiben Runtime-Bugs in Code-Pfaden anderer Module unsichtbar.
 
 **WORKLOG-Ref:** AUFTRAG #12 (QS grün) → AUFTRAG #11 abschließbar.
+
+---
+
+## Synaptic Mosaic — Phase U (Desktop) — Iteration 1
+
+**Datum:** 2026-05-02 vormittags
+**Prüfgegenstand:** Phase U Desktop (BrainDump-Detail-Modal mit Verknüpfungen-Block + Suggestions-Banner) vor Commit
+**Erstellt von:** Hauptsession — VibeCoding (Sprint Synaptic Mosaic Auto-Pilot)
+**Auftrag:** AUFTRAG #13 vc.md
+**Bezugscommit:** HEAD `c1ce54d` (Phase F + Phase B + docs/qs committed)
+
+### Diff-Range geprüft
+
+`desktop/src/index.html` +192/-3 LoC in einem File:
+- CSS +14 neue Klassen (banner.suggestion, suggestion-card, confidence-badge, wiki-link, bd-row-clickable, links-section)
+- HTML: `<div id="suggestionsBanner">` im Projects-Tab, neuer `<div id="bdDetailModal">` analog zum Achievement-Modal-Pattern, BrainDump-Tabellen-Zeilen clickable mit `event.stopPropagation()` auf Checkbox+Delete-Cells
+- JS: `openBraindumpDetail`, `renderLinks`, `wikiLabelFor`, `openLinkTarget`, `closeBraindumpDetail`, `deleteBraindumpFromDetail`, `refreshSuggestionsBanner`, `acceptSuggestion`, `dismissSuggestion`. Hook in `refreshProjects()` triggert `refreshSuggestionsBanner()`.
+
+### Build-Verifikation
+
+| Build | EXIT | Nachweis |
+|---|---|---|
+| `cargo tauri build --bundles deb,rpm` | 0 | `Finished release profile in 14.89s`, DEB+RPM mtime 10:06 (frisch) |
+
+Bundle-Frontend-Datei nicht eigenständig im Filesystem — Tauri embedded Assets in `nexus-desktop`-Binary. Build-EXIT=0 ist ausreichende Verifikation; der Frontend-Stand war zur Build-Zeit sauber.
+
+### Findings
+
+#### SM-U-001-KOR — Race-Condition bei rekursiver Wikilink-Navigation
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Korrektheit
+- **Befund:** `openBraindumpDetail(id, evt)` ruft `await api(\`/braindump/${id}/links\`, ...)` und rendert das Result via `renderLinks`. Wenn der User schnell durch mehrere BrainDumps navigiert (Wikilink-Klick → `openLinkTarget('braindump', id)` → `openBraindumpDetail(id)`), kann der `await` eines früheren Requests ZURÜCKKOMMEN während der neuere Request bereits läuft. Resultat: kurzzeitig falsche Links im UI, bis der zweite `await` rendert. Kein Crash, kein Daten-Schaden — nur UI-Drift für 1-2s.
+- **Korrekturvorschlag:** Nach dem `await api(...)` einen Guard einfügen: `if (currentBdDetailId !== id) return;` vor dem `renderLinks(linksEl, data)`. Damit verfällt der Render wenn der User zwischenzeitlich zu einem anderen BrainDump navigiert hat. ~2 LoC. Alternativ AbortController, aber Guard reicht.
+- **Status:** offen, Phase-X-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-U-002-KON — Sentinel-Filter prüft `relation`, nicht `created_by`
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Konsistenz
+- **Befund:** `renderLinks` filtert `l.relation !== 'noop-marker'`. Wenn ein User über `POST /links` einen manuellen Link mit `relation="noop-marker"` schreibt (technisch erlaubt — Server-Override aus SM-B-002 forciert nur `created_by="user"`, NICHT `relation`), würde dieser Link aus der UI verschwinden. Edge-Case (kein realer User würde "noop-marker" als Relation nutzen), aber Inkonsistenz.
+- **Korrekturvorschlag:** Filter um `created_by`-Check erweitern: `(data.outgoing || []).filter(l => !(l.relation === 'noop-marker' && l.created_by === 'llm'))`. Damit nur LLM-Sentinels gefiltert, User-Manual-Eingaben bleiben sichtbar.
+- **Status:** offen, Phase-X-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-U-003-WAR — `acceptSuggestion` partial-Flag-Handling via `alert()` ist UX-blockierend
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Wartbarkeit / UX
+- **Befund:** Wenn die accept-Response `partial=true` enthält (assigns sind teilweise fehlgeschlagen — Edge-Case wenn BrainDump-IDs nicht mehr existieren), öffnet der Code ein blocking-`alert()`. UX-blockierend, aber Edge-Case. Eleganter wäre der existierende `globalBanner` (suggestion-Variant) mit Auto-Hide nach 5s.
+- **Korrekturvorschlag:** `globalBanner` mit info-Variant (oder neuer `.banner.warning`) verwenden: `showBanner('Projekt erstellt — X von Y Notizen verknüpft', 'warning')` statt `alert(...)`. Erfordert minimal-Refactor von `showBanner` falls heute nur Error-Variant supported.
+- **Status:** offen, Phase-X-Polish-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-U-004-PER — `wikiLabelFor` O(n) Array-Lookups pro Link-Render
+- **Schweregrad:** 🟢 Minor (Bookmark)
+- **Kategorie:** Performance
+- **Befund:** `wikiLabelFor(type, id)` macht `projects.find(...)` UND `braindumps.find(...)` für jeden Link. Bei 10 Links und 50 BrainDumps + 5 Projects: 10 × (50 + 5) = 550 Comparisons. Bei 5000 BrainDumps wäre das 50.000 Comparisons pro Modal-Open — spürbar. Aktuelle NEXUS-Skala (deutlich unter 100 BDs) macht das vernachlässigbar.
+- **Korrekturvorschlag:** Map-Caching: `const bdById = new Map(braindumps.map(b => [b.id, b]));` einmal pro Modal-Open. Oder lazily im `wikiLabelFor`-Caller. Phase-X-Bookmark — kein aktuelles Bottleneck, aber für Vault-Sprint relevant wenn Datenvolumen steigt.
+- **Status:** offen, Phase-X-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+### Beobachtung außerhalb Phase-U-Scope
+
+#### SM-F-RETRO-001-VOL — Englische Strings-Restbestand aus Phase F
+- **Schweregrad:** 🟡 Major (für Phase-F-DoD), 🟢 Minor (für Phase-U-Scope)
+- **Kategorie:** Vollständigkeit / Lokalisierung
+- **Befund:** Beim Diff-Review von Phase U sind 7 englische User-facing Strings in `desktop/src/index.html` aufgefallen, die in Phase-F-Iteration 2 nicht erwischt wurden:
+  - Z. 679: `'Could not load braindumps: ' + e.message` (catch-Banner refreshBraindumps)
+  - Z. 730: `'No braindumps found.'` (empty-state)
+  - Z. 742: Tabellen-Header `<th>Category</th><th>Content</th><th>Date</th>` (3 Strings)
+  - Z. 782: `'Could not load projects: ' + e.message` (catch-Banner refreshProjects)
+  - Z. 800: `'No projects found.'` (empty-state)
+  - Z. 847: `'Could not load tasks: ' + e.message` (catch-Banner refreshTasks)
+  - Z. 980: `'Could not load achievements: ' + e.message` (catch-Banner refreshAchievements)
+
+  Diese Strings sind in catch-Blöcken eingebettet — Phase F hat HTML-Source-Defaults und Toolbars/Modals/JS-Banner gegrept, aber catch-Bodies und Tabellen-Header nicht erfasst.
+- **Korrekturvorschlag:**
+  - Z. 679: `'BrainDumps konnten nicht geladen werden: '`
+  - Z. 730: `'Keine BrainDumps gefunden.'`
+  - Z. 742: `<th>Kategorie</th><th>Inhalt</th><th>Datum</th>`
+  - Z. 782: `'Projekte konnten nicht geladen werden: '`
+  - Z. 800: `'Keine Projekte gefunden.'`
+  - Z. 847: `'Aufgaben konnten nicht geladen werden: '`
+  - Z. 980: `'Achievements konnten nicht geladen werden: '`
+
+  In **Phase X mitnehmen** (kein Phase-U-Blocker). Lerneffekt: bei i18n-Audit zukünftig auch JS-catch-Body-`innerHTML`-Schreibvorgänge greppen, nicht nur HTML-Source.
+- **Status:** offen, Phase-X-Auflage (mitfixen wenn `docs/LINKS.md` und `CHANGELOG.md` etc. angefasst werden)
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- ✅ **Click-Handler-Race-Sicherung:** `<tr class="bd-row-clickable" onclick="openBraindumpDetail(...)">` mit `event.stopPropagation()` auf Checkbox-Cell und Delete-Button-Cell. Doppelte Defense durch `if (evt && evt.target && evt.target.tagName === 'INPUT') return;` in `openBraindumpDetail`. Beide Schutzmechanismen greifen unabhängig — robust gegen subtle Browser-Quirks.
+- ✅ **Sentinel-Filter wirkt vor Empty-Check:** `noop-marker`-Sentinel-Self-Links werden aus outgoing+incoming gefiltert, danach greift Empty-State korrekt. BrainDump mit nur Sentinel zeigt "Keine Verknüpfungen".
+- ✅ **Rekursive Modal-Navigation per `openLinkTarget`:** Modal bleibt offen, `currentBdDetailId` wird sauber überschrieben, async-Race ist Edge-Case (siehe SM-U-001-Minor).
+- ✅ **`silent: true` Pattern:** für `/braindump/{id}/links` und `/projects/suggestions` konsistent mit JJ-Sprint-`checkConnection`-Pattern. Errors werden nicht-blockierend in Empty-States kommuniziert.
+- ✅ **Server-Response-Konsumption:** `acceptSuggestion` konsumiert das `partial`-Flag aus SM-B-006-Korrektur korrekt. Suggestions-Re-Fetch nach action.
+- ✅ **CSS-Konsistenz:** `.banner.suggestion` reuse-orientiert (orange-Tint analog `.badge-priority-medium` aus existierendem Code), `.confidence-badge` matches Pattern, `.wiki-link` nutzt `--primary-tint` aus PC-Sprint-Token-System.
+- ✅ **Empty-Handling überall:** Empty-State für Suggestions-Banner (`hidden`-Class), für BrainDump-Detail-Links ("Keine Verknüpfungen…"), für leere `pending`-Liste.
+- ✅ **Tauri-Build EXIT=0:** Frontend-Stand wurde sauber in DEB+RPM eingebaut (mtime 10:06 frisch).
+- ✅ **Plan-DoD U-DSK-1 + U-DSK-2 erfüllt:** BrainDump-Detail-View zeigt Verknüpfungen, Klicks navigieren; Projects-Tab Banner zeigt pending Suggestions mit Approve/Verwerfen-Buttons.
+- ✅ **Phase-U-spezifische Strings deutsch:** alle 16+ neuen User-facing Strings deutsch (Lade…, Keine Verknüpfungen, Rückverweise, Konfidenz, Übernehmen, Verwerfen, Schließen, Löschen, BrainDump, Zusammenfassung, Projekt-Vorschläge, Notizen, Vorschlag, Fehler beim Übernehmen/Verwerfen, BrainDump löschen?, Verknüpfungen konnten nicht geladen werden).
+
+### Verdikt
+
+**✅ Freigabe — Phase U Desktop abgeschlossen**
+
+0 Blocker / 0 Major / 4 Minor (Phase-X-Bookmarks) + 1 Phase-F-Retro-Beobachtung (in Phase X mitfixen).
+
+Phase U Desktop ist Commit-bereit. Sprint-Loop kann zu Phase X übergehen, wo:
+- SM-B-005 Race-Window als Edge-Case-Doku
+- SM-U-001 bis SM-U-004 als Polish-Bookmarks oder Quick-Fixes mitnehmen (alle <10 LoC)
+- **SM-F-RETRO-001 Pflicht-Mitfix**: 7 englische Strings durch deutsche ersetzen (Phase-F-DoD-Vervollständigung)
+
+Phase-U-Android läuft separat über AS-CLI (Memory-Beschränkung Dual-CLI-Workflow).
+
+**Empfehlung an vc-chef:** Sprint-Loop weitermachen — Phase U Desktop committen, Phase X starten (CHANGELOG/CURRENT_STATE/todo/docs/LINKS.md + SM-F-RETRO-001-Lokalisierungs-Fix + Builds). SM-U-001..004 als Polish-Bündel optional mit-aufnehmen.
+
+**Lerneffekt für Persona:** bei i18n-Audit auch JS-catch-Body-`innerHTML`-Schreibvorgänge und Tabellen-Header greppen, nicht nur HTML-Source-Defaults und Toolbars.
+
+**WORKLOG-Ref:** AUFTRAG #13 (QS grün)
+
+---
+
+## Synaptic Mosaic — Phase X (Doku + Polish + Build) — Iteration 1
+
+**Datum:** 2026-05-02 vormittags
+**Prüfgegenstand:** Phase-X-Doku-Sync + SM-F-RETRO-001-Korrektur + SM-U-001/002/003-Polish + Builds — vor Commit
+**Erstellt von:** Hauptsession — VibeCoding (Sprint Synaptic Mosaic Auto-Pilot)
+**Auftrag:** AUFTRAG #14 vc.md
+**Bezugscommit:** HEAD `5eff289` (Phase F + B + docs/qs + U Desktop committed)
+
+### Diff-Range geprüft
+
+NEU: `docs/LINKS.md` (~250 LoC)
+GEÄNDERT (alles uncommitted gegen HEAD):
+- `desktop/src/index.html` (10 Edits: 7 SM-F-RETRO-001 + 3 SM-U-001/002/003 + showBanner-Refactor mit Variant + Auto-Hide)
+- `CHANGELOG.md` (Synaptic-Mosaic-v0.1.2-Block oberhalb PC, ~70 Zeilen)
+- `CURRENT_STATE.md` (Sprint-Block oberhalb PC, mit Commit-Hash-Referenzen)
+- `todo.md` (PC-Final-Gate done, neuer SM-Sprint-Block mit Phasen-Hierarchie + Cross-CLI-Bookmarks)
+- `HANDOVER.md` (1 neuer 2026-05-02-Block oben, alter Stand bleibt)
+
+### Build-Verifikation (eigenständig nachgeprüft)
+
+| Build | EXIT | Nachweis |
+|---|---|---|
+| `cargo build --release` (core) | 0 | `nexus-core` mtime 10:20:51 |
+| `cargo tauri build --bundles deb,rpm` (desktop) | 0 | DEB+RPM mtime 10:21:11/12, beide neuer als source `index.html` (10:16:02) → Bundle-Frontend hat alle Phase-X-Edits |
+
+### Findings
+
+#### SM-X-RESIDUE-001-VOL — 8. englischer Restbestand übersehen
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Befund:** Beim Re-Grep nach SM-F-RETRO-001-Korrektur ist mir Z. 992 `'No achievements defined.'` aufgefallen — gleiches Pattern wie die 7 SM-F-RETRO-001-Strings (innerHTML-Assignment in Empty-State-Branch), aber NICHT in der Iter-1-Liste enthalten. Mein Fehler in der Phase-U-Tuvok-Sektion: ich habe nur 7 Strings gefunden, der 8. ist im `achievementGrid`-Empty-State und durchgerutscht.
+- **Korrekturvorschlag:** Z. 992 `'No achievements defined.'` → `'Keine Achievements definiert.'`. 1 Edit, Pflicht-Mitfix vor Phase-X-Commit (gleiche Klasse wie SM-F-RETRO-001).
+- **Status:** offen, Pflicht-Mitfix vor Commit
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-X-PRE-001-WAR — `showBanner('LLM gespeichert')` mit Default-Error-Variant
+- **Schweregrad:** 🟢 Minor (Bookmark)
+- **Kategorie:** Wartbarkeit / UX
+- **Befund:** Z. 1088 `showBanner('LLM gespeichert: ${provider}...')` zeigt eine Erfolgsmeldung, nutzt aber den neuen Default-Variant `'error'` (rot). Das ist **pre-existing** (vor dem Phase-X-Refactor war das HTML-Element bereits hartcodiert mit `class="banner error"`, also auch davor visuell falsch). Kein Phase-X-Regress — der Refactor verändert das Verhalten nicht. Aber jetzt, wo `showBanner` einen Variant-Parameter hat, ist die Korrektur trivial.
+- **Korrekturvorschlag:** Optional: neue `'success'`-Variant in CSS einführen (analog `.banner.suggestion`) und Z. 1088 auf `showBanner('...', 'success', 4000)` umstellen. Kann jetzt mitgenommen werden oder als UX-Sprint-Bookmark verschoben werden. Empfehlung: **nicht** Pflicht, weil pre-existing.
+- **Status:** offen, Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- ✅ **SM-F-RETRO-001 Korrektur (7/7):** alle 7 in der Iter-1-Liste genannten Strings korrekt ersetzt. Re-Grep nach `Could not load|No braindumps|No projects|<th>Category|<th>Content|<th>Date|No tasks|No achievements found` zeigt nur den 8. Restbestand (SM-X-RESIDUE-001) — ein Tippfehler meinerseits in der Iter-1-Inventur, kein Implementer-Fehler.
+- ✅ **SM-U-001 Race-Guard:** Z. 1509 (im try-Branch vor `renderLinks`) UND Z. 1512 (im catch-Branch vor `innerHTML`-Set) abgesichert — dual-defense, robust.
+- ✅ **SM-U-002 Sentinel-Filter:** `isSentinel`-Helper Z. 1521 mit kombiniertem `relation === 'noop-marker' && created_by === 'llm'`-Check, beide outgoing+incoming nutzen ihn (Z. 1522/1523). User-Manual-Links mit `relation='noop-marker'` und `created_by='user'` bleiben sichtbar — gewünschtes Verhalten per Iter-1-Korrekturvorschlag.
+- ✅ **SM-U-003 showBanner-Refactor:**
+  - Neue Signatur `showBanner(msg, variant = 'error', autoHideMs = 0)` — Backwards-compatible (Default-Variant `'error'` matcht pre-existing-Verhalten, autoHideMs=0 = kein Auto-Hide).
+  - Variant-Class-Toggle: `b.classList.remove('hidden', 'error', 'suggestion'); b.classList.add('banner', variant)` — sauber, deckt beide bekannten Variants ab.
+  - Timer-Cleanup in `setTimeout`: vorher-Cleanup verhindert akkumulierte Timer bei mehreren `showBanner`-Calls in Folge.
+  - Timer-Cleanup in `hideBanner`: `b._hideTimer = null` nach `clearTimeout`, kein Leak wenn `hideBanner` während aktiven Timer aufgerufen wird.
+  - `acceptSuggestion` nutzt `'suggestion'`-Variant + 6000ms Auto-Hide (pragmatisch).
+  - `accept`/`dismiss` Error-Branches nutzen `'error'`-Variant + 8000ms Auto-Hide.
+- ✅ **showBanner Backwards-Compat — Caller-Audit:** 7 Caller geprüft, alle nutzen entweder default-Signatur (variant='error', kein Auto-Hide) oder explizit die neuen Args. Kein bestehender Caller bricht. Z. 1088 ist pre-existing-UX-Quirk, kein Refactor-Regress (siehe SM-X-PRE-001).
+- ✅ **`docs/LINKS.md` Vollständigkeit:** Datenmodell beider Tabellen mit Spalten-Erklärung, alle 7 Endpoints mit Validierungs-Fehlern, LLM-Trait-Default-Impl + EXTRACT_LINKS_PROMPT, Background-Task-Verhalten inkl. Sentinel-Mechanik, alle 4 env-Vars, bekannte Limitationen mit Schweregrad (SM-B-005 Race-Window mit Multi-User-Hinweis, Provider-Coverage Bookmark, Performance Bookmark), Test-Auflistung. Lückenlos.
+- ✅ **`HANDOVER.md` Update:** neuer 2026-05-02-Block oben, alter 2026-05-01-Block bleibt unverändert. Cross-CLI-Bookmark explizit (BrainDumpHistoryScreen + ProjectsScreen + NexusApiClient + DTOs + APK-Build + Tuvok-Final-Live). Klar genug für eine fremde Session in der AS-CLI.
+- ✅ **`todo.md` SM-Block-Hierarchie:** Phase F/B/U-DSK done abgehakt, Phase U-AND als pending mit SM-U-AND-1..4 (4 Files, eindeutig zugeordnet), Phase X teils-done (SM-X-1..6 ✅ inkl. Polish-Fixes; SM-X-7..11 noch offen — Builds bereits jetzt grün, aber Commit + Bericht stehen aus). PC-Final-Gate-Auflagen als überholt markiert.
+- ✅ **CHANGELOG-Block-Hierarchie:** SM-Block oben (newest first), PC danach, JJ danach. Added/Changed/Fixed-Sektionen sauber pro Phase, keine Doppellistung. SM-Block ist umfangreich aber strukturiert (Phase B / Phase U / Phase F + Phase X / Bookmarks / Auflagen).
+- ✅ **Cross-Doc-Konsistenz:** Commit-Hashes `a640837 / 2b45fcd / c1ce54d / 5eff289` korrekt referenziert in CURRENT_STATE + todo + HANDOVER. CHANGELOG referenziert keine Hashes (Standard-Konvention).
+- ✅ **Build-Verifikation eigenständig:** Bundle-mtime (10:21) ist neuer als source-mtime (10:16) → alle Phase-X-Edits im Bundle eingebaut.
+
+### Verdikt
+
+**⚠️ Freigabe mit Auflagen — Phase X**
+
+1 Pflicht-Mitfix (SM-X-RESIDUE-001, 1 Edit): Z. 992 'No achievements defined.' → 'Keine Achievements definiert.'
+
+1 Bookmark (SM-X-PRE-001): pre-existing UX-Quirk bei `showBanner('LLM gespeichert')` mit Default-Error-Variant — kein Phase-X-Regress, optional jetzt mitnehmen oder als UX-Polish-Bookmark verschieben.
+
+Nach SM-X-RESIDUE-001-Fix: ✅ Freigabe für Phase-X-Commit + Sprint-Closure-Bericht.
+
+**Empfehlung an vc-chef:** SM-X-RESIDUE-001 in 1 Edit fixen (kein Re-Tuvok nötig, ist trivial), dann Phase-X-Commit (`docs(synaptic): Phase X — Doku + Polish + Builds`). Sprint-Closure-Bericht an Management — Zentrale für Admin-Information. SM-X-PRE-001 als Phase-X-Bookmark in den Bericht aufnehmen.
+
+**WORKLOG-Ref:** AUFTRAG #14

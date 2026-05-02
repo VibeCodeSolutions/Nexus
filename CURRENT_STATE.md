@@ -1,8 +1,33 @@
 # NEXUS — Current State
 
-**Stand:** 2026-05-01 (abend)
-**Aktuelle Phase:** Sprint "Polymorphic Clock" — Code-Phasen D+A+X Tuvok-grün, Builds als Final-Gate-Auflagen für Admin
-**Phase-Status:** v0.1.0 GA-fähig steht, Joyful-Jellyfish-Sprint Code-Tuvok-grün, Polymorphic-Clock-UI-Sprint Code-Tuvok-grün
+**Stand:** 2026-05-02 (vormittag)
+**Aktuelle Phase:** Sprint "Synaptic Mosaic" — Phase F + B + U Desktop committed (Tuvok-grün), Phase X läuft (Doku + Polish + Builds), Phase-U-Android über AS-CLI separat
+**Phase-Status:** v0.1.0 GA-fähig, JJ-Sprint Code-Tuvok-grün, PC-Sprint Code-Tuvok-grün, **SM-Sprint** v0.1.2-Tag steht nach AS-CLI-Phase-U-AND + Cross-CLI-Final-Gate
+
+---
+
+## Sprint "Synaptic Mosaic" (2026-05-02)
+
+Auslöser: Knowledge-Graph-Scope (Wikilinks zwischen BrainDumps/Projekten + Auto-Projekt-Bildung aus thematischen Clustern) plus Phase-F-Aufräum-Sammelaufgabe (UI-Lokalisierung, Settings-Bug, Tauri-Bundle-Refresh).
+
+- ✅ **Phase F — Frontend-Bugs + i18n** (`a640837 feat(synaptic): Phase F`): Desktop alle UI-Strings deutsch (Header/Tabs/Toolbars/Modals/JS-Banner + JS-dynamisch "Alle Kategorien"-Fix), `core/src/diag.rs` 4 deutsche Backend-Strings (SM-PR-006), Android Bottom-Nav + SettingsScreen + TasksScreen status/priority-Mappings (Offen/Erledigt, Niedrig/Mittel/Hoch). `docs/i18n-strings-de.md` (NEU) als Working-Doc + Lerneffekt-Sammlung für Variable-basierte/JS-dynamische Strings. Iter-2 mit SM-F-1 + SM-F-2 in 1 Korrektur-Zyklus geheilt.
+- ✅ **Phase B — Backend Links + Auto-Projekt** (`2b45fcd feat(synaptic): Phase B`): 2 neue Migrations (`links` + `project_suggestions`), 2 neue Module (`core/src/links.rs` + `core/src/suggestions.rs`), 7 Bearer-pflichtige Endpoints, `LlmProvider::extract_links`-Trait-Default-Impl + Override für Claude+Ollama, `EXTRACT_LINKS_PROMPT` (deutsch), Background-Task-Erweiterung mit Sentinel-Marker (Cost-Loop-Schutz SM-B-001), Cleanup-Cascade in `delete_braindump`/`delete_project`, 6 Mock-LLM-Tests + 5 Inline-CRUD-Tests (= 11 Tests Plan-DoD-übererfüllt). Iter-2 hat 3 Major (SM-B-001 Sentinel, SM-B-002 Server-Override `created_by`, SM-B-003 Mock-LLM-Tests) + 2 Counter-Drift-Minors + Bonus-Discovery `transcript`-Spalte in 1 Zyklus geheilt. SM-B-004 (Migration-Rename per Plan) als Plan-Bug zurückgenommen — sqlx-migrate-Version-Kollision.
+- ✅ **Phase U Desktop — Verknüpfungen + Suggestions-Banner** (`5eff289 feat(synaptic): Phase U Desktop`): Neuer BrainDump-Detail-Modal (analog `settingsModal`-Pattern, +192 LoC) mit Volltext+Tags+Summary+Verknüpft-mit-Section, Tabellen-Zeilen clickable mit dual-defense (`event.stopPropagation` auf inner-cells + Tag-Check), `renderLinks` filtert noop-marker-Sentinels, `wikiLabelFor` mit 📁/📝-Icons, `openLinkTarget` rekursiv für BrainDumps und Tab-Switch für Projects. Suggestions-Banner im Projects-Tab mit Confidence-Badge + Member-Count + Übernehmen/Verwerfen-Buttons, `partial`-Flag-Konsumption. 14 neue CSS-Klassen unter Material-3-Token-System aus PC-Sprint. Tuvok-Iter-1 ✅ (0 Major, 4 Minor als Phase-X-Bookmarks).
+- ⏳ **Phase X (Desktop-Anteil) — in Arbeit:** `CHANGELOG.md` SM-Block, dieser Block, `todo.md`-Sync, `docs/LINKS.md` (NEU), Phase-F-Restbestand (SM-F-RETRO-001: 7 englische Strings), SM-U-001/002/003 Polish-Quick-Fixes, Core+Tauri-Builds, `HANDOVER.md`-Update für AS-CLI-Cross-CLI-Sprint-Closure.
+
+**Bookmarks für Folge-Sprint (Vault):**
+- Links-Tabelle ist 80% des Edges-Schemas in `docs/VAULT-DESIGN.md`
+- SM-U-004 `wikiLabelFor` Map-Caching für größere Datenvolumina
+- SM-B-005 Race-Window in `repo::delete_project` (Multi-User-Szenarien)
+- Provider-Coverage `extract_links` für gemini/openai/mistral/groq/deepseek/openrouter/zai
+
+**Final-Gate-Auflagen (Cross-CLI):**
+- Tauri-Build `cd desktop && cargo tauri build --bundles deb,rpm` EXIT=0 (mit Phase-X-Stand)
+- Core-Build `cd core && cargo build --release` EXIT=0
+- AS-CLI: Phase-U-Android (`BrainDumpHistoryScreen` Bottom-Sheet, `ProjectsScreen` Top-Banner, `NexusApiClient`-Funktionen, Link/Suggestion DTOs) + APK-Build + adb-Live-Smoke
+- Cross-CLI Tuvok-Final-Live nach AS-CLI-Done
+
+**Sprint-Tag:** `v0.1.2` als nächster Bump nach Cross-CLI-Final-Gate.
 
 ---
 
@@ -20,7 +45,7 @@ Auslöser: Admin-Feedback zum Look-and-Feel — das alte Dark-Lila-Theme wirkte 
 - Live-E2E-Checkliste (Desktop): Theme-Cycle 3-fach durchklicken, OS-Theme-Wechsel im System-Mode, Onboarding-Palette gleich Dashboard
 - Live-E2E-Checkliste (Android, Pixel): AppearanceCard + Recompose, Persistenz über App-Restart, System-Theme-Reaktion, Footer auf allen 7 Routes
 
-**Sprint-Tag:** `v0.1.1` als nächster Bump nach erfolgreichem Final-Gate.
+**Sprint-Tag:** `v0.1.1` als nächster Bump nach erfolgreichem Final-Gate (heute SM-Sprint überholt — direkt v0.1.2 nach Cross-CLI-Closure).
 
 ---
 

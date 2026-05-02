@@ -134,6 +134,7 @@ body {
 .banner.error { background: rgba(220, 53, 69, 0.12); color: var(--danger); border: 1px solid rgba(220, 53, 69, 0.3); }
 .banner.hidden { display: none; }
 .banner.suggestion { background: rgba(255,152,0,0.10); color: var(--text); border: 1px solid rgba(255,152,0,0.35); margin-bottom: 16px; }
+.banner.success { background: rgba(76,175,80,0.12); color: var(--success); border: 1px solid rgba(76,175,80,0.3); }
 .suggestion-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
 .suggestion-card .meta { flex: 1; min-width: 220px; }
 .suggestion-card .meta h4 { margin: 0 0 4px; font-size: 14px; }
@@ -602,15 +603,21 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 applyTheme(currentTheme);
 
 // --- API ---
-function showBanner(msg) {
+function showBanner(msg, variant = 'error', autoHideMs = 0) {
   const b = document.getElementById('globalBanner');
   if (!b) return;
   b.textContent = msg;
-  b.classList.remove('hidden');
+  b.classList.remove('hidden', 'error', 'suggestion', 'success');
+  b.classList.add('banner', variant);
+  if (autoHideMs > 0) {
+    if (b._hideTimer) clearTimeout(b._hideTimer);
+    b._hideTimer = setTimeout(hideBanner, autoHideMs);
+  }
 }
 function hideBanner() {
   const b = document.getElementById('globalBanner');
   if (!b) return;
+  if (b._hideTimer) { clearTimeout(b._hideTimer); b._hideTimer = null; }
   b.classList.add('hidden');
   b.textContent = '';
 }
@@ -676,7 +683,7 @@ async function refreshBraindumps() {
     refreshUnsortedBadge();
   } catch (e) {
     document.getElementById('bdTable').innerHTML =
-      '<div class="empty-state"><p>Could not load braindumps: ' + e.message + '</p></div>';
+      '<div class="empty-state"><p>BrainDumps konnten nicht geladen werden: ' + e.message + '</p></div>';
   }
 }
 
@@ -727,7 +734,7 @@ function filterBraindumps() {
 
 function renderBraindumps(items) {
   if (!items.length) {
-    document.getElementById('bdTable').innerHTML = '<div class="empty-state"><p>No braindumps found.</p></div>';
+    document.getElementById('bdTable').innerHTML = '<div class="empty-state"><p>Keine BrainDumps gefunden.</p></div>';
     updateBulkButtonState();
     return;
   }
@@ -739,7 +746,7 @@ function renderBraindumps(items) {
     <td onclick="event.stopPropagation()"><button class="btn btn-sm btn-danger" onclick="deleteBraindump('${esc(b.id)}')">Löschen</button></td>
   </tr>`).join('');
   document.getElementById('bdTable').innerHTML = `<table>
-    <thead><tr><th style="width:40px;"></th><th>Category</th><th>Content</th><th>Date</th><th style="width:90px;">Actions</th></tr></thead>
+    <thead><tr><th style="width:40px;"></th><th>Kategorie</th><th>Inhalt</th><th>Datum</th><th style="width:90px;">Aktionen</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
   updateBulkButtonState();
 }
@@ -779,7 +786,7 @@ async function refreshProjects() {
     refreshSuggestionsBanner();
   } catch (e) {
     document.getElementById('projectCards').innerHTML =
-      '<div class="empty-state"><p>Could not load projects: ' + e.message + '</p></div>';
+      '<div class="empty-state"><p>Projekte konnten nicht geladen werden: ' + e.message + '</p></div>';
   }
 }
 
@@ -797,7 +804,7 @@ function populateProjectSelects() {
 
 async function renderProjects() {
   if (!projects.length) {
-    document.getElementById('projectCards').innerHTML = '<div class="empty-state"><p>No projects found.</p></div>';
+    document.getElementById('projectCards').innerHTML = '<div class="empty-state"><p>Keine Projekte gefunden.</p></div>';
     return;
   }
   const cards = await Promise.all(projects.map(async p => {
@@ -844,7 +851,7 @@ async function refreshTasks() {
     renderTasks();
   } catch (e) {
     document.getElementById('taskList').innerHTML =
-      '<div class="empty-state"><p>Could not load tasks: ' + e.message + '</p></div>';
+      '<div class="empty-state"><p>Aufgaben konnten nicht geladen werden: ' + e.message + '</p></div>';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = originalText; }
   }
@@ -977,13 +984,13 @@ async function refreshAchievements() {
     renderAchievements();
   } catch (e) {
     document.getElementById('achievementGrid').innerHTML =
-      '<div class="empty-state"><p>Could not load achievements: ' + e.message + '</p></div>';
+      '<div class="empty-state"><p>Achievements konnten nicht geladen werden: ' + e.message + '</p></div>';
   }
 }
 
 function renderAchievements() {
   if (!achievements.length) {
-    document.getElementById('achievementGrid').innerHTML = '<div class="empty-state"><p>No achievements defined.</p></div>';
+    document.getElementById('achievementGrid').innerHTML = '<div class="empty-state"><p>Keine Achievements definiert.</p></div>';
     return;
   }
   const cards = achievements.map(a => {
@@ -1079,7 +1086,7 @@ async function saveLlmConfig() {
     await api('/api/settings/provider', { method: 'POST', body: JSON.stringify(body) });
     document.getElementById('settingApiKey').value = '';
     hideBanner();
-    showBanner(`LLM gespeichert: ${provider}${model ? ' / ' + model : ''}`);
+    showBanner(`LLM gespeichert: ${provider}${model ? ' / ' + model : ''}`, 'success', 4000);
     setTimeout(hideBanner, 3000);
     loadLlmProviders();
   } catch (e) {
@@ -1498,16 +1505,23 @@ async function openBraindumpDetail(id, evt) {
   document.getElementById('bdDetailModal').classList.remove('hidden');
   try {
     const data = await api(`/braindump/${encodeURIComponent(id)}/links`, {}, { silent: true });
+    // SM-U-001: Race-Guard — User könnte bei rekursiver Wikilink-Navigation
+    // bereits zu einem anderen BrainDump gewechselt sein, dann verfällt der Render.
+    if (currentBdDetailId !== id) return;
     renderLinks(linksEl, data);
   } catch (e) {
+    if (currentBdDetailId !== id) return;
     linksEl.innerHTML = '<span class="empty">Verknüpfungen konnten nicht geladen werden.</span>';
   }
 }
 
 function renderLinks(container, data) {
-  // Filter Sentinel-Marker raus (noop-marker = Cost-Loop-Schutz, nicht User-relevant)
-  const out = (data.outgoing || []).filter(l => l.relation !== 'noop-marker');
-  const inc = (data.incoming || []).filter(l => l.relation !== 'noop-marker');
+  // Filter Sentinel-Marker raus (noop-marker mit created_by='llm' = Cost-Loop-Schutz,
+  // nicht User-relevant). SM-U-002: created_by-Check schützt User-Manual-Links mit
+  // beliebiger Relation.
+  const isSentinel = l => l.relation === 'noop-marker' && l.created_by === 'llm';
+  const out = (data.outgoing || []).filter(l => !isSentinel(l));
+  const inc = (data.incoming || []).filter(l => !isSentinel(l));
   if (out.length === 0 && inc.length === 0) {
     container.innerHTML = '<span class="empty">Keine Verknüpfungen — werden im Background extrahiert, sobald genug Kontext vorhanden ist.</span>';
     return;
@@ -1604,12 +1618,13 @@ async function refreshSuggestionsBanner() {
 async function acceptSuggestion(id) {
   try {
     const res = await api(`/projects/suggestions/${encodeURIComponent(id)}/accept`, { method: 'POST' });
+    // SM-U-003: partial-Flag → suggestion-Banner mit Auto-Hide statt blocking-alert.
     if (res && res.partial) {
-      alert(`Projekt erstellt — ${res.linked_braindumps} von ${res.requested_braindumps} Notizen verknüpft (Rest übersprungen).`);
+      showBanner(`Projekt erstellt — ${res.linked_braindumps} von ${res.requested_braindumps} Notizen verknüpft.`, 'suggestion', 6000);
     }
     refreshProjects();
   } catch (e) {
-    alert('Fehler beim Übernehmen: ' + e.message);
+    showBanner('Fehler beim Übernehmen: ' + e.message, 'error', 8000);
   }
 }
 
@@ -1618,7 +1633,7 @@ async function dismissSuggestion(id) {
     await api(`/projects/suggestions/${encodeURIComponent(id)}/dismiss`, { method: 'POST' });
     refreshSuggestionsBanner();
   } catch (e) {
-    alert('Fehler beim Verwerfen: ' + e.message);
+    showBanner('Fehler beim Verwerfen: ' + e.message, 'error', 8000);
   }
 }
 </script>

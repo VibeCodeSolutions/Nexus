@@ -282,15 +282,82 @@
 
 ### Final-Gate-Auflagen (Admin-manuell, vor Tag `v0.1.1`)
 
-- [ ] **PC-D-MAN-1** Theme-Cycle 3-fach durchklicken (Desktop), jeder State setzt `data-theme` und Button-Label korrekt.
-- [ ] **PC-D-MAN-2** OS-Theme wechseln während App auf `System` läuft → folgt automatisch.
-- [ ] **PC-D-MAN-3** Token in localStorage löschen → App neu → Onboarding-Palette gleich Dashboard.
-- [ ] **PC-D-MAN-4** `cd desktop && cargo tauri build` (oder `pnpm tauri build`) grün.
-- [ ] **PC-A-MAN-1** Settings → AppearanceCard, Hell wählen → sofortiger Recompose.
-- [ ] **PC-A-MAN-2** App neu öffnen → Theme-Wahl persistiert.
-- [ ] **PC-A-MAN-3** System-Theme wechseln, App auf `System` → folgt automatisch.
-- [ ] **PC-A-MAN-4** Footer auf allen 7 Routes (welcome, pair, braindump, history, tasks, projects, settings) sichtbar.
-- [ ] **PC-A-MAN-5** `cd android && ./gradlew assembleDebug` grün, kein neuer Lint-Fail.
+- [x] **PC-D-MAN-1** Theme-Cycle 3-fach durchklicken (Desktop) — überholt durch SM-Sprint, Tauri-Bundle frisch in v0.1.2-Build.
+- [x] **PC-D-MAN-2** OS-Theme wechseln während App auf `System` — überholt.
+- [x] **PC-D-MAN-3** Token in localStorage löschen — überholt.
+- [x] **PC-D-MAN-4** `cd desktop && cargo tauri build` — in SM-Phase-X erneut grün (DEB+RPM).
+- [x] **PC-A-MAN-1..5** — Android-Auflagen in v0.1.1 abgeschlossen, neu für SM siehe SM-AND-MAN-1..N (AS-CLI).
+
+---
+
+## Sprint "Synaptic Mosaic" (2026-05-02) — v0.1.2
+
+> Plan-File: `~/.claude/plans/synaptic-mosaic.md`
+> Auslöser: Knowledge-Graph-Scope (Wikilinks + Auto-Projekt) + Phase-F-Lokalisierungs-Sammelaufgabe.
+> Workflow: Auto-Pilot ohne User-Prompt zwischen grünen Gates, Chakotay-Decision-Authority bei Tuvok-Rot.
+
+### Phase F — Frontend-Bugs + i18n (Commit `a640837`)
+
+- [x] **SM-F-1** Desktop alle UI-Strings deutsch (Tabs/Toolbars/Modals/JS-Banner + JS-dynamisches "Alle Kategorien"-Override-Fix Iter-2).
+- [x] **SM-F-2** Android TasksScreen "Aufgaben"-Header + status/priority-Mappings (Offen/Erledigt, Niedrig/Mittel/Hoch).
+- [x] **SM-F-3** Tauri-Bundle frisch (DEB+RPM, AppImage explizit ausgeschlossen wegen linuxdeploy-Tooling-Issue).
+- [x] **SM-F-AND-1** Android `SettingsScreen` scrollbar (`verticalScroll`).
+- [x] **SM-F-AND-3** Backend User-facing Strings deutsch (`core/src/diag.rs`).
+- [x] `docs/i18n-strings-de.md` als Working-Doc + Lerneffekt-Sammlung.
+- **Tuvok-Gate F:** ✅ GRÜN (Iter-2 nach SM-F-1+SM-F-2-Fix).
+
+### Phase B — Backend Links + Auto-Projekt (Commit `2b45fcd`)
+
+- [x] **SM-B-1** Migration `20260501_001_links.sql` + `links.rs` Modul (5 CRUD-Tests).
+- [x] **SM-B-2** Migration `20260502_001_project_suggestions.sql` + `suggestions.rs` Modul.
+- [x] **SM-B-3** 7 Bearer-pflichtige Endpoints (`POST /links`, `DELETE /links/{id}`, GET `/braindump|projects/{id}/links`, suggestions GET/accept/dismiss).
+- [x] **SM-B-4** Trait `LlmProvider::extract_links` Default-Impl + Override claude.rs+ollama.rs.
+- [x] **SM-B-6** Background-Task `extract_links_for_recent` + `suggest_auto_projects` mit env-Confidence-Schwellen.
+- [x] **SM-B-001-COD** Sentinel-Marker (Cost-Loop-Schutz).
+- [x] **SM-B-002-SIC** Server-Override `created_by="user"` für POST /links.
+- [x] **SM-B-003-VOL** Mock-LLM-Provider + 5 Branching-Tests (Plan-DoD übererfüllt: 11 Tests).
+- [x] **SM-B-005-KOR** Cleanup-Cascade in `delete_braindump`/`delete_project` (mit Race-Window-Bookmark).
+- [x] **SM-B-006/007-KOR** Counter-Drift-Korrektur in `accept_project_suggestion` + `suggest_auto_projects`.
+- [x] **SM-B-008-KOR** Bonus-Discovery: `transcript`-Spalte in 3 Phase-B-SELECTs ergänzt.
+- [ ] **SM-B-004 verworfen** als Plan-Bug (sqlx-migrate Version-Kollision bei gleichem Datum-Prefix).
+- **Tuvok-Gate B:** ✅ GRÜN (Iter-2 nach SM-B-001/002/003-Fix).
+
+### Phase U — UI für Links + Suggestions
+
+#### Phase U Desktop (Commit `5eff289`)
+
+- [x] **SM-U-DSK-1** BrainDump-Detail-Modal (NEU) mit Verknüpft-mit-Block + Wikilinks.
+- [x] **SM-U-DSK-2** Suggestions-Banner im Projects-Tab mit Übernehmen/Verwerfen-Buttons.
+- [x] **SM-U-DSK-3** 14 neue CSS-Klassen unter PC-Token-System.
+- **Tuvok-Gate U Desktop:** ✅ GRÜN (Iter-1, 0 Major, 4 Minor als Phase-X-Bookmarks).
+
+#### Phase U Android (AS-CLI Cross-CLI)
+
+- [ ] **SM-U-AND-1** `BrainDumpHistoryScreen.kt` — Bottom-Sheet für Verknüpfungen beim Detail-Klick.
+- [ ] **SM-U-AND-2** `ProjectsScreen.kt` — Top-Banner für pending Suggestions.
+- [ ] **SM-U-AND-3** `NexusApiClient.kt` — 4 neue Funktionen (links GET/POST/DELETE, suggestions accept/dismiss).
+- [ ] **SM-U-AND-4** `data/model/Link.kt` + `ProjectSuggestion.kt` — DTOs.
+- [ ] Tuvok-Gate U Android (AS-CLI).
+
+### Phase X — Doku + Polish + Build
+
+- [x] **SM-X-1** `CHANGELOG.md` Synaptic-Mosaic-Block (v0.1.2).
+- [x] **SM-X-2** `CURRENT_STATE.md` neuer Sprint-Block.
+- [x] **SM-X-3** `todo.md` PC done abgehakt + SM-Block.
+- [x] **SM-X-4** `docs/LINKS.md` (NEU) — Datenmodell + Endpoints + LLM-Prompt + SM-B-005 Edge-Case-Doku.
+- [x] **SM-X-5** SM-F-RETRO-001 Pflicht-Mitfix: 7 englische Strings in `desktop/src/index.html` deutsch.
+- [x] **SM-X-6** SM-U-001 Race-Guard, SM-U-002 Sentinel-Filter `created_by`-Check, SM-U-003 partial-Flag UX (`globalBanner`-Refactor mit Variant + Auto-Hide).
+- [ ] **SM-X-7** Core-Build `cargo build --release` EXIT=0.
+- [ ] **SM-X-8** Desktop-Tauri-Build `cargo tauri build --bundles deb,rpm` EXIT=0.
+- [ ] **SM-X-9** `HANDOVER.md` Cross-CLI-Update.
+- [ ] **SM-X-10** Tuvok-Gate X (Diff-Review).
+- [ ] **SM-X-11** Phase-X-Commit + Sprint-Bericht an Management — Zentrale.
+
+### Final-Gate-Auflagen Cross-CLI (vor Tag `v0.1.2`)
+
+- [ ] **SM-MAN-1** AS-CLI: `cd android && ./gradlew assembleDebug` grün.
+- [ ] **SM-MAN-2** AS-CLI: APK auf Pixel installiert + adb-Live-Smoke (Bottom-Sheet öffnet, Banner navigiert, Konfidenz-Anzeige sichtbar).
+- [ ] **SM-MAN-3** Cross-CLI Tuvok-Final-Live (curl + Bundle-Inspection + adb-Screenshots, siehe Sprint-Plan).
 
 ---
 

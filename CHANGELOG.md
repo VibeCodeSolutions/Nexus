@@ -1,5 +1,63 @@
 # NEXUS — Changelog
 
+## [Unreleased] — Sprint "Synaptic Mosaic" (2026-05-02) — v0.1.2
+
+### Added — Phase B (Backend Links + Auto-Projekt)
+- **`links`-Tabelle** + Repo-Modul `core/src/links.rs` für polymorphe Verknüpfungen zwischen BrainDumps und Projekten. CRUD + `delete_for_node`-Cascade-Helper (5 Inline-Tests). Migration `20260501_001_links.sql`.
+- **`project_suggestions`-Tabelle** + `core/src/suggestions.rs` für pending Auto-Vorschläge. Migration `20260502_001_project_suggestions.sql`.
+- **7 neue Bearer-pflichtige Endpoints:** `POST /links`, `DELETE /links/{id}`, `GET /braindump/{id}/links`, `GET /projects/{id}/links`, `GET /projects/suggestions`, `POST /projects/suggestions/{id}/{accept,dismiss}`.
+- **`LlmProvider::extract_links`** als Trait-Method mit Default-Impl `Ok(Vec::new())` (SM-PR-002). Override-Pflicht für `claude.rs` + `ollama.rs`. `LinkSuggestion`-DTO + `NodeRef`-Kontext + `EXTRACT_LINKS_PROMPT` (deutsch, robustes JSON-Parsing).
+- **`ProjectSuggestion`** erweitert um `confidence` (0.0-1.0) und `reason` für Auto-Projekt-Branching.
+- **Background-Task-Erweiterung** (`core/src/main.rs`): `extract_links_for_recent` jeden Cycle (limit=10), `suggest_auto_projects` alle N Cycles (default 6 ≈ 30 min, env `NEXUS_AUTO_PROJECT_INTERVAL_CYCLES`). Confidence-Schwellen env-konfigurierbar (`NEXUS_LINK_CONFIDENCE_MIN` / `NEXUS_AUTO_PROJECT_CONFIDENCE_MIN`).
+- **Sentinel-Marker (`relation='noop-marker'`)** verhindert Cost-Loop bei API-LLMs: BrainDumps mit 0 LLM-Treffern bekommen einen Selbst-Link, sodass der NOT-EXISTS-Filter im nächsten Cycle greift. Bei `Err(...)` wird kein Sentinel geschrieben — temporäre Fehler dürfen retryen.
+- **Cleanup-Cascade in `repo::delete_braindump`/`delete_project`** ruft `links::delete_for_node` für polymorphe Orphan-Verhinderung.
+- **6 Mock-LLM-Tests** (`synaptic_phase_b_tests` in `handlers.rs`) — Confidence-Filter, Sentinel-Verhalten, Err-Pfad, Auto-Create-vs-Suggestion-Branching.
+- **`docs/LINKS.md`** (NEU) — Datenmodell, Endpoints, LLM-Integration, Background-Task-Verhalten, env-Vars, Tests, bekannte Limitationen (SM-B-005 Race-Window).
+
+### Added — Phase U (Desktop)
+- **BrainDump-Detail-Modal** mit Volltext, Meta (Kategorie + Datum), Summary, Tags und neuer **"Verknüpft mit"-Section**. Wikilinks 📁 für Projects, 📝 für BrainDumps mit Confidence-Anzeige in Prozent. Klick navigiert (rekursiv für BrainDumps, Tab-Switch für Projects).
+- **Suggestions-Banner im Projects-Tab** (`#suggestionsBanner` zwischen Toolbar und Card-Grid). Pro Vorschlag Confidence-Badge, Member-Count, Übernehmen/Verwerfen-Buttons. Banner versteckt sich automatisch wenn keine pending Suggestions.
+- **Sentinel-Filter im UI:** `relation='noop-marker' && created_by='llm'`-Sentinels werden aus der "Verknüpft mit"-Liste entfernt — User sieht nur echte Verknüpfungen.
+- **`showBanner`-Refactor** mit Variant-Support (`error`/`suggestion`) und optionalem Auto-Hide (`acceptSuggestion` nutzt 6s-Auto-Hide statt blocking-`alert()`).
+
+### Added — Phase F (Frontend-Bugs + i18n)
+- **`docs/i18n-strings-de.md`** — i18n-Working-Doc mit grep-Output und Übersetzungs-Tabelle. Lerneffekt SM-F-1/F-2: JS-dynamische `innerHTML`-Strings + Variable-basierte Display-Texte (`task.status`, `task.priority`) sind statisch unsichtbar — Re-Grep nach Übersetzung Pflicht.
+
+### Changed — Phase F + Phase X
+- **Desktop UI komplett deutsch** (PC + JJ + SM): Header, Tabs, Toolbars, Modals, JS-Banner, **catch-Body-Innerhtml** (SM-F-RETRO-001 in Phase X), **Tabellen-Header** (Kategorie/Inhalt/Datum/Aktionen), Empty-States (Keine BrainDumps/Projekte gefunden), Status-/Priority-Mappings auf Android (Offen/Erledigt, Niedrig/Mittel/Hoch).
+- **Backend User-facing Strings deutsch** (`core/src/diag.rs`): "keine Migrationen angewendet", "fehlt", "vorhanden", "nicht konfiguriert".
+- **`POST /links` Server-Override** (SM-B-002): `created_by` wird zwangsläufig auf `"user"` gesetzt, unabhängig vom Request-Body. Verhindert dass User den Background-Task-Filter (`created_by='llm'`) unterläuft.
+- **`accept_project_suggestion`-Response** (SM-B-006): zählt erfolgreich verknüpfte BrainDumps explizit, neue Felder `linked_braindumps`, `requested_braindumps`, `partial`-Flag.
+- **`AutoProjectStats`** (SM-B-007) erweitert um `members_linked` und `dropped`-Counter; Confidence<min-Drops loggen `tracing::debug!`.
+
+### Fixed — Phase B Iter-2
+- **SM-B-001-COD** (LLM-Re-Query-Loop, Cost-Risk): Sentinel-Marker schreibt Selbst-Link nach 0 LLM-Treffern, Cost-Loop bei Claude-API verhindert.
+- **SM-B-002-SIC** (`created_by` client-controllable): Server-Override sichert Audit-Trail-Konsistenz.
+- **SM-B-003-VOL** (Tests-DoD-Lücke): Mock-LLM + 5 Tests für Background-Task-Logik.
+- **SM-B-006/007** (Counter-Drift bei silent assign-Failures).
+- **SM-B-008-KOR** (Bonus-Discovery): drei Phase-B-SELECTs lasen `transcript`-Spalte nicht → `ColumnNotFound`. Spalte ergänzt.
+- **SM-F-1** (Desktop "All Categories" trotz Übersetzung englisch — JS-`innerHTML`-Pfad überschrieb HTML-Default).
+- **SM-F-2** (Android TasksScreen englische Display-Strings: "Tasks"-Header, status/priority-Rohwerte ohne Mapping).
+- **SM-F-RETRO-001** (Phase X): 7 englische Strings aus Phase-F-Iter-2 durchgerutscht (catch-Banner + Empty-States + Tabellen-Header) — alle deutsch ersetzt.
+
+### Phase-X Polish (Desktop)
+- **SM-U-001 Race-Guard:** `currentBdDetailId !== id`-Check nach `await api()` in `openBraindumpDetail` verhindert Stale-Render bei rekursiver Wikilink-Navigation.
+- **SM-U-002 Sentinel-Filter** prüft jetzt `relation && created_by` kombiniert — User-Manual-Links mit beliebigen Relationen bleiben sichtbar.
+- **SM-U-003 partial-Flag UX:** `globalBanner` mit `suggestion`-Variant + 6s Auto-Hide statt blocking-`alert()`.
+
+### Bookmarks für Folge-Sprints
+- **Vault-Sprint** (`docs/VAULT-DESIGN.md`): Links-Tabelle ist 80% des Edges-Schemas. Plus SM-U-004 Map-Caching für `wikiLabelFor` bei größeren Datenvolumina.
+- **SM-B-005 Race-Window** in `repo::delete_project` zwischen `tx.commit` und `links::delete_for_node` — akzeptabel im Single-User-Setup, dokumentiert in `docs/LINKS.md`.
+- **Provider-Coverage:** 7 LLM-Provider haben `extract_links`-No-Op-Default. Bei Wechsel auf Gemini/OpenAI/etc. kein LLM-Link-Output.
+
+### Hardware-/Build-Auflagen (Final-Gate)
+- Core-Build: `cd core && cargo build --release` EXIT=0
+- Desktop-Tauri: `cd desktop && cargo tauri build --bundles deb,rpm` EXIT=0 (AppImage gezielt ausgeschlossen wegen SM-F-3-Tooling — separat per `linuxdeploy` installierbar)
+- Android-Build: `cd android && ./gradlew assembleDebug` EXIT=0 (Phase F + Phase U Android via AS-CLI)
+- Cross-CLI-E2E (siehe `HANDOVER.md`): Phase-U-Android (`BrainDumpHistoryScreen`-Bottom-Sheet + `ProjectsScreen`-Top-Banner + `NexusApiClient` 4 Funktionen + Link/Suggestion DTOs), X-6 APK-Build, X-8 Tuvok-Final-Live cross-CLI.
+
+---
+
 ## [Unreleased] — Sprint "Polymorphic Clock" (2026-05-01)
 
 ### Added

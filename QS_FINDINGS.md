@@ -2113,3 +2113,96 @@ Nach SM-X-RESIDUE-001-Fix: ✅ Freigabe für Phase-X-Commit + Sprint-Closure-Ber
 **Empfehlung an vc-chef:** SM-X-RESIDUE-001 in 1 Edit fixen (kein Re-Tuvok nötig, ist trivial), dann Phase-X-Commit (`docs(synaptic): Phase X — Doku + Polish + Builds`). Sprint-Closure-Bericht an Management — Zentrale für Admin-Information. SM-X-PRE-001 als Phase-X-Bookmark in den Bericht aufnehmen.
 
 **WORKLOG-Ref:** AUFTRAG #14
+
+---
+
+## Synaptic Mosaic — Phase U (Android, Cross-CLI) — Iteration 1
+
+> **Datum:** 2026-05-02 — **Auftrag:** AS-CLI Diff-Review SM-U-AND-1..4 (BrainDumpHistoryScreen Bottom-Sheet + ProjectsScreen Suggestions-Banner + NexusApiClient 4 Funktionen + 2 DTO-Files) vor Commit. Cross-CLI-Lauf in der AS-CLI (`/home/kaik/Projekte/Apps/Nexus/android` als CWD).
+
+### Geprüft
+
+5 Files, +408 Insertions / −4 Deletions:
+- `android/app/src/main/java/com/vibecode/nexus/data/model/Link.kt` (NEU, 23 LoC)
+- `android/app/src/main/java/com/vibecode/nexus/data/model/ProjectSuggestion.kt` (NEU, 24 LoC)
+- `android/app/src/main/java/com/vibecode/nexus/data/NexusApiClient.kt` (+30 LoC, 4 neue suspend-Funktionen)
+- `android/app/src/main/java/com/vibecode/nexus/ui/screen/BrainDumpHistoryScreen.kt` (+231 LoC, ModalBottomSheet + WikiLinkFlow + Sentinel-Filter)
+- `android/app/src/main/java/com/vibecode/nexus/ui/screen/ProjectsScreen.kt` (+151 LoC, Top-Banner als LazyColumn-Item + SuggestionsBanner/Row)
+
+Build: `cd android && ./gradlew assembleDebug` EXIT=0 (18s, 4 executed/33 up-to-date), APK 66.5 MB unter `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### Findings
+
+#### SM-U-AND-001-COD
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Code-Qualität
+- **Befund:** Bei Klick auf BrainDump-Wikilink, dessen Target-ID nicht in `entries` ist (z.B. zwischenzeitlich gelöschter BrainDump, oder Race-Window während noch-nicht-fertig-geladener Listen), passiert silent kein UI-Update — `entries.firstOrNull { it.id == newId }?.let { detailEntry = it }` (Z. 121) ist no-op. User-Confusion möglich bei stale Links.
+- **Korrekturvorschlag:** Bei `firstOrNull == null` → Snackbar "BrainDump nicht mehr verfügbar" oder Sheet schließen + Hinweis. Phase-X-Bookmark-Niveau.
+- **Status:** offen — Phase-X-Bookmark
+
+#### SM-U-AND-002-WAR
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Wartbarkeit
+- **Befund:** `AssistChip(onClick = {}, enabled = false, label = ...)` wird dreimal als reines statisches Label genutzt (BrainDumpHistoryScreen Z. 174-178 Category, Z. 209-211 Tags; ProjectsScreen Z. 334-342 Konfidenz-Chip). Material-3-Disabled-Style ist semantisch "klickbar aber gerade aus", nicht "statisches Label". Code-Smell, nicht Funktionsbug.
+- **Korrekturvorschlag:** Surface mit Pill-Shape, oder `SuggestionChip` mit no-op onClick, oder `Badge`. Bei Konfidenz-Chip wäre `AssistChipDefaults.assistChipColors(...)`-Override-Pattern (das schon angewandt wird) ein Smell-Reduzer, ändert aber nichts an der Semantik.
+- **Status:** offen — Folge-Sprint-Polish-Bookmark
+
+#### SM-U-AND-003-WAR
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Wartbarkeit
+- **Befund:** Zwei unbenutzte Imports in `ProjectsScreen.kt` Z. 40-41:
+  - `import androidx.compose.foundation.layout.size` (nicht verwendet)
+  - `import androidx.compose.foundation.shape.CircleShape` (nicht verwendet)
+  Plus Import-Reihenfolge: Z. 40-49 sind ans Ende der androidx.compose-Block-Sequenz angefügt statt alphabetisch eingeordnet.
+- **Korrekturvorschlag:** Beide Imports entfernen. Trivial-Edit, kein Re-Tuvok nötig. Empfehlung: Pflicht-Mitfix vor Commit (Code-Hygiene, keine Funktionsabhängigkeit).
+- **Status:** offen — Pflicht-Mitfix-Empfehlung
+
+#### SM-U-AND-004-VOL
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit (relativ zur Desktop-Referenz)
+- **Befund:** Klick auf Project-Wikilink im Sheet zeigt Snackbar "Projekt im Projekte-Tab: <name>" und schließt das Sheet (BrainDumpHistoryScreen Z. 123-126), wechselt aber NICHT programmatisch auf den Projects-Tab. Desktop-Referenz tut Tab-Switch automatisch (`document.querySelector('.tab[data-tab="projects"]').click()`).
+- **Bewertung:** Out-of-Scope-Compromise — programmatic Tab-Switch würde MainActivity-NavController-Hookup und einen 5. File-Touchpoint (`MainActivity.kt`) erfordern, was Phase-U-Android-Scope (4 Files) sprengen würde. Snackbar ist handlungsfähig (User weiß welcher Tab).
+- **Korrekturvorschlag:** Folge-Sprint-Bookmark — Tab-Switch via Callback-Lambda an Screen-Composable, MainActivity setzt Tab-State entsprechend.
+- **Status:** offen — Folge-Sprint-Bookmark
+
+#### SM-U-AND-005-PER
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Performance / UX-Polish
+- **Befund:** Bei programmatic Sheet-Close (Project-Wikilink-Click → `detailEntry = null` Z. 125, oder rekursive BD-Switch via `onNavigateToBraindump`) wird das `ModalBottomSheet` ohne Hide-Animation entfernt — die `let`-Block-Bedingung wird falsy und das Sheet-Composable verschwindet aus der Composition. User sieht plötzliches Verschwinden statt Slide-down.
+- **Korrekturvorschlag:** `scope.launch { sheetState.hide() }.invokeOnCompletion { detailEntry = null }` für graceful close. Helper-Funktion `closeSheet(scope, sheetState, onDone)` wäre wiederverwendbar.
+- **Status:** offen — Folge-Sprint-Polish-Bookmark
+
+### Was geprüft und in Ordnung
+
+- ✅ **DTO-Vertrag Backend-konform:** `Link` (10 Felder) matcht `core/src/links.rs::Link` 1:1 inkl. Nullability (`reason: String?`). `BrainDumpLinks { outgoing, incoming }` matcht JSON-Response von `handlers::get_braindump_links`. `ProjectSuggestion` (8 Felder) matcht `list_project_suggestions`-Enriched-JSON inkl. `member_braindump_ids` als `List<String>` (parse_member_ids gibt Vec). `AcceptSuggestionResponse` (5 Felder) matcht `accept_project_suggestion`-Response.
+- ✅ **Bearer-Auth:** alle 4 neuen NexusApiClient-Funktionen (`getBrainDumpLinks`, `listProjectSuggestions`, `acceptProjectSuggestion`, `dismissProjectSuggestion`) rufen `bearerAuth(token!!)` korrekt auf, sind durch `authedRequest`-Wrapper geschützt (token=null → Result.failure). Konsistent mit Bestand-Funktionen.
+- ✅ **`dismissProjectSuggestion` ohne `.body()`:** Backend liefert 204 No Content; Pattern identisch zu `deleteTask` (Z. 145-150). expectSuccess=true wirft bei 4xx/5xx — landet bei `onFailure`. Korrekt.
+- ✅ **Sentinel-Filter:** `Link::isSentinel()` prüft beide Bedingungen `relation == "noop-marker" && created_by == "llm"` (BrainDumpHistoryScreen Z. 308). Beide outgoing+incoming-Listen filtern (Z. 235-236). Identisch zu Desktop SM-U-002-Pattern. User-Manual-Links mit `relation='noop-marker'` (theoretisch möglich) bleiben sichtbar.
+- ✅ **Recursive Wikilink-Navigation:** `BrainDumpDetailSheet` re-keyed alle Per-Entry-States via `remember(entry.id)` (Z. 144-146) und `LaunchedEffect(entry.id)` (Z. 148). Beim Wechsel cancelled Compose den vorherigen Suspend-Job sauber → kein Race. Sheet-State bleibt offen über recompose hinweg (sheetState ohne Key-Param). Pattern korrekt.
+- ✅ **Wikilink-Label-Resolution:** `wikiLabelFor` (Z. 310-326) löst Project→`📁 name`, BrainDump→`📝 summary | raw_text.take(60) | id`. Identisch zur Desktop-Logik. O(n) `firstOrNull` ist akzeptabel bei < 100 BD (Map-Caching ist SM-U-004 Phase-X-Bookmark).
+- ✅ **`projects`-Load best-effort:** Bei Failure von `getProjects` rendert Project-Wikilinks die ID. Akzeptabel weil Fallback-Pfad in `wikiLabelFor` (Z. 318: `p?.name ?: id`) gibt sinnvollen Output. Single-User-System.
+- ✅ **`acceptProjectSuggestion`-Response-Handling:** `partial`-Flag sauber abgefangen (ProjectsScreen Z. 163-169). Erfolgs-Snackbar mit Project-Name (`„${res.name}"`) bei `partial=false` ist Mobile-UX-Verbesserung gegenüber Desktop (silent success), kein Regress.
+- ✅ **`dismissProjectSuggestion`-Lokal-Update:** Filter-Update läuft erst im `onSuccess`-Branch (Z. 181), nicht optimistisch. Bei Backend-Failure bleibt Suggestion sichtbar + Snackbar mit Fehler. Konsistent.
+- ✅ **Banner-Position als LazyColumn-Item:** `item(key = "suggestions-banner")` Z. 156 als erstes Item, gefolgt von `items(items, key = ...)`. LazyColumn behält Banner über Recompositions hinweg, scrollt mit. Empty-State-Sichtbarkeit: `items.isEmpty() && suggestions.isEmpty()` → Empty-Box (Z. 140); andernfalls LazyColumn (Banner und/oder Project-Cards).
+- ✅ **Snackbar-Konsistenz:** Beide Screens haben eigenen Scaffold-internen `SnackbarHostState`. Sichtbarkeit nicht durch ModalBottomSheet-Overlay blockiert, weil Snackbar-Show in Coroutine async läuft und `detailEntry = null` das Sheet schon vorher schließt (Project-Wikilink-Pfad).
+- ✅ **`expectSuccess = true` (HttpClient-Config):** unverändert, deckt alle 4 neuen Endpoints ab.
+- ✅ **Build:** `assembleDebug` EXIT=0 in 18s, keine Warnings sichtbar im Output.
+- ✅ **Cross-Phase-Drift:** keine Edits außerhalb der 4 angekündigten Files + 1 mitgeänderten (NexusApiClient). Scope sauber gehalten.
+
+### Verdikt
+
+**⚠️ Freigabe mit Auflagen — Phase U (Android)**
+
+1 Pflicht-Mitfix (SM-U-AND-003-WAR, 2 Edits): unbenutzte Imports `size` + `CircleShape` in `ProjectsScreen.kt` Z. 40-41 entfernen. Trivial, kein Re-Tuvok nötig.
+
+4 Bookmarks für Folge-Sprint (alle Polish/Mobile-UX, kein Phase-U-Regress):
+- SM-U-AND-001-COD: Stale-Wikilink-Click ohne UI-Feedback
+- SM-U-AND-002-WAR: AssistChip(enabled=false) als statisches Label (3× verwendet)
+- SM-U-AND-004-VOL: Project-Wikilink ohne programmatic Tab-Switch (Mobile-Compromise gegenüber Desktop)
+- SM-U-AND-005-PER: Sheet-Close ohne Hide-Animation bei programmatic Switch
+
+Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Final-Live-Gate.
+
+**Empfehlung an vc-chef:** Beide Imports entfernen (1 Edit pro Zeile, sicherer Pflicht-Mitfix), dann Phase-U-Android-Commit (`feat(synaptic): Phase U Android — BrainDump-Bottom-Sheet + Suggestions-Banner`). Anschließend Cross-CLI-Final-Live-Gate (SM-MAN-2 + SM-MAN-3): adb-Live-Smoke + Tuvok-Final-Live-Test (curl + Bundle + adb-Screenshots) bevor `v0.1.2`-Tag. 4 Bookmarks in den Sprint-Bericht / `todo.md`-Backlog aufnehmen.
+
+**WORKLOG-Ref:** AUFTRAG #15

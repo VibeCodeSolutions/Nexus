@@ -1,11 +1,14 @@
 package com.vibecode.nexus.data
 
+import com.vibecode.nexus.data.model.AcceptSuggestionResponse
+import com.vibecode.nexus.data.model.BrainDumpLinks
 import com.vibecode.nexus.data.model.BrainDumpRequest
 import com.vibecode.nexus.data.model.BrainDumpResponse
 import com.vibecode.nexus.data.model.HealthResponse
 import com.vibecode.nexus.data.model.ModelsResponse
 import com.vibecode.nexus.data.model.ProjectProgress
 import com.vibecode.nexus.data.model.ProjectResponse
+import com.vibecode.nexus.data.model.ProjectSuggestion
 import com.vibecode.nexus.data.model.ProvidersResponse
 import com.vibecode.nexus.data.model.SetProviderRequest
 import com.vibecode.nexus.data.model.TaskCreateRequest
@@ -167,6 +170,33 @@ class NexusApiClient(private val settings: ConnectionSettings) {
         client.get("$baseUrl/projects/$projectId/braindumps") {
             bearerAuth(token!!)
         }.body()
+    }
+
+    // Synaptic Mosaic — Links + Project-Suggestions
+
+    suspend fun getBrainDumpLinks(braindumpId: String): Result<BrainDumpLinks> = authedRequest {
+        client.get("$baseUrl/braindump/$braindumpId/links") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun listProjectSuggestions(): Result<List<ProjectSuggestion>> = authedRequest {
+        client.get("$baseUrl/projects/suggestions") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun acceptProjectSuggestion(id: String): Result<AcceptSuggestionResponse> = authedRequest {
+        client.post("$baseUrl/projects/suggestions/$id/accept") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun dismissProjectSuggestion(id: String): Result<Unit> = authedRequest {
+        client.post("$baseUrl/projects/suggestions/$id/dismiss") {
+            bearerAuth(token!!)
+        }
+        Unit
     }
 
     // Diagnostics

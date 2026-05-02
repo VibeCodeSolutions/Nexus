@@ -37,9 +37,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import com.vibecode.nexus.data.NexusApiClient
 import com.vibecode.nexus.data.model.ProjectProgress
 import com.vibecode.nexus.data.model.ProjectResponse
+import com.vibecode.nexus.data.model.ProjectSuggestion
 import kotlinx.coroutines.launch
 
 data class ProjectWithProgress(
@@ -56,8 +65,10 @@ fun ProjectsScreen(
 ) {
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<ProjectWithProgress>>(emptyList()) }
+    var suggestions by remember { mutableStateOf<List<ProjectSuggestion>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isRefreshing by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     suspend fun loadData() {
         apiClient.getProjects().onSuccess { projects ->
@@ -67,6 +78,7 @@ fun ProjectsScreen(
             }
             items = withProgress
         }
+        apiClient.listProjectSuggestions().onSuccess { suggestions = it }
     }
 
     LaunchedEffect(isPaired) {
@@ -76,7 +88,10 @@ fun ProjectsScreen(
         isLoading = false
     }
 
-    Scaffold(modifier = modifier) { innerPadding ->
+    Scaffold(
+        modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -120,7 +135,7 @@ fun ProjectsScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    if (items.isEmpty()) {
+                    if (items.isEmpty() && suggestions.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -135,6 +150,42 @@ fun ProjectsScreen(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            if (suggestions.isNotEmpty()) {
+                                item(key = "suggestions-banner") {
+                                    SuggestionsBanner(
+                                        suggestions = suggestions,
+                                        onAccept = { id ->
+                                            scope.launch {
+                                                apiClient.acceptProjectSuggestion(id)
+                                                    .onSuccess { res ->
+                                                        if (res.partial) {
+                                                            snackbarHostState.showSnackbar(
+                                                                "Projekt erstellt — ${res.linked_braindumps} von ${res.requested_braindumps} Notizen verknüpft."
+                                                            )
+                                                        } else {
+                                                            snackbarHostState.showSnackbar("Projekt „${res.name}“ erstellt.")
+                                                        }
+                                                        loadData()
+                                                    }
+                                                    .onFailure {
+                                                        snackbarHostState.showSnackbar("Übernehmen fehlgeschlagen: ${it.message}")
+                                                    }
+                                            }
+                                        },
+                                        onDismiss = { id ->
+                                            scope.launch {
+                                                apiClient.dismissProjectSuggestion(id)
+                                                    .onSuccess {
+                                                        suggestions = suggestions.filter { it.id != id }
+                                                    }
+                                                    .onFailure {
+                                                        snackbarHostState.showSnackbar("Verwerfen fehlgeschlagen: ${it.message}")
+                                                    }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                             items(items, key = { it.project.id }) { item ->
                                 ProjectCard(item)
                             }
@@ -208,6 +259,100 @@ private fun ProjectCard(item: ProjectWithProgress) {
                         color = progressColor
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionsBanner(
+    suggestions: List<ProjectSuggestion>,
+    onAccept: (String) -> Unit,
+    onDismiss: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Projekt-Vorschläge (${suggestions.size})",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Spacer(Modifier.height(8.dp))
+            suggestions.forEachIndexed { index, suggestion ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                }
+                SuggestionRow(suggestion = suggestion, onAccept = onAccept, onDismiss = onDismiss)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionRow(
+    suggestion: ProjectSuggestion,
+    onAccept: (String) -> Unit,
+    onDismiss: (String) -> Unit,
+) {
+    val confPct = (suggestion.confidence * 100).toInt()
+    val memberCount = suggestion.member_braindump_ids.size
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = suggestion.name,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
+        if (suggestion.description.isNotBlank()) {
+            Text(
+                text = suggestion.description,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        if (!suggestion.reason.isNullOrBlank()) {
+            Text(
+                text = suggestion.reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AssistChip(
+                onClick = {},
+                enabled = false,
+                colors = AssistChipDefaults.assistChipColors(
+                    disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ),
+                label = { Text("Konfidenz $confPct%") }
+            )
+            Text(
+                text = "$memberCount Notizen",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { onAccept(suggestion.id) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) { Text("Übernehmen") }
+            OutlinedButton(onClick = { onDismiss(suggestion.id) }) {
+                Text("Verwerfen")
             }
         }
     }

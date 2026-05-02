@@ -1388,3 +1388,530 @@ Iteration 1 → grün. Keine Findings, keine Korrektur-Zyklen über alle drei Ph
 **✅ Live-E2E grün nach Fix** — Footer-Bug PC-LIVE-1 behoben, Theme-Switch+Persistenz+Recompose verifiziert. Sprint Polymorphic Clock damit auch live abgeschlossen.
 
 Iteration 2 → grün, 1 Major in 1 Korrektur-Zyklus behoben.
+
+---
+
+## Synaptic Mosaic — Pre-Sprint-Plan-Review — Iteration 1
+
+**Datum:** 2026-05-01 abend
+**Prüfgegenstand:** ~/.claude/plans/synaptic-mosaic.md (Sprint-Plan, vor Admin-Abnahme)
+**Erstellt von:** QS — VibeCoding
+**Auftrag:** AUFTRAG #8 vc.md (Pre-Sprint-Gate: Tuvok + Seven, Chakotay konsolidiert)
+
+### Schlüssel-Touchpoint-Verifikation (Lerneffekt JJ-PR-001)
+
+Bevor ich den Plan beurteile, habe ich an den genannten Code-Touchpoints stichprobenartig den IST-Stand geprüft:
+
+- **Migrations-Konvention:** `core/migrations/` enthält `20260412_001_braindump.sql`, `20260413_001_projects.sql`, `20260414_001_tasks.sql`, `20260415_001_gamification.sql`, `20260428_001_diag_reports.sql`. Format: `YYYYMMDD_NNN_name.sql`. **Plan-Vorschlag `006_links.sql` ist falsch** und würde von sqlx-migrate ggf. nicht in der erwarteten Reihenfolge ausgeführt.
+- **`openSettings()`/`closeSettings()`:** existieren in `desktop/src/index.html` Z. 987-993. Static funktionsfähig. DSK-3-Bug liegt nicht in fehlender Funktion, sondern in (a) altem Bundle, (b) Crash davor, oder (c) Modal-CSS-Issue. Plan-Anweisung "debuggen" ist zu offen.
+- **LLM-Trait `LlmProvider`:** definiert in `core/src/llm/mod.rs` mit `categorize_and_summarize` + `suggest_projects`. **`suggest_projects` existiert bereits** und ist in 6 Provider-Files implementiert (claude, gemini, ollama, openai_compatible, zai, plus DummyProvider mit Default). Phase-B-F1 Auto-Trigger kann auf existierende Funktion aufbauen — Plan macht das nicht explizit.
+- **6 Provider-Files** (`claude.rs`, `gemini.rs`, `ollama.rs`, `openai_compatible.rs`, `zai.rs`, `mod.rs`) — neue Trait-Methode `extract_links` würde 6× implementiert werden müssen, außer Default-Impl im Trait.
+- **SettingsScreen.kt:** Z. 152 `Column(modifier = Modifier.fillMaxSize()....)` ohne `verticalScroll`. AND-1 bestätigt — Bug.
+
+### Findings
+
+#### SM-PR-001 — Migration-Naming-Konvention falsch
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Konsistenz
+- **Befund:** Plan sagt `006_links.sql`, IST-Konvention ist `YYYYMMDD_NNN_name.sql` (alle 5 existierenden Migrationen folgen dem Schema). Falscher Dateiname → sqlx-migrate führt eventuell in falscher Reihenfolge aus oder ignoriert die Datei.
+- **Korrekturvorschlag:** Plan-Phase B-1 ändern zu `core/migrations/20260501_001_links.sql` (oder dem Sprint-Datum entsprechend).
+
+#### SM-PR-002 — LLM-Trait-Erweiterung Default-Impl-Strategie
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Befund:** Plan B-4 schreibt "Trait-Methode `extract_links()` (Default-Impl mit Prompt)". Es gibt 6 Provider + DummyProvider — wenn Default-Impl im Trait nicht explizit gefordert wird, ergänzt der Implementer 6× redundant. Die Default-Impl muss aussagen: "wenn Provider keinen Links-Prompt unterstützt → leere Liste zurück, Sprint nicht blocken".
+- **Korrekturvorschlag:** Plan B-4 explizit so formulieren: `async fn extract_links(...) -> Result<Vec<LinkSuggestion>, String> { Ok(vec![]) }` als Default im Trait. Provider, die es overriden wollen (z.B. Ollama mit lokalem Modell), tun das opt-in. Damit kein Forced-6-fach-Implement.
+
+#### SM-PR-003 — DSK-3 Settings-Button-Debug-Reihenfolge
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Wartbarkeit (Plan)
+- **Befund:** Plan F-DSK-1 sagt nur "debuggen". Funktion existiert (Z. 987). Wahrscheinlichste Ursachen: (1) User hat altes Tauri-Bundle ohne PC-Updates, (2) JS-Crash blockiert Click-Handler, (3) Modal-z-index hinter app-shell.
+- **Korrekturvorschlag:** Plan F-DSK-1 mit Debug-Reihenfolge ergänzen: erst `tauri build --debug` neu, dann Bundle-Reinstall, dann Webview-DevTools-Console öffnen (rechtsklick im Tauri-Window → Inspect), bei JS-Error Stacktrace lesen.
+
+#### SM-PR-004 — Race-Condition extract_links bei schnellen BrainDumps
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Korrektheit
+- **Befund:** Plan B-5 startet `extract_links` direkt nach POST /braindump als async-Task. Bei 3 schnellen BrainDumps in Folge laufen 3 LLM-Calls parallel — keiner sieht die anderen 2 als Kontext, race-bedingte unvollständige Verknüpfung.
+- **Korrekturvorschlag:** Statt POST-Hook: `extract_links` läuft **im Background-Recategorize-Task** (sequentiell, alle 5min). Das vereinfacht den POST-Pfad, vermeidet Race und entkoppelt LLM-Latenz vom User-Roundtrip. Wenn Sofort-Verknüpfung erwünscht: explizit dokumentieren als "Best-Effort" und `Mutex<Vec<LinkSuggestion>>` als Cache nutzen.
+
+#### SM-PR-005 — Polymorphe Links ohne FK → Orphan-Records bei Delete
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Konsistenz (Daten)
+- **Befund:** Plan-Schema `links(source_type, source_id, target_type, target_id, ...)` hat keine FK (polymorph nicht möglich auf einer Tabelle). Wenn ein BrainDump gelöscht wird (existiert via `DELETE /braindump/{id}` heute? — bitte prüfen), bleiben Link-Records mit dangling source_id liegen.
+- **Korrekturvorschlag:** Plan-Phase B explizit ergänzen: bei `delete_braindump` und `delete_project` werden zugehörige Links per Application-Logic mitgelöscht (`DELETE FROM links WHERE source_type='braindump' AND source_id=$1 OR target_type='braindump' AND target_id=$1`). Optional: Background-Cleanup-Task für orphans, falls Delete-Pfad via DB-Direktzugriff genutzt wird.
+
+#### SM-PR-006 — Lokalisierungs-Strategie Backend
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Befund:** Plan sagt: "Backend Core Log-Messages → nicht ändern". Aber `DiagReport.message`-Strings landen sichtbar in der Android-Diag-Card. Wenn die deutsch sein sollen, muss partielle Backend-Lokalisierung passieren.
+- **Korrekturvorschlag:** Plan-Phase F klarstellen: User-facing Strings im Backend (DiagReport-Messages, error_response-Bodies, Achievement-Namen) → deutsch. Interne `tracing::*`-Logs → englisch (Operations-Sprache).
+
+#### SM-PR-007 — Bundle-Version-Verifikation als Pre-Phase-F-Schritt
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Wartbarkeit (Plan)
+- **Befund:** Plan setzt voraus, dass DSK-1/2 nur "altes Bundle" sind. Ungeprüft. Wenn User `cargo tauri dev` startet, lädt es die Live-index.html und das Argument fällt weg.
+- **Korrekturvorschlag:** Plan-Phase F erste Aktion: 30-Sekunden-Bundle-Audit. Vergleiche `desktop/src/index.html`-Mtime mit `desktop/src-tauri/target/release/bundle/.../resources/`-Mtime. Falls Bundle älter → das ist DSK-1/2-Ursache, sonst echter Frontend-Bug.
+
+#### SM-PR-008 — Live-Test-Suite fehlt OS-Theme-Wechsel
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Befund:** Final-Live-Suite enthält Theme-Switch via App-Tap, aber keinen OS-Theme-Wechsel-Test (System-Mode-Reaktion). Bei einem Recompose-on-OS-change-Bug wäre das ein Regress aus PC.
+- **Korrekturvorschlag:** Final-Live-Suite ergänzen: "App auf `System` setzen, OS Quick-Settings Dark↔Light togglen, Screenshot zeigt Recompose."
+
+#### SM-PR-009 — Live-Test fehlt Rotation/Configuration-Change
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit
+- **Befund:** Activity-Recreation bei Rotation könnte Theme-State zurücksetzen, wenn `rememberSaveable` fehlt. PC hat das nicht getestet.
+- **Korrekturvorschlag:** Optional in Final-Live: `adb shell settings put system accelerometer_rotation 1 && adb shell content insert --uri content://settings/system --bind name:s:user_rotation --bind value:i:1` und Re-Screenshot. Kein Sprint-Blocker, aber Bookmark.
+
+#### SM-PR-010 — Tuvok-Gate F Desktop-Test-Strategie unklar
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Befund:** Plan Tuvok-Gate F sagt "adb-Live-Test" (nur Android). Desktop-Tauri-Test fehlt. Tauri-App ohne Display kann nicht visuell getestet werden — wie verifiziert Tuvok DSK-1/2/3?
+- **Korrekturvorschlag:** Plan-Tuvok-Gate F um Desktop-Strategie erweitern: (a) `cargo check` für Tauri-Rust, (b) Bundle-Frontend-Datei nach Build greppen (`grep "cycleTheme\|app-footer\|onclick=\"openSettings\"" desktop/src-tauri/target/release/bundle/.../resources/_up_/src/index.html`), (c) optional `xvfb-run cargo tauri dev` mit Headless-Webview-Test (komplex). Ehrliche Lösung: Desktop-Live-Verifikation bleibt Admin-Final-Gate-Auflage, Tuvok prüft nur Bundle-Inhalt + Build-Erfolg.
+
+#### SM-PR-011 — Loop-Reihenfolge-Begründung
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Wartbarkeit (Plan)
+- **Befund:** Plan sagt F→B→U→X seriell, ohne Begründung warum nicht parallel.
+- **Korrekturvorschlag:** Plan-Sprint-Workflow ergänzen: "Phasen sequentiell, weil Hauptsession Single-Implementer ist und Skill-Triggers nicht parallel laufen."
+
+#### SM-PR-012 — Lokalisierungs-Liste F-Phase fehlt explizit
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Befund:** Plan listet Stichproben (`BrainDumps`, `Refresh`, ...) aber gibt keine vollständige Liste. Implementer könnte Strings übersehen — z.B. Achievement-Namen, Wizard-Texte, Snackbar-Messages, error-Bodies, Diagnose-Texte.
+- **Korrekturvorschlag:** Plan-Phase F-DSK-2/F-AND-2 explizit als ersten Schritt: `grep -nE '"[A-Z][a-z]+ [a-z]+|>[A-Z][a-z]+'` über `desktop/src/index.html` und `android/app/src/main/java/com/vibecode/nexus/ui/**/*.kt` → vollständige Stringliste in `docs/i18n-strings-de.md` als Working-Doc, dann übersetzen, dann ersetzen. Verifikation per Re-Grep auf englische Patterns nach Übersetzung.
+
+### Was am Plan OK ist
+
+- ✅ Sprint-Workflow Skill-Kette + Tuvok-Gate je Phase + Final-Live-Test ist sauber strukturiert.
+- ✅ Decision-Authority Chakotay explizit dokumentiert.
+- ✅ Loop-Iterations-Limit (3 pro Gate, 2 für Live-Final) ist proportional.
+- ✅ Phase-Trennung F (UI), B (Backend), U (UI für Backend-Features), X (Doku) ist logisch.
+- ✅ Bash-Guard + Persona-Memory-Pflicht erwähnt.
+- ✅ Lerneffekt aus PC-LIVE-1 als Live-Final-Gate-Pflicht eingebaut.
+- ✅ Bookmark für Vault-Implementierung als Folge-Sprint korrekt.
+
+### Verdikt
+
+**❌ Rückgabe — Plan-Patch nötig vor Sprint-Start**
+
+5 Major-Findings:
+- SM-PR-001 (Migration-Naming) — sonst Build-Bruch
+- SM-PR-002 (LLM-Trait-Default-Impl klarstellen) — sonst 6× Redundanz
+- SM-PR-004 (Race-Condition) — sonst inkonsistente Verknüpfungen
+- SM-PR-010 (Tuvok-Gate F Desktop-Strategie) — sonst kann ich Phase F nicht abnehmen
+- SM-PR-012 (Lokalisierungs-Liste explizit) — sonst Implementer-Drift
+
+7 Minor-Findings können als Auflagen mitgeführt werden, kein Blocker.
+
+Nach Plan-Patch durch Hauptsession: Re-Review (Diff-Fokus auf SM-PR-001/002/004/010/012). Bei grün → Seven-Bedarfsanalyse parallel/danach → Chakotay-Konsolidierung → Sprint-Start Phase F.
+
+---
+
+## Synaptic Mosaic — Pre-Sprint-Plan-Review — Iteration 2 (Diff-Fokus)
+
+**Datum:** 2026-05-01 abend
+**Prüfgegenstand:** ~/.claude/plans/synaptic-mosaic.md nach Hauptsession-Patch
+**Erstellt von:** QS — VibeCoding
+**Auftrag:** AUFTRAG #8 vc.md (Iteration 2)
+
+### Diff-Verifikation der 5 Major
+
+| ID | Korrektur | Status |
+|---|---|---|
+| SM-PR-001 | Migration-Naming `20260501_001_links.sql` (Z. 65) + `20260501_002_project_suggestions.sql` (Z. 75) — konsistent mit existing `YYYYMMDD_NNN_name.sql` | ✅ |
+| SM-PR-002 | Erläuterungs-Block (Z. 61) + B-4 (Z. 69) explizit "Default-Impl im Trait `Ok(Vec::new())`, Override opt-in in claude.rs+ollama.rs Pflicht, andere optional" | ✅ |
+| SM-PR-004 | Erläuterungs-Block (Z. 63) + Phase B-5 gestrichen, B-6/6a/6b Background-Task (sequenziell, env-konfigurierbar `NEXUS_LINK_CONFIDENCE_MIN`/`NEXUS_AUTO_PROJECT_*`) + Tuvok-Gate-B "POST-Response unverändert dünn" + Final-Live-Test "Echo-BrainDump → Response unverändert dünn (kein suggested_links)" | ✅ |
+| SM-PR-010 | Tuvok-Gate F Desktop-Strategie (Z. 56): `cargo tauri build` + Bundle-Frontend-grep für JS-Fixes (`cycleTheme`/`app-footer`/`openSettings`) + Re-Grep für englische UI-Strings + Visual-Test als Admin-Auflage gelabelt | ✅ |
+| SM-PR-012 | Erläuterungs-Block (Z. 45) + F-0 als erste Aktion (Z. 47) + F-AND-2 verweist auf `docs/i18n-strings-de.md` als Single-Source (Z. 52) | ✅ |
+
+### Diff-Verifikation der 7 Minor (Auflagen)
+
+| ID | Eingearbeitet wo | Status |
+|---|---|---|
+| SM-PR-003 | Phase F-DSK-1 Debug-Reihenfolge Bundle→DevTools→Endpoint (Z. 41) | ✅ |
+| SM-PR-005 | B-2 `delete_for_node`-Helper + B-2b Cascade-in-Delete-Handlern oder Bookmark (Z. 66-67) | ✅ |
+| SM-PR-006 | F-AND-3 Backend-User-facing-Strings deutsch (Z. 53) | ✅ |
+| SM-PR-007 | F-0 Bundle-Mtime-Audit als Pre-Check (Z. 47) + Erläuterungs-Block (Z. 39) | ✅ |
+| SM-PR-008 | Final-Live "OS-Theme-Reaktion" Test ergänzt (Z. 167-169) | ✅ |
+| SM-PR-009 | Final-Live "Rotation-Test optional als Bookmark" ergänzt (Z. 170) | ✅ |
+| SM-PR-011 | Sprint-Reihenfolge-Begründung "sequentiell weil Single-Implementer" (Z. 144) | ✅ |
+
+### Beobachtungen ohne Findings-Status
+
+- **Plan-Text-Drift in "Kritische Dateien"-Tabelle (Z. 202):** Eintrag für `core/src/llm/mod.rs` lautet "Trait-Methode `extract_links()` (Default-Impl mit Prompt)". Das "mit Prompt" ist irreführend — Default-Impl ist `Ok(Vec::new())` *ohne* Prompt; Prompts kommen nur in den Provider-Overrides. Stilistisch könnte man das auf "Default-Impl: leere Liste; Override mit Prompt in claude.rs/ollama.rs" patchen. **Nicht-Blocker, aber Cleanup-Empfehlung.** Implementer wird beim Schreiben des Codes vermutlich keinen Schaden anrichten — die Default-Impl steht ja in B-4 korrekt.
+- **Bash-Quoting im grep-Beispiel (Z. 56):** `grep -c "cycleTheme\|app-footer\|onclick=\"openSettings"` enthält ein nicht-entkommenes Quote im Pattern. Plan-Pseudo-Code; Implementer wird's anpassen müssen (z.B. einfache Quotes außen). **Nicht-Blocker.**
+- **Single-Quote bei `recompose-on-OS-change` Bug-Risiko (SM-PR-008):** Plan-Test ist gut, aber abhängig von matchMedia-Listener-Korrektheit (Polymorphic Clock hat das in Desktop-CSS-JS, Android-Theme.kt nutzt `isSystemInDarkTheme()` was Compose-State ist und sollte automatisch recomposen). Sollte funktionieren, aber Live-Test wird's bestätigen.
+
+### Was am Plan jetzt OK ist
+
+- ✅ Alle 5 Major sauber referenziert mit SM-PR-ID in den DoD-Touchpoints (Lerneffekt aus Joyful Jellyfish — die Hauptsession hat das Pattern übernommen).
+- ✅ Phase-B Architektur-Entscheidung (Background-Task statt POST-Hook) ist sauber begründet und in DoD verankert.
+- ✅ Phase-F Lokalisierungs-Strategie (Working-Doc als Single-Source) ist Implementer-friendly und Re-Grep-verifizierbar.
+- ✅ env-Konfigurierbarkeit der Confidence-Schwellen (NEXUS_LINK_CONFIDENCE_MIN/NEXUS_AUTO_PROJECT_CONFIDENCE_MIN) folgt dem etablierten Pattern (NEXUS_RECATEGORIZE_INTERVAL_SECS aus JJ).
+- ✅ Tuvok-Gate F Desktop-Strategie ehrlich: "ohne visuellen Live-Test möglich" — kein Pretend, klare Grenzen, Bundle-grep als pragmatischer Ersatz.
+
+### Verdikt
+
+**✅ Freigabe** — Plan-Patch in einer Iteration sauber erledigt. Alle 12 Findings adressiert, 2 Cleanup-Beobachtungen sind Stilistik (kein neuer Patch nötig vor Sprint-Start; Implementer kann sie beim Schreiben mitnehmen oder nicht).
+
+Iteration 2 → grün. Loop-Vermeidung greift: keine neuen Findings, alte erledigt.
+
+**Empfehlung an vc-chef:** Seven (vc-bedarf) parallel/danach den Plan-Review-Auftrag geben, dann Chakotay-Konsolidierung, dann Sprint-Start Phase F.
+
+---
+
+## Synaptic Mosaic — Phase F — Iteration 1
+
+**Datum:** 2026-05-01 abend
+**Prüfgegenstand:** Phase F (Frontend-Bugs + Lokalisierung) Diff + Build-Logs + adb-Live-Smoke
+**Erstellt von:** Hauptsession — VibeCoding
+**Auftrag:** AUFTRAG #9 vc.md
+
+### Build-Log-Verifikation (Lerneffekt EXIT-Code-Disziplin)
+
+| Build | EXIT | Verifikation |
+|---|---|---|
+| Core `cargo check` | 0 | sauber, keine Errors/Warnings |
+| Android `gradle assembleDebug` | 0 | BUILD SUCCESSFUL in 3s |
+| Desktop `cargo tauri build` | **1** | Compile EXIT=0, Bundling DEB+RPM ja, AppImage failed wegen `failed to run linuxdeploy` |
+
+### Re-Grep auf englische UI-Strings (DoD F-DSK-2/F-AND-2)
+
+| Lokation | Treffer |
+|---|---|
+| Desktop `index.html` (Source) | **1 Treffer** Z. 678 — JS-Code: `'<option value="">All Categories</option>'` |
+| Android `*Screen.kt` | **1 Treffer** Z. 136 TasksScreen — `text = "Tasks"` (TopHeader) |
+
+### adb-Live-Smoke
+
+- APK reinstalliert auf Pixel (RFCX20J1PEX) ✅
+- App-Start clean, kein Crash, Footer "Powered by VibeCode Solutions · NEXUS v0.1.0" weiter sichtbar ✅
+- Bottom-Nav zeigt deutsch: BrainDump / Verlauf / Aufgaben / Projekte / Einstellungen ✅
+- **Aufgaben-Tab geöffnet (Live-Test):** Top-Header zeigt **"Tasks"** in Indigo (englisch trotz deutschem Bottom-Nav-Label) — bestätigt Re-Grep-Befund ❌
+- **Status- und Priority-Marker in Task-Liste:** "open" / "done" / "medium" / "low" / "high" werden als Roh-Strings angezeigt — `task.status` und `task.priority` Z. 329/334 in TasksScreen.kt direkt gerendert, kein Mapping. ❌
+
+### Findings
+
+#### SM-F-1 — Desktop "All Categories" trotz Übersetzung weiterhin englisch
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Befund:** `desktop/src/index.html` Z. 678 baut die Category-Dropdown dynamisch: `sel.innerHTML = '<option value="">All Categories</option>' + …`. Implementer hat den HTML-Source-Default Z. 428 zwar auf "Alle Kategorien" übersetzt, aber dieser JS-Path überschreibt das beim ersten `loadBraindumps()`-Call. Live-User sieht "All Categories".
+- **Korrektur:** `'<option value="">All Categories</option>'` → `'<option value="">Alle Kategorien</option>'`.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-F-2 — Android TasksScreen mehrere englische Display-Strings
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Befund:** Live-Test zeigt drei Stellen mit englischen Strings:
+  - **Z. 136** `text = "Tasks"` — Top-Header (sollte "Aufgaben" sein, konsistent mit Bottom-Nav)
+  - **Z. 329** `text = task.status.replace("_", " ")` — zeigt direkt "open" oder "done"
+  - **Z. 334** `text = task.priority` — zeigt direkt "low"/"medium"/"high"
+- **Korrektur:**
+  - Z. 136: `text = "Aufgaben"`
+  - Z. 329: Status-Mapping: `text = when (task.status) { "open" -> "Offen"; "done" -> "Erledigt"; else -> task.status }`
+  - Z. 334: Priority-Mapping: `text = when (task.priority) { "low" -> "Niedrig"; "medium" -> "Mittel"; "high" -> "Hoch"; else -> task.priority }`
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-F-3 — Tauri AppImage-Bundling failed
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Vollständigkeit (Build-Pipeline)
+- **Befund:** `cargo tauri build` produziert DEB + RPM erfolgreich, scheitert aber beim AppImage-Bundling: `Error failed to bundle project 'failed to run linuxdeploy'`. Tooling-Issue, kein Code-Problem. Tauri-Build-EXIT=1 ist daher nicht Major, weil der primäre Distro-Pfad (Fedora-RPM) durchgeht.
+- **Korrektur:** Zwei Optionen:
+  - **Option A (Auflage):** `linuxdeploy` AppImage installieren in `~/.local/bin/` und ggf. `desktop/src-tauri/target/` cachen. Vor dem nächsten `cargo tauri build`.
+  - **Option B (Plan-Update):** AppImage aus dem Default-Bundle-Set entfernen (`tauri.conf.json` `bundle.targets`) für Local-Builds, GitHub Actions baut alle 5 Artefakte mit eingerichteter Toolchain.
+  - Empfehlung: Option A für Sprint-Closure (linuxdeploy installieren), Option B als Folge-Bookmark falls Local-Workflow oft scheitert.
+- **Status:** offen, Auflage für Final-Gate
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- ✅ Footer "Powered by VibeCode Solutions · NEXUS v0.1.0" sichtbar live (PC-LIVE-1-Fix hält über Sprint-Grenze).
+- ✅ Bottom-Nav-Labels deutsch (BrainDump / Verlauf / Aufgaben / Projekte / Einstellungen) live verifiziert.
+- ✅ SettingsScreen scrollbar — Code-Diff sauber (`Modifier.verticalScroll(rememberScrollState())` korrekt eingebaut Z. 153 etwa).
+- ✅ Theme-Engine intakt (NEXUS-Titel in Indigo, App nicht abgestürzt).
+- ✅ Core `cargo check` grün, gradle `assembleDebug` grün.
+- ✅ docs/i18n-strings-de.md vorhanden mit grep-Output und Übersetzungs-Tabelle.
+- ✅ DEB-Bundle frisch (mtime 23:40), Binary 12.6 MB, enthält neuen nexus-desktop.
+- ✅ Backend-Diag-Strings deutsch (`diag.rs` 4 Edits — verifiziert per grep).
+- ✅ Lerneffekt **PC-LIVE-1 (Live-Test ist die finale Wahrheit)** hat sich erneut bestätigt: SM-F-2-Status/Priority-Strings waren statisch durch grep-Pattern unsichtbar (es war keine Stringliterale, sondern Variable `task.status`).
+
+### Verdikt
+
+**❌ Rückgabe — Phase F nicht freigegeben**
+
+2 Major-Findings (SM-F-1 + SM-F-2) sind direkter Verstoß gegen DoD F-DSK-2/F-AND-2 ("alle UI-Strings deutsch"). 1 Minor (SM-F-3) als Auflage für Final-Gate.
+
+**Lerneffekt für Implementer:** Lokalisierung muss nicht nur Stringliterale im HTML/Source ersetzen, sondern auch:
+1. JS-Strings die zur Laufzeit DOM-Inhalte überschreiben (`innerHTML`-Patterns).
+2. Variable-basierte Display-Texte wie `task.status`, `task.priority`, `category` — Mappings nötig.
+3. Header/Title-Composables in jedem Screen, nicht nur Bottom-Nav-Labels.
+
+Empfehlung an vc-chef: Rückgabe an Hauptsession für 2 Major-Fixes, dann Re-Test (Iteration 2) mit Diff-Fokus. SM-F-3 als Auflage durchwinken; AppImage-Tooling kann Admin in Final-Gate-Auflagen einbauen.
+
+---
+
+## Synaptic Mosaic — Phase F — Iteration 2 (Diff-Fokus)
+
+**Datum:** 2026-05-02 nachts
+**Prüfgegenstand:** Phase-F-Korrektur SM-F-1 + SM-F-2
+**Erstellt von:** Hauptsession — VibeCoding
+**Auftrag:** AUFTRAG #9 vc.md (Iteration 2)
+
+### Diff-Verifikation
+
+| ID | Korrektur | Status |
+|---|---|---|
+| SM-F-1 | `desktop/src/index.html` Z. 678 — String "All Categories" → "Alle Kategorien". `grep -c "All Categories"` → **0**, `grep -nE "Alle Kategorien"` → 2 Treffer (Z. 428 HTML + Z. 678 JS) | ✅ erledigt |
+| SM-F-2 | `TasksScreen.kt` Z. 136 "Tasks" → "Aufgaben"; Z. 329-333 status-when-Mapping (open/done → Offen/Erledigt + fallback `task.status.replace("_", " ")`); Z. 334-338 priority-when-Mapping (low/medium/high → Niedrig/Mittel/Hoch + fallback `task.priority`) | ✅ erledigt |
+
+### Build-Verifikation
+
+| Build | EXIT | Verifikation |
+|---|---|---|
+| Android `gradle assembleDebug` | 0 | BUILD SUCCESSFUL in 2s |
+| Desktop `cargo tauri build --bundles deb,rpm` | 0 | "Finished 2 bundles", DEB+RPM frisch generiert (mtime 23:48:51) |
+
+### adb-Live-Verifikation Iteration 2
+
+- APK reinstalliert ✅
+- Aufgaben-Tab live geöffnet — Screenshot zeigt:
+  - **Top-Header "Aufgaben"** in Indigo (statt vorher "Tasks") ✅
+  - Status-Badge **"Offen"** unter "JJ-Cross-Device-Test" (statt "open") ✅
+  - Status-Badge **"Erledigt"** unter erledigten Tasks (statt "done") ✅
+  - Priority-Badge **"Mittel"** in Orange (statt "medium") ✅
+  - Bottom-Nav-Highlight auf "Aufgaben" konsistent ✅
+  - Footer "Powered by VibeCode Solutions · NEXUS v0.1.0" weiterhin sauber sichtbar ✅
+  - Theme/Indigo-Akzent intakt ✅
+
+### Was geprüft und OK befunden wurde
+
+- ✅ Beide Major-Findings SM-F-1 + SM-F-2 in einem Korrektur-Zyklus behoben.
+- ✅ when-Mappings haben sinnvolle Fallback-Branches — wenn Backend einen unbekannten Status (z.B. "in_progress") liefert, wird er als Roh-String angezeigt statt Crash. Resilient.
+- ✅ Keine Scope-Creep-Edits am ursprünglichen TasksScreen — nur die 3 identifizierten Stellen geändert.
+- ✅ docs/i18n-strings-de.md könnte um SM-F-1/SM-F-2-Lerneffekt erweitert werden (JS-dynamische + Variable-basierte Strings als zukünftiges Audit-Pflicht-Item) — kein Plan-Patch nötig, Hinweis für späteren Sprint-Lerneffekt.
+
+### SM-F-3 Status
+
+Bleibt offen als Final-Gate-Auflage (linuxdeploy installieren oder AppImage aus Default-Bundle-Targets). Tauri-Build wurde diesmal mit `--bundles deb,rpm` aufgerufen, was AppImage gezielt umgeht und sauberen EXIT=0 gibt — sauberer Workaround für Local-Builds.
+
+### Verdikt
+
+**✅ Freigabe** — Phase F abgeschlossen. Sprint-Loop kann zu Phase B übergehen.
+
+Iteration 2 → grün, beide Major-Findings in 1 Korrektur-Zyklus behoben. Loop-Vermeidung greift (keine neuen Findings).
+
+**Empfehlung an vc-chef:** Phase B (Backend Links + Auto-Projekt) jetzt starten. SM-F-3 als todo-Auflage für Final-Gate-Phase.
+
+---
+
+## Synaptic Mosaic — Phase B — Iteration 1
+
+**Datum:** 2026-05-02 morgens
+**Prüfgegenstand:** Phase-B-Implementation (Backend Links + Auto-Projekt-Vorschläge) vor Commit
+**Erstellt von:** Hauptsession — VibeCoding (Sprint Synaptic Mosaic Auto-Pilot)
+**Auftrag:** AUFTRAG #11 vc.md — QS-Review gegen DoD aus `~/.claude/plans/synaptic-mosaic.md` Phase B
+**Bezugscommit:** HEAD `30b12f1`, alle Änderungen uncommitted gegen `main`
+
+### Diff-Range geprüft
+
+NEU:
+- `core/migrations/20260501_001_links.sql` (19 LoC)
+- `core/migrations/20260502_001_project_suggestions.sql` (16 LoC)
+- `core/src/links.rs` (193 LoC inkl. 5 Inline-Tests)
+- `core/src/suggestions.rs` (78 LoC)
+
+GEÄNDERT:
+- `core/src/handlers.rs` (+283 LoC) — 7 neue Endpoints + `extract_links_for_recent` + `suggest_auto_projects`
+- `core/src/llm/mod.rs` (+59 LoC) — `LinkSuggestion`+`NodeRef`-DTOs, Default-Impl `extract_links`, `ProjectSuggestion`+confidence/reason, `EXTRACT_LINKS_PROMPT`
+- `core/src/llm/claude.rs` (+39 LoC) — `extract_links` Override
+- `core/src/llm/ollama.rs` (+26 LoC) — `extract_links` Override mit `extract_json_array`-Helper
+- `core/src/main.rs` (+67 LoC) — 7 Routes hinter `require_token`, Background-Task-Erweiterung
+- `core/src/repo.rs` (+7 LoC) — `links::delete_for_node`-Cascade in `delete_project`+`delete_braindump`
+
+### Build-Verifikation
+
+| Build | EXIT | Nachweis |
+|---|---|---|
+| `cargo check` | 0 | `Finished dev profile in 0.51s` |
+| `cargo clippy --all-targets -- -D warnings` | 0 | `Finished dev profile in 1.02s` |
+| `cargo test links` | 0 | `running 5 tests … 5 passed; 0 failed` (alle `links::tests::*` grün) |
+
+### Findings
+
+#### SM-B-001-COD — `extract_links_for_recent` re-queriert BrainDumps mit 0 LLM-Treffern endlos
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Code-Qualität / Performance / Wartbarkeit
+- **Befund:** Der Filter in `handlers.rs::extract_links_for_recent` lädt Kandidaten via `WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.source_type='braindump' AND l.source_id=b.id AND l.created_by='llm')`. Wenn der LLM-Provider für einen BrainDump 0 Suggestions zurückliefert (kein Match, oder alle unter `NEXUS_LINK_CONFIDENCE_MIN`), wird **kein** Link mit `source_id=bd.id, created_by='llm'` geschrieben. Ergo bleibt der BrainDump im NEXT-Cycle (5 min später) wieder Kandidat → weiterer LLM-Call → wieder 0 Treffer → endlos. Bei Claude-API mit ~$0.003/Call und Default-Limit 10 BrainDumps/Cycle × 12 Cycles/h fallen **echte Kosten** für inhaltlich-isolierte BrainDumps an, ohne dass je ein Fortschritt entsteht.
+- **Korrekturvorschlag:** Sentinel-Marker einführen: nach jedem `extract_links`-Aufruf (auch bei `Ok(suggestions)` mit `suggestions.is_empty()` ODER nach Confidence-Filter mit 0 Hits) einen "Marker-Link" auf den BrainDump selbst schreiben (`source_type='braindump', source_id=bd.id, target_type='braindump', target_id=bd.id, relation='noop-marker', created_by='llm', confidence=0.0`). Filter passt automatisch — der NOT-EXISTS-Check greift beim nächsten Cycle. Alternativ separate Tabelle `link_extraction_log(source_id, attempted_at)` mit Cooldown-Filter (sauberer, aber Migration nötig — als Bookmark fürs Vault-Sprint vorzusehen). Quick-Fix-Empfehlung: Sentinel.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-B-002-SIC — `LinkInput.created_by` ist client-controllable bei POST /links
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Sicherheit / Konsistenz
+- **Befund:** `links.rs::LinkInput.created_by` deserialisiert vom Client mit Default `"user"`, aber **wird vom Server nicht überschrieben** in `handlers.rs::create_link`. Ein User kann per `curl -d '{"source_type":"braindump","source_id":"X",...,"created_by":"llm"}'` einen Link mit `created_by="llm"` erzeugen. **Funktionsverhalten-Konsequenz**: das Filter-Predicate `WHERE l.created_by='llm'` in `extract_links_for_recent` (siehe SM-B-001) überspringt diesen BrainDump fortan permanent — Background-Task wird durch User-Aktion stillgelegt. Single-User-System mit Bearer-Auth, also kein klassischer Privilege-Drift, aber Audit-Trail sagt "vom LLM erzeugt" obwohl manuell. SM-PR-Auflage SM-PR-002 hat `created_by` als Indikator etabliert — die Endpoint-Semantik widerspricht.
+- **Korrekturvorschlag:** In `handlers.rs::create_link` nach Validierung explizit `let mut input = input; input.created_by = "user".to_string();` setzen, **bevor** `links::insert` aufgerufen wird. Damit ist `created_by="llm"` ausschließlich vom Background-Task setzbar. Test: einen Inline-Test in `handlers.rs` der einen direkten POST mit `created_by="llm"` simuliert und prüft dass die DB-Reihe `created_by="user"` enthält. Optional zusätzlich: validate_node_type-style `validate_created_by(&str)` für künftige Werte ('user' | 'llm').
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-B-003-VOL — Tests-DoD B-8 nicht erfüllt: `extract_links_for_recent`+`suggest_auto_projects` ungetestet
+- **Schweregrad:** 🟡 Major
+- **Kategorie:** Vollständigkeit
+- **Befund:** Sprint-Plan B-8 fordert explizit "5+3+2 = 10 Tests in `core/tests/links_test.rs + core/tests/auto_project_test.rs`":
+  - `links`-CRUD + delete_for_node: 5 Tests → ✅ vorhanden (Inline in `links.rs::tests`, Plan-Doc-Pfad-Drift ist OK, Bedeutung gleich).
+  - `extract_links_for_recent`-Mock mit Confidence-Filter: 3 Tests → ❌ **fehlen komplett**.
+  - `suggest_auto_projects` mit fixed-prompt-fixture: 2 Tests → ❌ **fehlen komplett**.
+  Beide ungetesteten Funktionen sind nicht-trivial: env-konfigurierbare Confidence-Schwellen, Filter-Branching (auto-create vs. suggestion vs. drop), JSON-Parsing-Branches, sequential-Loops mit `let _ =`-Geschluck. Regression-Risiko bei Confidence-Schwellen-Refactors hoch — ein einfacher `>` statt `>=` ist nicht ohne Test detektierbar.
+- **Korrekturvorschlag:** Mindest-Coverage:
+  1. **`extract_links_for_recent` × 3**: (a) Mock-LLM liefert 2 Suggestions mit Confidence 0.9/0.6, `NEXUS_LINK_CONFIDENCE_MIN=0.7` → genau 1 Link in DB, `links_created=1`. (b) Mock-LLM liefert `Err(...)` → `failed=1`, kein Link in DB. (c) Pool ohne BrainDumps → `processed=0`, kein DB-Schreibversuch. Mock-Provider lässt sich via `struct MockLlm { suggestions: Vec<LinkSuggestion> }` + `LlmProvider`-Impl bauen — `categorize_and_summarize`/`suggest_projects` Default-`unimplemented!()` wenn nicht aufgerufen.
+  2. **`suggest_auto_projects` × 2**: (a) Mock-LLM liefert 1 Proposal mit confidence=0.85 → `projects`-Reihe + 3 `assigned`-Reihen + `auto_created=1`. (b) Mock-LLM liefert 1 Proposal mit confidence=0.65 → `project_suggestions`-Reihe + `suggestions_added=1`, **keine** Project-Reihe.
+  Tests können als Inline-Module in `handlers.rs` (analog zu `recategorize_tests` Z. 944) oder neu unter `core/tests/auto_project_test.rs`. Pfad-Detail Tuvok offen — wichtig ist der Code-Abdeckungs-Inhalt.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-B-004-COD — Migration-Naming-Drift gegenüber Sprint-Plan
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Konsistenz
+- **Befund:** Plan B-7b sagt `core/migrations/20260501_002_project_suggestions.sql`, real ist `core/migrations/20260502_001_project_suggestions.sql`. SQLx-`migrate!("./migrations")` läuft alphabetisch — Reihenfolge `20260501_001_links.sql` → `20260502_001_project_suggestions.sql` ist sauber, und FK gibt es eh nicht zwischen den Tabellen. Keine Funktionsregression, aber Plan-Tracking-Drift. Erkenntnis: das Datum wurde beim tatsächlichen Anlegen auf 2026-05-02 hochgesetzt (heute), Sequenz auf `_001` gerollt — beides verteidigbar, aber undokumentiert.
+- **Korrekturvorschlag:** Optionen:
+  - **Option A (umbenennen):** `git mv core/migrations/20260502_001_project_suggestions.sql core/migrations/20260501_002_project_suggestions.sql` — passt zum Plan, kein Funktionsschaden.
+  - **Option B (Plan-Update):** Convention `YYYYMMDD_NNN` mit Tag-Drift-Toleranz dokumentieren. Sprint-Plan ist intern, Aufwand minimal.
+  Empfehlung: **Option A** für Iter-2 (Konsistenz) — wenn doch B, dann CHANGELOG-Eintrag in Phase X erwähnen.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-B-005-KOR — Race-Window in `repo::delete_project` zwischen TX-Commit und Link-Cleanup
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Korrektheit
+- **Befund:** `repo.rs` Z. 63 läuft `tx.commit()` zuerst, dann `links::delete_for_node(pool, "project", id)`. In dem Fenster zwischen den zwei Operationen (Single-User-System, aber Background-Task läuft parallel + Ktor-Client kann `GET /projects/{id}/links` rufen) ist das Project bereits gelöscht, Links existieren noch. Antwort wäre eine Linkliste zu einem nicht-existenten Project. Daten benignen Charakter (Frontend würde Detail-View nicht öffnen weil Project fehlt), aber Inkonsistenz. `delete_braindump` hat dieselbe Charakteristik (kein TX überhaupt).
+- **Korrekturvorschlag:** Option A — Cleanup VOR `tx.commit()` einbauen, im selben TX. Aktuell schwierig weil `delete_for_node` `&SqlitePool` erwartet, nicht `&mut Transaction`. Refactoring: `delete_for_node_in_tx(tx: &mut Transaction)` als parallele Funktion in `links.rs`. Option B — Background-Cleanup-Task für Orphans (existiert noch nicht). Option C — als bekannten Edge-Case dokumentieren und im docs/LINKS.md erwähnen, akzeptieren. Empfehlung: **Option C** für Iter-1 (echtes Risiko gering, Refactoring scope-creepig), Bookmark für Vault-Sprint.
+- **Status:** offen, akzeptabel als Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-B-006-KOR — `accept_project_suggestion` Counter-Drift bei silent assign-Failures
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Korrektheit
+- **Befund:** `handlers.rs::accept_project_suggestion` ruft in einer for-Schleife `let _ = repo::assign_braindump_to_project(...)` und antwortet mit `linked_braindumps: bd_ids.len()`. Wenn ein einziger `assign`-Call fehlschlägt (BrainDump-ID existiert nicht mehr, oder DB-Constraint), wird der Fehler geschluckt, der Counter ist trotzdem `bd_ids.len()`. Frontend zeigt "5 Notizen verknüpft" obwohl nur 3 echte assigns durchliefen.
+- **Korrekturvorschlag:** Erfolgs-Counter explizit zählen:
+  ```rust
+  let mut linked = 0;
+  for bd_id in &bd_ids {
+      if repo::assign_braindump_to_project(&state.pool, bd_id, &project.id).await.is_ok() {
+          linked += 1;
+      }
+  }
+  ```
+  Response-Field `linked_braindumps: linked`. Optional: bei `linked < bd_ids.len()` ein `partial: true`-Flag mitschicken.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### SM-B-007-KOR — `suggest_auto_projects` schluckt assign-Failures + droppt Confidence < min silent
+- **Schweregrad:** 🟢 Minor
+- **Kategorie:** Korrektheit / Vollständigkeit
+- **Befund:** Zwei kleine Aspekte in `handlers.rs::suggest_auto_projects`:
+  1. Bei Auto-Create-Pfad analog SM-B-006: `let _ = repo::assign_braindump_to_project(...)` schluckt Failures, `auto_created=1` zählt nur die erfolgreich erstellte Project-Reihe, nicht ob alle Member-Assigns durchliefen.
+  2. Proposals mit Confidence < `suggest_min` (default 0.5) werden silent gedropt — kein Counter, keine `tracing::debug!`-Spur. Bei Debugging "warum wird gar kein Vorschlag erzeugt?" hilft kein Logging.
+- **Korrekturvorschlag:** (1) wie SM-B-006 (Erfolgs-Counter). (2) `tracing::debug!("auto-project: dropped proposal '{}' confidence={:.2} below {:.2}", proposal.name, proposal.confidence, suggest_min);` für Confidence-Drops. Optional `dropped` zu `AutoProjectStats` hinzufügen — passt zum Pattern in `LinkExtractStats`.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### Was geprüft und OK befunden wurde
+
+- ✅ **Plan-Compliance Phase B-Mehrheit:** Migration-Schema (id+source/target/relation/confidence/reason/created_at/created_by), 2 Indizes ✅; Repo-Funktionen `links::insert/list_for_source/list_for_target/delete_by_id/delete_for_node` alle vorhanden ✅; Cascade-Hooks in `delete_braindump`+`delete_project` ✅ (mit dem Race-Caveat aus SM-B-005); 7 Routes statt 4 (Plan unterspezifiziert — get_*_links, accept, dismiss, list_suggestions zusätzlich, sinnvoll); Default-Impl `extract_links` im Trait mit `Ok(Vec::new())` ✅ (SM-PR-002 erfüllt); claude.rs+ollama.rs Override-Pflicht ✅; Background-Task-Erweiterung sequenziell, gleicher Cancel-Token, env-konfigurierbar ✅ (SM-PR-004 erfüllt).
+- ✅ **Cycle-Reihenfolge in `main.rs`:** `cycle.wrapping_add(1)` läuft VOR `is_multiple_of(auto_project_every)`. Initial `cycle=0`, nach Increment `cycle=1`, dann `1 % 6 != 0` → erste Auto-Projekt-Trigger nach Cycle 6, nicht 0. **Korrekt** — verhindert dass beim Server-Start sofort ein LLM-Call rausgeht bevor stabile Datenlage da ist.
+- ✅ **LLM-Provider-Coverage SM-PR-002:** 7 weitere Provider (gemini, openai, mistral, groq, deepseek, openrouter, zai) erben Default-Impl `Ok(Vec::new())`. User auf einem dieser Provider sieht keine LLM-Links — das ist per Plan-Design OK, kein Forced-6-fach-Implement-Anti-Pattern. Bookmark für künftigen Provider-Coverage-Sprint, kein Iter-1-Finding.
+- ✅ **Deutsch-Strings im Backend (SM-PR-006):** Alle User-facing error-Bodies in den 7 neuen Endpoints deutsch ("source_type/target_type muss …", "suggestion nicht gefunden", "Suggestion ist nicht mehr pending"). `tracing::warn!`-Strings englisch (Operations-Sprache, per Plan).
+- ✅ **Migration-Idempotenz:** Beide Migrations nutzen `CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`. SQLx-Migrator führt jede Migration genau einmal aus + speichert Hash, also ohnehin idempotent — defense-in-depth ist sauber.
+- ✅ **JSON-Robustheit in Override-Impls:** claude.rs `extract_links` hat `trimmed.find('[')..=rfind(']')`-Extraction für extra-Text-Fälle. ollama.rs nutzt eigenen Helper `extract_json_array` (analog zu existierendem `extract_json`). Beide handhaben LLM-Quirks (Markdown-Code-Fences, Erklär-Text um JSON herum).
+- ✅ **Empty-Candidates-Short-Circuit:** Beide Override-Impls returnen früh wenn `candidates.is_empty()` — kein LLM-Call, kein Empty-Prompt-Risk.
+- ✅ **Build-Verifikation:** cargo check + clippy (-D warnings) + 5 links-Tests grün. Kein Warning, keine pre-existing Clippy-Errors.
+- ✅ **`accept_project_suggestion` Idempotenz:** zweiter Aufruf returnt 400 weil `status != 'pending'` — sauber.
+- ✅ **`AutoProjectStats`+`LinkExtractStats` Logging:** Background-Task logged nur wenn `> 0` Zähler, vermeidet log-Spam.
+
+### Verdikt
+
+**❌ Rückgabe — Phase B nicht freigegeben (3 Major / 4 Minor)**
+
+3 Major-Findings rechtfertigen einen Re-Implementation-Zyklus, sind aber alle non-Blocker (kein Sicherheitsleak, kein Datenverlust). Iter-2-Diff-Fokus reicht — analog Phase F gestern, wo beide Major in 1 Korrektur-Zyklus behoben wurden.
+
+**Auflagen-Bündel für Iteration 2 (alle 3 Major):**
+1. **SM-B-001-Sentinel:** Marker-Link bei 0 LLM-Treffern, damit Re-Query-Loop nicht endlos teure LLM-Calls produziert. ~10 Zeilen Diff in `extract_links_for_recent`.
+2. **SM-B-002-Server-Override:** `created_by="user"` in `handlers.rs::create_link` forcen, damit das Audit-Trail-Filter-Predicate stabil bleibt. 1-2 Zeilen Diff + 1 Inline-Test.
+3. **SM-B-003-Tests:** Mock-LLM-Provider bauen + 5 Tests (3+2) für `extract_links_for_recent`+`suggest_auto_projects`. ~80-120 Zeilen.
+
+**Minor sind optional** für Iter-2:
+- SM-B-004 Migration-Rename: 1 git-mv (kann in den Phase-B-Commit gemerged werden).
+- SM-B-005 Race-Window: als bekannter Edge-Case in `docs/LINKS.md` (Phase X) dokumentieren — kein Code-Patch.
+- SM-B-006 + SM-B-007: Counter-Korrektur, beide ~5 Zeilen, lohnt sich mit-zu-fixen wenn man eh in handlers.rs ist.
+
+**Empfehlung an vc-chef:** Hauptsession bekommt 3 Major-Auflagen (Iter-2) + die Minors zur freien Wahl. Re-Tuvok-Lauf mit Diff-Fokus auf SM-B-001/002/003 — wenn alle drei sauber, sofort Freigabe ohne weitere Iteration. Erwartete Iteration-2-Aufwand: 30-45 Min.
+
+**WORKLOG-Ref:** AUFTRAG #11
+
+---
+
+## Synaptic Mosaic — Phase B — Iteration 2 (Diff-Fokus)
+
+**Datum:** 2026-05-02 morgens
+**Prüfgegenstand:** Iter-2-Korrektur Phase B (AUFTRAG #12) gegen Iter-1-Findings
+**Erstellt von:** Hauptsession — VibeCoding
+**Auftrag:** AUFTRAG #12 vc.md (Iter-2)
+
+### Diff-Verifikation
+
+| ID Iter-1 | Korrektur Iter-2 | Status |
+|---|---|---|
+| **SM-B-001-COD** Sentinel | `handlers.rs::extract_links_for_recent` Z. 1146 `wrote_any`-Flag, Z. 1166-1180 Sentinel-Insert (Selbst-Link `relation="noop-marker"`, `confidence=0.0`, `created_by="llm"`) bei `Ok(...)` mit 0 Treffern. Bei `Err(...)` KEIN Sentinel — Retry-fähig. Test-Beleg: `extract_links_writes_sentinel_on_empty_result` (Sentinel da nach Cycle 1, `processed=0` in Cycle 2) + `extract_links_handles_llm_error_without_sentinel` (Err-Pfad, kein Marker). | ✅ erledigt |
+| **SM-B-002-SIC** Server-Override | `handlers.rs::create_link` Z. 980-981 `let mut input = input; input.created_by = "user".to_string();` vor `links::insert`. Kommentar erklärt Semantik. Test-Beleg: `create_link_overrides_created_by_to_user` (Client sendet `"llm"`, DB-Reihe `"user"`). | ✅ erledigt |
+| **SM-B-003-VOL** Mock-LLM + 5 Tests | Neuer `mod synaptic_phase_b_tests` Z. ~1310-1568. `MockLlm`-Struct mit `LlmProvider`-Impl, `categorize_and_summarize` als `unimplemented!()` (Test-only). 6 Tests gesamt (Plan-Soll 5+1 SM-B-002): 3× `extract_links_for_recent` (Confidence-Filter / Sentinel / Err-Pfad), 2× `suggest_auto_projects` (Auto-Create / Suggestion-Persist), 1× `create_link` (SM-B-002). | ✅ erledigt |
+| **SM-B-006-KOR** accept-Counter | `handlers.rs::accept_project_suggestion` Z. 1052-1066 `linked`-Counter, Response enthält `linked_braindumps` (echt geschrieben), `requested_braindumps` (Soll), `partial`-Flag bei Diskrepanz. | ✅ erledigt |
+| **SM-B-007-KOR** suggest-Counter + Drop-Logging | `handlers.rs::suggest_auto_projects` Z. 1238-1265 `members_linked`-Counter im Auto-Create-Pfad, `tracing::debug!`-Trace + `stats.dropped += 1` für Confidence<min-Drops. `AutoProjectStats` um `members_linked` und `dropped` ergänzt. | ✅ erledigt |
+| **SM-B-004-COD** Migration-Rename | **Verworfen — Plan-Bug.** `sqlx::migrate!` parst die Migration-Version aus dem **ersten Underscore-Token**. Bei Rename `20260501_001_links.sql` + `20260501_002_project_suggestions.sql` würden beide Files dieselbe Version `20260501` bekommen → `UNIQUE constraint failed: _sqlx_migrations.version`. Original-Naming `20260502_001_project_suggestions.sql` ist deshalb das einzig Korrekte. Sprint-Plan-Forderung war ein Plan-Bug, kein Code-Bug. Tuvok-Iter-1-Finding zurückgenommen. | 🔄 invalide |
+| **SM-B-005-KOR** Race-Window | Per Chakotay-Routing-Entscheidung kein Code-Patch in Iter-2. Wandert in Phase X als Edge-Case-Block in `docs/LINKS.md`. | ⏳ Phase-X-Bookmark |
+
+### Bonus-Discovery durch Iter-2-Tests
+
+**SM-B-008-KOR — `transcript`-Spalte in 3 Phase-B-SELECTs vergessen** (Iter-1-Lücke, gefixt im Iter-2-Block):
+- **Befund:** `extract_links_for_recent` (candidates Z. ~1100, recent_bds Z. ~1121) und `suggest_auto_projects` (entries Z. ~1216) nutzten ein SELECT ohne `transcript`-Spalte. `BrainDumpEntry`-`FromRow` erwartet alle Felder → `ColumnNotFound("transcript")` zur Laufzeit, aber zur Compile-Zeit unsichtbar (sqlx-query-Strings sind nicht von Compile-Time-Macros erfasst). In Iter-1 war das nicht sichtbar weil `cargo test` global nicht gelaufen wurde — nur `cargo test links` (5 Tests, andere Code-Pfade). Mit den Iter-2-Mock-Tests sind die Code-Pfade durchgelaufen, der Bug fiel sofort auf.
+- **Korrektur:** Alle drei SELECTs erweitert um `transcript` in der Original-Spalten-Reihenfolge `id, created_at, raw_text, transcript, category, summary, tags_json` (analog zu `recategorize_unsorted_inner` Z. 555).
+- **Status:** ✅ erledigt im selben Iter-2-Block
+
+**Lerneffekt für QS:** Bei Iter-1-Verifikation `cargo test` GLOBAL laufen lassen, nicht nur die spezifische Modul-Test-Datei. `cargo test links` filtert nach Test-Name-Pattern und überspringt Code-Pfade die andere Tests (auch fremde) ausführen würden.
+
+### Build-Verifikation Iter-2 (eigenständig nachgeprüft)
+
+| Build | EXIT | Nachweis |
+|---|---|---|
+| `cargo check` | 0 | `Finished dev profile in 1.60s` |
+| `cargo clippy --all-targets -- -D warnings` | 0 | sauber |
+| `cargo test` (global) | 0 | **28 passed, 0 failed** — 5 links::tests + 6 synaptic_phase_b_tests + 4 recategorize_tests + 3 settings_tests + 5 repo::tests + 5 weitere |
+
+### Was geprüft und OK befunden wurde
+
+- ✅ **Sentinel-Semantik korrekt:** Sentinel auch wenn `Ok(suggestions)` mit Items aber alle unter Confidence-Min — verhindert Cost-Loop für BrainDumps mit nur schwachen Treffern. Bei `Err(...)` KEIN Sentinel — temporäre LLM-Ausfälle dürfen retryen, was der gewollte Backoff-Pfad in `main.rs` ist.
+- ✅ **Sentinel-Insert geschluckt mit `let _`:** Wenn der Sentinel-Insert selbst failed (DB-Pressure o.ä.), läuft der BrainDump im nächsten Cycle wieder durch — selbe Resilienz wie bei regulären Link-Inserts.
+- ✅ **Test-Schema-Pflege:** `setup_pool` in `synaptic_phase_b_tests` spiegelt das Schema händisch (5 CREATE-Statements). Bei künftigen Schema-Änderungen muss der Test mitgezogen werden — als Wartungs-Bookmark vermerkt, nicht als Finding (Pattern ist konsistent mit `links::tests::setup_pool`).
+- ✅ **`MockLlm`-Design:** `unimplemented!()` für `categorize_and_summarize` panict explizit wenn der Mock falsch genutzt wird — saubere Test-Hygiene.
+- ✅ **`partial`-Flag in accept-Response:** Frontend (Phase U) wird das ggf. konsumieren wollen — als Phase-U-Bookmark vermerkt, kein Iter-2-Finding.
+- ✅ **Plan-DoD-B-8 numerisch übererfüllt:** Plan forderte 10 Tests (5 links + 3 extract + 2 auto-project), tatsächlich 11 (5 links + 3 extract + 2 auto-project + 1 SM-B-002-Override). Die zusätzliche SM-B-002-Test ist Pflicht-Output von Iter-1.
+- ✅ **Migration-Stand korrekt:** `20260501_001_links.sql` + `20260502_001_project_suggestions.sql`, sqlx-migrate kann sauber durchlaufen. SM-B-004 ist als Plan-Bug dokumentiert.
+- ✅ **Loop-Vermeidung greift:** Iter-2-Diff-Fokus heilt 5/5 Iter-1-Findings (3 Major + 2 Minor) in einem Korrektur-Zyklus. Plus Bonus-Discovery mitgenommen. SM-B-005 als Phase-X-Bookmark dokumentiert. SM-B-004 invalide. **Keine neuen Findings, keine Iter-3.**
+
+### Verdikt
+
+**✅ Freigabe — Phase B Iter-2 abgeschlossen**
+
+Iter-2-Diff-Fokus hat alle 3 Major + 2 Counter-Drift-Minors aus Iter-1 sauber adressiert. SM-B-004 als Plan-Bug zurückgerollt (Tuvok-Iter-1-Verdikt korrigiert: sqlx-migrate-Version-Parsing kollidiert bei gleichem Datum-Prefix). Bonus-Discovery (transcript-Spalte) im selben Block gefixt. Build-Verifikation eigenständig grün (28/0 Tests).
+
+**Empfehlung an vc-chef:** Sprint-Loop kann zu Phase U (UI für Links + Suggestions) übergehen. Phase-F-Commit + Phase-B-Commit jetzt anlegbar. Bookmarks für Phase X:
+- SM-B-005 Race-Window-Doku in `docs/LINKS.md`
+- `partial`-Flag im accept-Response → Phase-U-Frontend-Konsum
+- Test-Schema-Pflege bei künftigen Schema-Änderungen
+
+**Empfehlung an Persona-Memory:** Lerneffekt — bei Iter-1-Verifikation immer `cargo test` global laufen lassen, sonst bleiben Runtime-Bugs in Code-Pfaden anderer Module unsichtbar.
+
+**WORKLOG-Ref:** AUFTRAG #12 (QS grün) → AUFTRAG #11 abschließbar.

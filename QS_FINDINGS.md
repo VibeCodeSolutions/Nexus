@@ -2358,3 +2358,82 @@ Phase-U-Android-Funktionalität live verifiziert. Sprint "Synaptic Mosaic" v0.1.
 **Sprint Synaptic Mosaic auf Cross-CLI-Ebene abgeschlossen.**
 
 **WORKLOG-Ref:** AUFTRAG #16 (Iter-2 schließt)
+
+---
+
+## Sprint Crystalline Crab — Phase A — Pre-Commit Diff-Review — 2026-05-03
+**Status: ⚠️ Freigabe mit 1 Pflicht-Mitfix (Trigger-Plan)**
+
+Prüfung durchgeführt von: QS — VibeCoding
+
+### Was geprüft wurde
+- `git diff` über 4 Files: `.github/workflows/release.yml` (+5 LoC RUSTFLAGS env), `desktop/src-tauri/Cargo.toml` (1 LoC `features = ["devtools"]`), `CURRENT_STATE.md` (+43/-3 Sprint-Block + Findings 9/10/11), `scripts/setup-win11-vm.sh` (NEU 263 LoC, idempotentes VirtualBox-Setup für Win11 Eval ISO)
+- Trigger-Plan-Bewertung (Tag-Push v0.1.3-rc1 → CI baut MSI-Asset)
+
+### Findings
+
+**CC-PR-001-VOL** — 🟢 Minor
+- **Datei:** `.github/workflows/release.yml`
+- **Befund:** RUSTFLAGS `-C target-feature=+crt-static` ist nur im `build-core-windows`-Job gesetzt, nicht im `build-desktop-windows`-Job. Der Tauri-Wrapper `nexus-desktop.exe` hatte heute zufällig keinen Crash auf der frischen VM, aber konsistente Behandlung wäre robuster — auf einer noch frischeren Win-Maschine ohne WebView2-vor-Initialisierung könnte der Wrapper auch STATUS_DLL_NOT_FOUND werfen.
+- **Korrekturvorschlag:** Folge-Sprint — `env: RUSTFLAGS: "-C target-feature=+crt-static"` auch im build-desktop-windows-Job. Heute nicht-blockierend, weil der konkret beobachtete Bug (Sidecar) gefixt wird.
+- **Status:** Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+**CC-PR-002-WAR** — 🟢 Minor
+- **Datei:** `desktop/src-tauri/Cargo.toml`
+- **Befund:** Backlog-Eintrag „DevTools im Release-MSI hinter Build-Flag verstecken (vor 1.0-Release zwingend)" steht nur in CURRENT_STATE.md. Cargo.toml selbst hat keinen Hinweis — bei nächstem Tauri-Bump oder Refactor leicht zu übersehen.
+- **Korrekturvorschlag:** TODO-Kommentar direkt über die Zeile: `# TODO Crystalline-Crab-Backlog: vor 1.0-Release "devtools" hinter cfg(debug_assertions) verstecken oder eigenes "debug-build"-Feature anlegen`
+- **Status:** Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+**CC-PR-003-KON** — 🟢 Minor
+- **Datei:** `CURRENT_STATE.md`
+- **Befund:** Sprint-Block-Auslöser-Text sagt „8 Findings auf (5 Funktionsbugs, 3 Polish/UX)", die Liste enthält aber 11 Einträge (Findings 9/10/11 in Phase A entdeckt). Beim schnellen Lesen wirkt es als wären 9-11 nachträgliche Annexe.
+- **Korrekturvorschlag:** Auslöser-Text auf „8 UI-Findings + 3 Plattform-Findings (während Phase A ergänzt)" anpassen.
+- **Status:** Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+**CC-PR-004-VOL** — 🟢 Minor
+- **Datei:** `CURRENT_STATE.md`
+- **Befund:** DoD-Block sagt „Alle 8 Findings sichtbar gefixt in Linux-Build, VM-Win11-MSI und nativer Win11-Partition" — sollte 11 sein (oder klar trennen, dass Plattform-Findings 9/10/11 anders adressiert werden, z.B. #11 Pairing-VM-NAT geht in Backlog).
+- **Korrekturvorschlag:** DoD-Punkt umformulieren auf „Alle 8 UI-Findings sichtbar gefixt in Linux + VM + nativer Partition. Plattform-Findings 9/10 in Phase A erledigt, #11 in Backlog."
+- **Status:** Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+**CC-PR-005-KOR** — 🟢 Minor
+- **Datei:** `scripts/setup-win11-vm.sh:174-189` (`mount_iso`-Funktion)
+- **Befund:** awk-Pattern `awk -F= '/^"IDE Controller-1-0"=/ { sub(/^"/, "", $2); sub(/"$/, "", $2); print $2 }'` schneidet bei einem ISO-Pfad mit `=`-Zeichen ab — `awk -F=` splittet auf jedem `=`, `$2` bekommt nur das erste Pfad-Segment vor dem `=`. Ergebnis: False-Negative bei Idempotenz, ISO wird re-mounted. Kein Datenverlust (storageattach mit gleichem Medium ist idempotent), aber Skript-Rauschen.
+- **Korrekturvorschlag:** Robust mit sed: `sed -nE 's/^"IDE Controller-1-0"="(.*)"$/\1/p'`. Bei aktuellen ISO-Pfaden (Microsoft-Convention) kein realer Treffer.
+- **Status:** Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+**CC-PR-006-SIC** — 🟢 Minor
+- **Datei:** `scripts/setup-win11-vm.sh:67-77` (`get_iso_path`)
+- **Befund:** Defense-in-Depth: `[[ -f "$ISO_PATH" ]]` prüft nur Existenz, nicht ISO-Dateityp. Wenn Admin versehentlich z.B. einen MSI- oder ZIP-Pfad übergibt, wird VBoxManage später failen, mit unklarer Fehlermeldung. Niedrige Prio, weil Admin selber den Pfad angibt — kein Angriffsvektor.
+- **Korrekturvorschlag:** Suffix-Validation: `[[ "$ISO_PATH" == *.iso ]] || die "Kein ISO-Suffix: $ISO_PATH"`
+- **Status:** Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+**CC-PR-008-KON** — 🟡 **Major** (Pflicht-Mitfix vor CI-Trigger)
+- **Datei:** Trigger-Plan (nicht im Diff selbst, sondern im Auftrag-Workflow)
+- **Befund:** Plan war „Tag `v0.1.3-rc1` pushen → CI baut MSI". `.github/workflows/release.yml` triggert auf `tags: 'v*.*.*'` (matcht `v0.1.3-rc1` per Glob), aber `desktop/src-tauri/Cargo.toml` und `desktop/package.json` stehen weiterhin auf `0.1.2`. Der gebaute MSI hieße `nexus-desktop_0.1.2_x64_en-US.msi`, würde aber als Asset im Release-Tag `v0.1.3-rc1` veröffentlicht. Versions-Naming-Drift, im späteren Release-Audit verwirrend, und die DraftRelease-Notes würden inkonsistente Strings enthalten.
+- **Korrekturvorschlag:** Zwei saubere Optionen:
+  - **(a) Pre-Bump:** `scripts/bump-version.sh 0.1.3` lokal laufen, alle Cargo.toml + package.json + tauri.conf.json + android/build.gradle.kts auf `0.1.3` bringen, committen, dann Tag `v0.1.3-rc1` pushen → MSI heißt `nexus-desktop_0.1.3_x64_en-US.msi`, Konsistenz wiederhergestellt. Bedeutet: Sprint-Closure committet auf `0.1.3` (was sowieso geplant war).
+  - **(b) Workflow-Dispatch:** `gh workflow run release.yml` → CI läuft alle Build-Jobs, Artifacts via `gh run download <id> -n nexus-desktop-windows` lokal abholen, Admin lädt MSI in VM. Kein Tag-Push, kein Draft-Release, kein Naming-Konflikt. Sauberer für einen reinen Test-Build.
+- **Empfehlung:** **(b)** für die heutige Phase-B-Diagnose (nur Test, kein RC-Release nötig). Der RC-Tag `v0.1.3-rc1` macht erst Sinn, wenn Phase C (Desktop-Fixes) committet ist und ein echter RC nötig wird.
+- **Status:** offen (Pflicht-Mitfix vor CI-Trigger)
+- **Korrektur-Zyklen:** 0/2
+
+### Zusammenfassung
+
+| Schweregrad | Anzahl | IDs |
+|---|---|---|
+| 🔴 Blocker | 0 | — |
+| 🟡 Major | 1 | CC-PR-008-KON |
+| 🟢 Minor | 5 | CC-PR-001-VOL, CC-PR-002-WAR, CC-PR-003-KON, CC-PR-004-VOL, CC-PR-005-KOR, CC-PR-006-SIC |
+
+**Verdikt:** ⚠️ Freigabe mit Auflage. Code-Diff-Inhalt ist sauber (alle 4 Files passieren Korrektheit/Vollständigkeit/Konsistenz/Sicherheit). Einziger blockierender Punkt ist die Trigger-Wahl: bevor commit+push passieren, Empfehlung für Workflow-Dispatch oder Pre-Bump entscheiden.
+
+**Empfehlung an Abteilungsleitung — VibeCoding:** Workflow-Dispatch-Pfad (b) für die heutige Test-MSI-Erzeugung. Minors als Backlog für Crystalline-Crab-Phase-X (Doku-Sync) oder Folge-Sprint.
+
+**WORKLOG-Ref:** AUFTRAG #18 (Phase-A-Pre-Commit-Gate)

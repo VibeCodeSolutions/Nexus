@@ -47,6 +47,11 @@ jobs:
 
   build-core-windows:
     runs-on: windows-latest
+    # Statisch gegen MSVC-CRT linken, damit der Sidecar auf frisch-installiertem
+    # Win11 ohne Visual C++ Redistributable läuft (Crystalline-Crab-Finding #9:
+    # nexus-core.exe exitete mit STATUS_DLL_NOT_FOUND 0xC0000135 in fresh VM).
+    env:
+      RUSTFLAGS: "-C target-feature=+crt-static"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

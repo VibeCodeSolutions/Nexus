@@ -1,8 +1,48 @@
 # NEXUS — Current State
 
-**Stand:** 2026-05-02 (nachmittag)
-**Aktuelle Phase:** Sprint "Synaptic Mosaic" — ✅ Cross-CLI abgeschlossen (Phase F + B + U Desktop + X auf Hauptsession-CLI, Phase U Android auf AS-CLI, Cross-CLI Tuvok-Final-Live-Gate Iter-2 grün, SM-LIVE-CLEANUP-001 erledigt). **`v0.1.2` getaggt + gepusht.**
-**Phase-Status:** v0.1.0 GA-fähig, v0.1.1 PC implizit überholt, **v0.1.2 Synaptic Mosaic released**.
+**Stand:** 2026-05-03
+**Aktuelle Phase:** Sprint "Crystalline Crab" — Polish Win11 / Bugfix-Sweep nach erstem nativem Win11-Smoke. Plan freigegeben, Phase A läuft an.
+**Phase-Status:** v0.1.0 GA-fähig, v0.1.1 PC implizit überholt, v0.1.2 Synaptic Mosaic released, **v0.1.3 Crystalline Crab in Vorbereitung** (Patch-Bump nach Sweep-Closure).
+
+---
+
+## Sprint "Crystalline Crab" (2026-05-03, in Arbeit)
+
+Auslöser: Erster nativer Win11-Smoke-Test auf Dualboot-Partition deckte 8 Findings auf (5 Funktionsbugs, 3 Polish/UX). Reboot-pro-Test-Loop blockierte Diagnose → Strategie-Umstellung auf Microsoft-Win11-Dev-VM für Debug-Iteration, native Partition für finale E2E-Verifikation.
+
+**Findings:**
+1. Desktop: Theme-Toggle (🎨 System) reagiert nicht
+2. Desktop: Einstellungs-Button reagiert nicht
+3. Desktop+Android: „Aktualisieren" greift erst nach Tab-Wechsel
+4. Desktop: „Ausgewählte löschen" bleibt disabled
+5. Desktop+Android: LLM-/Modell-Liste unsortiert
+6. Android: Vertikal-Abstand Bottom-Bar↔Footer zu groß
+7. Desktop+Android: Dashboard wirkt trocken — Stilrichtung „funktional & illustriert"
+8. Desktop+Android: Footer/Strings v0.1.0 statt v0.1.2
+9. **Windows MSI fehlt VC++ Runtime-Bundling** — `nexus-core.exe` exit-codet mit `STATUS_DLL_NOT_FOUND` (0xC0000135) auf frisch-installiertem Win11 ohne Visual C++ Redistributable. Build-Pipeline muss VC++ Redist im MSI bündeln **oder** Core mit `RUSTFLAGS=-C target-feature=+crt-static` statisch linken. Entdeckt 2026-05-03 in der frischen VM während Phase B.
+10. **LLM-Skip im Onboarding fehlt** — Wizard zwingt zur Provider-/Key-Eingabe, kein „Später konfigurieren"-Pfad. Blockiert Ersteinrichtung wenn Admin (oder neuer User) noch keinen Key hat. Im Onboarding-Flow `/api/onboard/set-provider`-Schritt brauchen Skip-Variante + Default auf NoOpProvider.
+11. **Pairing in VM via NAT scheitert** — QR enthält VM-interne IP `10.0.2.x`, vom LAN nicht erreichbar. Lösungspfade: (a) Bridged-Network im VirtualBox-Setup-Skript, (b) `NEXUS_PAIR_HOST`-Env-Var um QR-IP zu overriden. Lower-Prio: Pairing wird auf nativer Win11-Partition getestet, VM bleibt für Desktop-UI-Diagnose.
+
+**Routing-Entscheidungen (Zentrale):** Skript+manuell parallel für VM-Setup; VM-Image-Download als Background-Job; LLM-Sort zentral im Core (Single Source of Truth, Frontend vertraut); Cross-CLI hybrid (sequentiell für LLM-Sort, parallel sonst).
+
+**Phasen:**
+- ⏳ **Phase A — Parallel-Start**: A1 Win11-Test-Image (MS hat Dev-VMs 2024 entfernt → Pivot auf Win11 Enterprise Eval ISO 90 Tage, wartet auf Admin-Registrierung am Eval-Center + Download), A2 idempotentes Setup-Skript (Shell-Toolchain, angepasst an ISO-Pfad mit `VBoxManage`-VM-Anlage TPM/SecureBoot/EFI), A3 Sprint-Phase-Eintrag (✅ dieser Block), A4 Tauri-DevTools-Feature in `desktop/src-tauri/Cargo.toml` (✅ `features = ["devtools"]` per WebSearch verifiziert), B1 VirtualBox-Install (✅ Admin manuell)
+- ⏸ **Phase B — VM-Setup + Diagnose**: blockiert auf A1+A2
+- ⏸ **Phase C — Desktop-Fixes**: blockiert auf B3-Diagnose-Ergebnis
+- ⏸ **Phase D — Android-Handoff an AS-CLI**: blockiert auf C2-Commit
+- ⏸ **Phase E — Verifikation Linux + VM + native Partition**: final
+
+**DoD:**
+- Alle 8 Findings sichtbar gefixt in Linux-Build, VM-Win11-MSI und nativer Win11-Partition
+- DevTools-Console leer im Normalbetrieb beider Plattformen
+- Tuvok finale QS-Pforte grün
+- Memory-Eintrag `project_windows_test.md` aktualisiert (✅ erledigt)
+- Plan-Datei: `~/.claude/plans/folgendes-systembutton-und-einstellungsb-spicy-kettle.md`
+
+**Backlog (out of scope dieses Sprints):**
+- DevTools im Release-MSI hinter Debug-Build-Flag verstecken (vor 1.0-Release zwingend)
+- Footer-Version dynamisch via Tauri `getVersion()` statt hardcoded
+- Tauri-Sidecar-Lifecycle-Refactor
 
 ---
 

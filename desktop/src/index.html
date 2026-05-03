@@ -361,6 +361,48 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 .onboarding-screen .subtle { color: var(--text-dim); font-size: 13px; }
 
 .hidden { display: none !important; }
+
+/* ============================================================
+   Phase C — Inline-Style-Refactor (CSP-Compliance)
+   ============================================================ */
+.mt-1rem { margin-top: 1rem; }
+.mt-04rem { margin-top: 0.4rem; }
+.mt-4 { margin-top: 4px; }
+.mt-6 { margin-top: 6px; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-20 { margin-top: 20px; }
+.mb-6 { margin-bottom: 6px; }
+.mb-8 { margin-bottom: 8px; }
+.mr-4 { margin-right: 4px; }
+.center-text { text-align: center; }
+.col-w-40 { width: 40px; }
+.col-w-90 { width: 90px; }
+
+.h3-llm { margin-top: 20px; margin-bottom: 8px; font-size: 14px; }
+.pair-uri-text {
+  display: block; padding: 0.6rem; background: var(--bg-input);
+  border-radius: 6px; font-size: 12px; word-break: break-all;
+}
+.subtle-hint { margin-top: 0.8rem; font-size: 12px; color: var(--text-dim); }
+.subtle-link { color: var(--text-dim); text-decoration: underline; }
+
+.modal-wide { max-width: 640px; }
+.bd-detail-meta { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+.bd-detail-text {
+  white-space: pre-wrap; font-size: 14px; line-height: 1.5;
+  padding: 10px; background: var(--surface);
+  border-radius: 6px; border: 1px solid var(--border);
+}
+.bd-detail-strong { font-size: 12px; color: var(--text-dim); }
+.bd-detail-rueck-strong { font-size: 11px; color: var(--text-dim); }
+.ach-modal-desc { color: var(--text-dim); font-size: 13px; margin-top: 8px; }
+
+.proj-pct-text { font-size: 12px; color: var(--text-dim); margin-top: 4px; display: block; }
+.task-subheader { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+.qr-msg { color: #666; padding: 1rem; }
+.sugg-member-count { font-size: 12px; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -381,9 +423,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <p>Installiere die NEXUS-App auf deinem Handy und scanne diesen Code.</p>
     <div id="qrContainer"></div>
     <div id="pairUriFallback" class="hidden">
-      <p class="subtle" style="margin-top:1rem;">Falls du den QR nicht scannen kannst, öffne diese URI auf dem Handy:</p>
-      <code id="pairUriText" style="display:block;padding:0.6rem;background:var(--bg-input);border-radius:6px;font-size:12px;word-break:break-all;"></code>
-      <button class="btn-secondary" id="pairUriCopy" style="margin-top:0.4rem;">Kopieren</button>
+      <p class="subtle mt-1rem">Falls du den QR nicht scannen kannst, öffne diese URI auf dem Handy:</p>
+      <code id="pairUriText" class="pair-uri-text"></code>
+      <button class="btn-secondary mt-04rem" id="pairUriCopy">Kopieren</button>
     </div>
     <p id="pairStatus" class="subtle">Warte auf Pairing …</p>
     <div class="button-row">
@@ -391,9 +433,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
       <button class="btn-secondary" id="pairRecheckBtn">Erneut prüfen</button>
       <button class="btn-primary" id="pairNextBtn" data-next="screenProvider" disabled>Warte auf Pairing …</button>
     </div>
-    <p id="pairSkipHint" class="subtle hidden" style="margin-top:0.8rem;font-size:12px;color:var(--text-dim);">
+    <p id="pairSkipHint" class="subtle subtle-hint hidden">
       Pairing scheint zu hängen?
-      <a href="#" id="pairSkipLink" style="color:var(--text-dim);text-decoration:underline;">Trotzdem weiter</a>
+      <a href="#" id="pairSkipLink" class="subtle-link">Trotzdem weiter</a>
     </p>
   </section>
 
@@ -421,8 +463,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   <h1><span>NEXUS</span> Dashboard</h1>
   <div class="header-actions">
     <span class="status-dot" id="statusDot" title="Nicht verbunden"></span>
-    <button class="btn btn-ghost btn-sm" id="themeToggle" onclick="cycleTheme()" title="Theme wechseln (Hell / Dunkel / System)">🎨 System</button>
-    <button class="btn btn-ghost" onclick="openSettings()">Einstellungen</button>
+    <button class="btn btn-ghost btn-sm" id="themeToggle" data-action="theme-cycle" title="Theme wechseln (Hell / Dunkel / System)">🎨 System</button>
+    <button class="btn btn-ghost" data-action="settings-open">Einstellungen</button>
   </div>
 </div>
 
@@ -438,13 +480,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- BrainDumps Tab -->
 <div class="content tab-content" id="tab-braindumps">
   <div class="toolbar">
-    <input type="text" id="bdSearch" placeholder="BrainDumps suchen…" oninput="filterBraindumps()">
-    <select id="bdCategory" onchange="filterBraindumps()">
+    <input type="text" id="bdSearch" placeholder="BrainDumps suchen…" data-input="bd-search">
+    <select id="bdCategory" data-change="bd-filter">
       <option value="">Alle Kategorien</option>
     </select>
-    <button class="btn btn-primary" onclick="refreshBraindumps()">Aktualisieren</button>
-    <button class="btn btn-ghost btn-sm" id="bdUnsortedBadge" onclick="filterUnsorted()" style="display:none;">Unsortiert (0)</button>
-    <button class="btn btn-danger" id="bdBulkDelete" onclick="deleteSelectedBraindumps()" disabled>Ausgewählte löschen</button>
+    <button class="btn btn-primary" data-action="bd-refresh">Aktualisieren</button>
+    <button class="btn btn-ghost btn-sm hidden" id="bdUnsortedBadge" data-action="bd-filter-unsorted">Unsortiert (0)</button>
+    <button class="btn btn-danger" id="bdBulkDelete" data-action="bd-bulk-delete" disabled>Ausgewählte löschen</button>
   </div>
   <div id="bdTable"></div>
 </div>
@@ -452,7 +494,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- Projects Tab -->
 <div class="content tab-content hidden" id="tab-projects">
   <div class="toolbar">
-    <button class="btn btn-primary" onclick="refreshProjects()">Aktualisieren</button>
+    <button class="btn btn-primary" data-action="proj-refresh">Aktualisieren</button>
   </div>
   <div id="suggestionsBanner" class="banner suggestion hidden"></div>
   <div class="card-grid" id="projectCards"></div>
@@ -461,20 +503,20 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- Tasks Tab -->
 <div class="content tab-content hidden" id="tab-tasks">
   <div class="toolbar">
-    <button class="btn btn-primary" onclick="openNewTask()">+ Neue Aufgabe</button>
-    <button class="btn btn-primary" id="taskRefreshBtn" onclick="refreshTasks()">Aktualisieren</button>
-    <select id="taskFilterStatus" onchange="renderTasks()">
+    <button class="btn btn-primary" data-action="task-new">+ Neue Aufgabe</button>
+    <button class="btn btn-primary" id="taskRefreshBtn" data-action="task-refresh">Aktualisieren</button>
+    <select id="taskFilterStatus" data-change="task-render">
       <option value="">Alle Status</option>
       <option value="open">Offen</option>
       <option value="done">Erledigt</option>
     </select>
-    <select id="taskFilterPriority" onchange="renderTasks()">
+    <select id="taskFilterPriority" data-change="task-render">
       <option value="">Alle Prioritäten</option>
       <option value="high">High</option>
       <option value="medium">Medium</option>
       <option value="low">Low</option>
     </select>
-    <select id="taskFilterProject" onchange="renderTasks()">
+    <select id="taskFilterProject" data-change="task-render">
       <option value="">Alle Projekte</option>
     </select>
   </div>
@@ -484,7 +526,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- Achievements Tab -->
 <div class="content tab-content hidden" id="tab-achievements">
   <div class="toolbar">
-    <button class="btn btn-primary" onclick="refreshAchievements()">Aktualisieren</button>
+    <button class="btn btn-primary" data-action="ach-refresh">Aktualisieren</button>
   </div>
   <div class="card-grid" id="achievementGrid"></div>
 </div>
@@ -498,18 +540,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <label>Bearer-Token</label>
     <input type="password" id="settingToken" placeholder="API-Token eingeben">
 
-    <h3 style="margin-top: 20px; margin-bottom: 8px; font-size: 14px;">LLM-Konfiguration</h3>
+    <h3 class="h3-llm">LLM-Konfiguration</h3>
     <label>Provider</label>
     <select id="settingProvider"><option value="">(lädt…)</option></select>
     <label>Modell</label>
     <select id="settingModel"><option value="">(zuerst Provider wählen)</option></select>
     <label>API-Key (leer = unverändert)</label>
     <input type="password" id="settingApiKey" placeholder="">
-    <button class="btn btn-ghost btn-sm" onclick="saveLlmConfig()" style="margin-top: 6px;">LLM speichern</button>
+    <button class="btn btn-ghost btn-sm mt-6" data-action="llm-save">LLM speichern</button>
 
-    <div class="actions" style="margin-top: 16px;">
-      <button class="btn btn-ghost" onclick="closeSettings()">Schließen</button>
-      <button class="btn btn-primary" onclick="saveSettings()">Verbindung speichern</button>
+    <div class="actions mt-16">
+      <button class="btn btn-ghost" data-action="settings-close">Schließen</button>
+      <button class="btn btn-primary" data-action="settings-save">Verbindung speichern</button>
     </div>
   </div>
 </div>
@@ -531,8 +573,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
       <option value="high">Hoch</option>
     </select>
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeNewTask()">Abbrechen</button>
-      <button class="btn btn-primary" onclick="createTask()">Erstellen</button>
+      <button class="btn btn-ghost" data-action="task-cancel">Abbrechen</button>
+      <button class="btn btn-primary" data-action="task-create">Erstellen</button>
     </div>
   </div>
 </div>
@@ -541,30 +583,30 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <div class="modal-overlay hidden" id="achievementModal">
   <div class="modal">
     <div class="ach-modal-icon" id="achModalIcon"></div>
-    <h2 id="achModalName" style="text-align:center;"></h2>
-    <p id="achModalDesc" style="text-align:center; color:var(--text-dim); font-size:13px; margin-top:8px;"></p>
-    <div class="ach-modal-status" id="achModalStatus" style="text-align:center;"></div>
+    <h2 id="achModalName" class="center-text"></h2>
+    <p id="achModalDesc" class="center-text ach-modal-desc"></p>
+    <div class="ach-modal-status center-text" id="achModalStatus"></div>
     <div class="actions">
-      <button class="btn btn-primary" onclick="closeAchievement()">Schließen</button>
+      <button class="btn btn-primary" data-action="ach-close">Schließen</button>
     </div>
   </div>
 </div>
 
 <!-- BrainDump Detail Modal (Synaptic Mosaic Phase U) -->
 <div class="modal-overlay hidden" id="bdDetailModal">
-  <div class="modal" style="max-width: 640px;">
+  <div class="modal modal-wide">
     <h2>BrainDump</h2>
-    <div id="bdDetailMeta" style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;"></div>
-    <div id="bdDetailText" style="white-space: pre-wrap; font-size: 14px; line-height: 1.5; padding: 10px; background: var(--surface); border-radius: 6px; border: 1px solid var(--border);"></div>
-    <div id="bdDetailSummary" style="margin-top: 12px;"></div>
-    <div id="bdDetailTags" style="margin-top: 8px;"></div>
+    <div id="bdDetailMeta" class="bd-detail-meta"></div>
+    <div id="bdDetailText" class="bd-detail-text"></div>
+    <div id="bdDetailSummary" class="mt-12"></div>
+    <div id="bdDetailTags" class="mt-8"></div>
     <div class="links-section">
       <h3>Verknüpft mit</h3>
       <div id="bdDetailLinks"></div>
     </div>
     <div class="actions">
-      <button class="btn btn-danger" onclick="deleteBraindumpFromDetail()">Löschen</button>
-      <button class="btn btn-primary" onclick="closeBraindumpDetail()">Schließen</button>
+      <button class="btn btn-danger" data-action="bd-detail-delete">Löschen</button>
+      <button class="btn btn-primary" data-action="bd-detail-close">Schließen</button>
     </div>
   </div>
 </div>
@@ -694,9 +736,9 @@ async function refreshUnsortedBadge() {
     const data = await api('/braindump/unsorted/count');
     const n = data.count || 0;
     btn.textContent = `Unsortiert (${n})`;
-    btn.style.display = n > 0 ? '' : 'none';
+    btn.classList.toggle('hidden', n === 0);
   } catch {
-    btn.style.display = 'none';
+    btn.classList.add('hidden');
   }
 }
 
@@ -738,15 +780,15 @@ function renderBraindumps(items) {
     updateBulkButtonState();
     return;
   }
-  const rows = items.map(b => `<tr class="bd-row-clickable" onclick="openBraindumpDetail('${esc(b.id)}', event)">
-    <td onclick="event.stopPropagation()"><input type="checkbox" class="bd-select" data-id="${esc(b.id)}" onchange="updateBulkButtonState()"></td>
+  const rows = items.map(b => `<tr class="bd-row-clickable" data-action="bd-row-open" data-bd-id="${esc(b.id)}">
+    <td><input type="checkbox" class="bd-select" data-id="${esc(b.id)}" data-change="bd-select-toggle"></td>
     <td>${b.category ? '<span class="badge badge-category">' + esc(b.category) + '</span>' : '-'}</td>
     <td>${esc((b.raw_text || '').substring(0, 120))}${(b.raw_text || '').length > 120 ? '...' : ''}</td>
     <td>${b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
-    <td onclick="event.stopPropagation()"><button class="btn btn-sm btn-danger" onclick="deleteBraindump('${esc(b.id)}')">Löschen</button></td>
+    <td><button class="btn btn-sm btn-danger" data-action="bd-delete" data-bd-id="${esc(b.id)}">Löschen</button></td>
   </tr>`).join('');
   document.getElementById('bdTable').innerHTML = `<table>
-    <thead><tr><th style="width:40px;"></th><th>Kategorie</th><th>Inhalt</th><th>Datum</th><th style="width:90px;">Aktionen</th></tr></thead>
+    <thead><tr><th class="col-w-40"></th><th>Kategorie</th><th>Inhalt</th><th>Datum</th><th class="col-w-90">Aktionen</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
   updateBulkButtonState();
 }
@@ -814,14 +856,15 @@ async function renderProjects() {
       pct = prog.progress_percent || prog.percent || prog.progress || 0;
     } catch {}
     return `<div class="card">
-      <button class="btn btn-sm btn-danger card-delete" onclick="deleteProject('${esc(p.id)}')" title="Projekt löschen">×</button>
+      <button class="btn btn-sm btn-danger card-delete" data-action="proj-delete" data-proj-id="${esc(p.id)}" title="Projekt löschen">×</button>
       <h3>${esc(p.name || p.title || 'Untitled')}</h3>
       <p>${esc(p.description || '')}</p>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <span style="font-size:12px;color:var(--text-dim);margin-top:4px;display:block">${Math.round(pct)}% complete</span>
+      <div class="progress-bar"><div class="progress-fill" data-pct="${pct}"></div></div>
+      <span class="proj-pct-text">${Math.round(pct)}% complete</span>
     </div>`;
   }));
   document.getElementById('projectCards').innerHTML = cards.join('');
+  applyProgressWidths(document.getElementById('projectCards'));
 }
 
 async function deleteProject(id) {
@@ -905,7 +948,7 @@ function renderTasks() {
 
     const openHtml = open.length
       ? `<div class="task-subgroup">
-          <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Offen (${open.length})</div>
+          <div class="task-subheader">Offen (${open.length})</div>
           ${open.map(renderTaskItem).join('')}
         </div>`
       : '';
@@ -931,10 +974,10 @@ function renderTaskItem(t) {
   const prio = t.priority || 'medium';
   const prioClass = `badge-priority-${prio}`;
   return `<div class="task-item">
-    <div class="checkbox ${done ? 'done' : ''}" onclick="toggleTask('${esc(t.id)}', ${done})"></div>
+    <div class="checkbox ${done ? 'done' : ''}" data-action="task-toggle" data-task-id="${esc(t.id)}" data-task-done="${done}"></div>
     <span class="task-title ${done ? 'done' : ''}">${esc(t.title || t.name || '')}</span>
     <span class="badge ${prioClass}">${esc(prio)}</span>
-    <button class="btn btn-sm btn-danger" onclick="deleteTask('${esc(t.id)}')">Delete</button>
+    <button class="btn btn-sm btn-danger" data-action="task-delete" data-task-id="${esc(t.id)}">Delete</button>
   </div>`;
 }
 
@@ -995,7 +1038,7 @@ function renderAchievements() {
   }
   const cards = achievements.map(a => {
     const unlocked = !!a.unlocked_at;
-    return `<div class="achievement-card ${unlocked ? 'unlocked' : 'locked'}" onclick="openAchievement('${esc(a.id)}')">
+    return `<div class="achievement-card ${unlocked ? 'unlocked' : 'locked'}" data-action="ach-open" data-ach-id="${esc(a.id)}">
       <div class="ach-icon">${unlocked ? esc(a.icon || '★') : '?'}</div>
       <div>
         <div class="ach-name">${esc(a.name || '')}</div>
@@ -1257,7 +1300,7 @@ async function renderPairQr() {
   currentPairUri = '';
   if (fallback) fallback.classList.add('hidden');
   if (!onboardCoreToken) {
-    container.innerHTML = '<p class="subtle" style="color:#666;padding:1rem;">Kein Core-Token verfügbar. Starte NEXUS im Tauri-App-Kontext.</p>';
+    container.innerHTML = '<p class="subtle qr-msg">Kein Core-Token verfügbar. Starte NEXUS im Tauri-App-Kontext.</p>';
     if (status) status.textContent = 'Token fehlt.';
     return;
   }
@@ -1271,7 +1314,7 @@ async function renderPairQr() {
     if (fallbackText) fallbackText.textContent = uri;
     if (fallback) fallback.classList.remove('hidden');
     if (typeof QRCode === 'undefined') {
-      container.innerHTML = '<p style="color:#666;padding:1rem;">QR-Code-Lib nicht geladen — nutze die URI unten.</p>';
+      container.innerHTML = '<p class="qr-msg">QR-Code-Lib nicht geladen — nutze die URI unten.</p>';
       if (status) status.textContent = 'QR-Lib fehlt — URI manuell auf dem Handy einlesen.';
       return;
     }
@@ -1284,7 +1327,7 @@ async function renderPairQr() {
     });
     if (status) status.textContent = 'Warte auf Pairing … (Scan den Code mit der NEXUS-App)';
   } catch (e) {
-    container.innerHTML = `<p style="color:#666;padding:1rem;">QR konnte nicht geladen werden: ${esc(e.message)}</p>`;
+    container.innerHTML = `<p class="qr-msg">QR konnte nicht geladen werden: ${esc(e.message)}</p>`;
     if (status) status.textContent = 'Fehler beim Laden — Erneut prüfen.';
   }
 }
@@ -1492,13 +1535,13 @@ async function openBraindumpDetail(id, evt) {
   document.getElementById('bdDetailText').textContent = bd.raw_text || '';
   const summaryEl = document.getElementById('bdDetailSummary');
   summaryEl.innerHTML = bd.summary
-    ? '<strong style="font-size: 12px; color: var(--text-dim);">Zusammenfassung:</strong> ' + esc(bd.summary)
+    ? '<strong class="bd-detail-strong">Zusammenfassung:</strong> ' + esc(bd.summary)
     : '';
   const tagsEl = document.getElementById('bdDetailTags');
   let tags = [];
   try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
   tagsEl.innerHTML = tags.length
-    ? tags.map(t => '<span class="badge badge-category" style="margin-right: 4px;">' + esc(t) + '</span>').join('')
+    ? tags.map(t => '<span class="badge badge-category mr-4">' + esc(t) + '</span>').join('')
     : '';
   const linksEl = document.getElementById('bdDetailLinks');
   linksEl.innerHTML = '<span class="empty">Lade…</span>';
@@ -1532,11 +1575,11 @@ function renderLinks(container, data) {
     const label = wikiLabelFor(targetType, targetId);
     const conf = link.confidence != null ? Math.round(link.confidence * 100) + '%' : '';
     const reason = link.reason ? ' title="' + esc(link.reason) + '"' : '';
-    return `<span class="wiki-link" onclick="openLinkTarget('${esc(targetType)}', '${esc(targetId)}')"${reason}>${esc(label)}${conf ? ' · ' + conf : ''}</span>`;
+    return `<span class="wiki-link" data-action="link-open" data-link-type="${esc(targetType)}" data-link-id="${esc(targetId)}"${reason}>${esc(label)}${conf ? ' · ' + conf : ''}</span>`;
   };
   let html = '';
-  if (out.length) html += '<div style="margin-bottom: 6px;">' + out.map(l => renderTarget(l, 'out')).join('') + '</div>';
-  if (inc.length) html += '<div><strong style="font-size: 11px; color: var(--text-dim);">Rückverweise:</strong><br>' + inc.map(l => renderTarget(l, 'in')).join('') + '</div>';
+  if (out.length) html += '<div class="mb-6">' + out.map(l => renderTarget(l, 'out')).join('') + '</div>';
+  if (inc.length) html += '<div><strong class="bd-detail-rueck-strong">Rückverweise:</strong><br>' + inc.map(l => renderTarget(l, 'in')).join('') + '</div>';
   container.innerHTML = html;
 }
 
@@ -1602,12 +1645,12 @@ async function refreshSuggestionsBanner() {
         ${reason}
         <div>
           <span class="confidence-badge">Konfidenz ${conf}</span>
-          <span style="font-size: 12px; color: var(--text-dim);">${memberCount} Notizen</span>
+          <span class="sugg-member-count">${memberCount} Notizen</span>
         </div>
       </div>
       <div class="actions">
-        <button class="btn btn-sm btn-primary" onclick="acceptSuggestion('${esc(s.id)}')">Übernehmen</button>
-        <button class="btn btn-sm btn-ghost" onclick="dismissSuggestion('${esc(s.id)}')">Verwerfen</button>
+        <button class="btn btn-sm btn-primary" data-action="sugg-accept" data-sugg-id="${esc(s.id)}">Übernehmen</button>
+        <button class="btn btn-sm btn-ghost" data-action="sugg-dismiss" data-sugg-id="${esc(s.id)}">Verwerfen</button>
       </div>
     </div>`;
   }).join('');
@@ -1635,6 +1678,76 @@ async function dismissSuggestion(id) {
   } catch (e) {
     showBanner('Fehler beim Verwerfen: ' + e.message, 'error', 8000);
   }
+}
+
+// ============================================================
+// Phase C — CSP-Compliant Event Delegation (Crystalline Crab)
+// ============================================================
+// Tauri injects CSP hashes that nullify 'unsafe-inline'. All event handlers
+// must be programmatic. data-action / data-change / data-input attributes
+// drive a single delegated dispatcher per event type.
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.dataset.action;
+  if (action === 'bd-row-open') {
+    if (e.target.closest('button, input, [data-action]:not(.bd-row-clickable)')) return;
+    openBraindumpDetail(el.dataset.bdId, e);
+    return;
+  }
+  switch (action) {
+    case 'theme-cycle': cycleTheme(); break;
+    case 'settings-open': openSettings(); break;
+    case 'settings-close': closeSettings(); break;
+    case 'settings-save': saveSettings(); break;
+    case 'llm-save': saveLlmConfig(); break;
+    case 'bd-refresh': refreshBraindumps(); break;
+    case 'bd-filter-unsorted': filterUnsorted(); break;
+    case 'bd-bulk-delete': deleteSelectedBraindumps(); break;
+    case 'bd-delete': e.stopPropagation(); deleteBraindump(el.dataset.bdId); break;
+    case 'bd-detail-delete': deleteBraindumpFromDetail(); break;
+    case 'bd-detail-close': closeBraindumpDetail(); break;
+    case 'proj-refresh': refreshProjects(); break;
+    case 'proj-delete': deleteProject(el.dataset.projId); break;
+    case 'task-new': openNewTask(); break;
+    case 'task-refresh': refreshTasks(); break;
+    case 'task-cancel': closeNewTask(); break;
+    case 'task-create': createTask(); break;
+    case 'task-toggle': toggleTask(el.dataset.taskId, el.dataset.taskDone === 'true'); break;
+    case 'task-delete': deleteTask(el.dataset.taskId); break;
+    case 'ach-refresh': refreshAchievements(); break;
+    case 'ach-open': openAchievement(el.dataset.achId); break;
+    case 'ach-close': closeAchievement(); break;
+    case 'link-open': openLinkTarget(el.dataset.linkType, el.dataset.linkId); break;
+    case 'sugg-accept': acceptSuggestion(el.dataset.suggId); break;
+    case 'sugg-dismiss': dismissSuggestion(el.dataset.suggId); break;
+  }
+});
+
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-change]');
+  if (!el) return;
+  switch (el.dataset.change) {
+    case 'bd-filter': filterBraindumps(); break;
+    case 'bd-select-toggle': updateBulkButtonState(); break;
+    case 'task-render': renderTasks(); break;
+  }
+});
+
+document.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-input]');
+  if (!el) return;
+  switch (el.dataset.input) {
+    case 'bd-search': filterBraindumps(); break;
+  }
+});
+
+// Dynamic widths set programmatically (CSP blocks inline style attrs).
+function applyProgressWidths(root) {
+  (root || document).querySelectorAll('.progress-fill[data-pct]').forEach(el => {
+    el.style.width = el.dataset.pct + '%';
+  });
 }
 </script>
 

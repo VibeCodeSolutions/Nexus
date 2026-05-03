@@ -2437,3 +2437,100 @@ Prüfung durchgeführt von: QS — VibeCoding
 **Empfehlung an Abteilungsleitung — VibeCoding:** Workflow-Dispatch-Pfad (b) für die heutige Test-MSI-Erzeugung. Minors als Backlog für Crystalline-Crab-Phase-X (Doku-Sync) oder Folge-Sprint.
 
 **WORKLOG-Ref:** AUFTRAG #18 (Phase-A-Pre-Commit-Gate)
+
+---
+
+## Sprint Crystalline Crab — Phase C — Pre-Commit Diff-Review — 2026-05-03
+
+**Geprüft:** Phase-C-CSP-Fix-Pakete (3 Files, +175/-63 LoC).
+- `desktop/src-tauri/tauri.conf.json` — CSP-String erweitert (img-src 'self' data:, connect-src um http://ipc.localhost https://ipc.localhost)
+- `desktop/src-tauri/Cargo.lock` — Auto-Update Version 0.1.0 → 0.1.2 (kein Code)
+- `desktop/src/index.html` — 27 inline-onclick + 6 onchange/oninput + 29 inline-style="..." → data-action/data-change/data-input + CSS-Utility-Klassen + globaler Action-Dispatcher
+
+**Bezugspunkt:** AUFTRAG #19 vc.md (Implementer: Hauptsession-CLI). Phase-B-Diagnose-Hypothese: Tauri injiziert CSP-Hashes/Nonces für eigene Inline-Scripts → laut CSP-Spec wird `'unsafe-inline'` IGNORIERT wenn Hash/Nonce daneben steht → eigene inline-Handler/-Styles werden geblockt.
+
+### CC-C-005-VOL
+- **Schweregrad:** 🟡 Major (Pflicht-Mitfix)
+- **Kategorie:** Vollständigkeit
+- **Prüfgegenstand:** CSS-Klassen-Coverage neuer data-class-Referenzen
+- **Erstellt von:** Hauptsession-CLI — VibeCoding
+- **Befund:** `<div id="bdDetailTags" class="mt-8">` (BD-Detail-Modal, Zeile 601) referenziert eine CSS-Klasse `.mt-8`, die im neuen Utility-Block NICHT definiert ist. Definiert sind: `.mt-4`, `.mt-6`, `.mt-12`, `.mt-16`, `.mt-20` und `.mb-8`. Pre-Refactor-Wert war `style="margin-top: 8px;"`. Effekt: bdDetailTags-Block hat nach dem Refactor keinen Top-Margin mehr → Layout-Regression: Tags kleben am bdDetailSummary-Block.
+- **Korrekturvorschlag:** Im CSS-Utility-Block die Definition `.mt-8 { margin-top: 8px; }` einfügen (zwischen `.mt-6` und `.mt-12`).
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### CC-C-006-SIC
+- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Kategorie:** Sicherheit
+- **Prüfgegenstand:** CSP-Hardening nach Refactor
+- **Erstellt von:** Hauptsession-CLI — VibeCoding
+- **Befund:** `'unsafe-inline'` ist nach dem Refactor in `script-src` und `style-src` redundant — Tauri injiziert Hashes/Nonces, die `'unsafe-inline'` laut CSP-Spec ignorieren. Die Direktive ist also wirkungslos in Production-Builds. Defensives Drinlassen schadet nicht funktional, aber strengere CSP wäre besser.
+- **Korrekturvorschlag:** In Folge-Sprint nach Verifikation des Tauri-Hash-Injection-Verhaltens (DEV vs. RELEASE) entfernen. Vorher Tauri-Doku/Issue-Tracker konsultieren ob DEV-Mode auch Hashes injiziert.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### CC-C-007-COD
+- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Kategorie:** Code-Qualität
+- **Prüfgegenstand:** Konsistenz der Event-Handler-Strategie
+- **Erstellt von:** Hauptsession-CLI — VibeCoding
+- **Befund:** Programmatische `el.onclick = ...` Property-Assignments verbleiben in `loadLlmProviders` (Z. ~1056), `renderProviderGrid` (Z. ~1357), `renderProviderDetail` (Z. ~1381, 1391, 1407, 1424). Diese sind CSP-konform (nicht Inline-HTML-Attr), aber stilinkonsistent zum neuen data-action-Dispatcher und überschreiben evtl. existierende Handler.
+- **Korrekturvorschlag:** In Folge-Sprint zu `addEventListener` migrieren oder via dynamischen `data-action`-Werten in den Dispatcher integrieren.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### CC-C-008-VOL
+- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Kategorie:** Vollständigkeit (UX-Regression-Risiko)
+- **Prüfgegenstand:** Klick-Verhalten BD-Tabelle nach Refactor
+- **Erstellt von:** Hauptsession-CLI — VibeCoding
+- **Befund:** Pre-Refactor hatten Sub-TDs der `bd-row-clickable`-Zeile `onclick="event.stopPropagation()"` um zu verhindern, dass Klicks auf TD-Rand (5-10px um die Checkbox/Buttons) das Detail-Modal öffnen. Nach Refactor fängt der Action-Dispatcher via `e.target.closest('button, input, [data-action]:not(.bd-row-clickable)')` Inner-Element-Klicks korrekt ab — aber NICHT, wenn der Klick direkt auf den TD-Rand fällt (kein interaktives Inner-Element getroffen). Folge: Detail-Modal öffnet bei TD-Rand-Klick. UX-Regression-Risiko niedrig (kleine Klickfläche), Hauptfunktionen unberührt.
+- **Korrekturvorschlag:** In Folge-Sprint dedicated `.bd-row-skip` Marker-Klasse auf Sub-TDs setzen + closest-Check erweitern. Alternativ: TD-Padding minimieren bzw. Buttons full-cell-stretch.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### CC-C-009-PER
+- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Kategorie:** Performance / Konfiguration
+- **Prüfgegenstand:** CSP connect-src Coverage-Breite
+- **Erstellt von:** Hauptsession-CLI — VibeCoding
+- **Befund:** `https://ipc.localhost` wurde zusätzlich zur in der Console-Error-Meldung beobachteten `http://ipc.localhost` aufgenommen — defensiv, möglicherweise unnötig. Tauri 2.10.x verwendet auf Windows-WebView2 das HTTP-Schema. Bei macOS/Linux Verifikation noch offen.
+- **Korrekturvorschlag:** Beobachten in Cross-Plattform-Smoke-Tests. Falls überall HTTP genügt, `https://ipc.localhost` aus connect-src entfernen für minimale CSP.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### CC-C-010-PER
+- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Kategorie:** Performance / Drittlib
+- **Prüfgegenstand:** qrcode.min.js Table-Fallback-Pfad
+- **Erstellt von:** Externe Library
+- **Befund:** Bei der Diff-Verifikation aufgefallen: `desktop/src/qrcode.min.js` enthält in seinem Table-Fallback-Renderpfad inline-`<table style="border:0;...">`-HTML, das via innerHTML eingefügt wird. Bei aktivierter strenger CSP würde dieser Pfad geblockt werden. Aktuell unkritisch — Tauri-WebView2 hat garantierten SVG-Support, der primäre Renderpfad nutzt programmatische SVG-Elemente. Aber: Bei künftigem Lib-Replacement oder ungewöhnlichen Browser-Umgebungen prüfen.
+- **Korrekturvorschlag:** In Folge-Sprint Library auswechseln (z.B. `qrcode-svg` reine SVG-Variante) oder eigene Mini-QR-Render-Funktion. Bookmark, kein Pflicht-Mitfix.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### Zusammenfassung Phase C
+
+| Schweregrad | Anzahl | IDs |
+|---|---|---|
+| 🔴 Blocker | 0 | — |
+| 🟡 Major | 1 | CC-C-005-VOL |
+| 🟢 Minor | 5 | CC-C-006-SIC, CC-C-007-COD, CC-C-008-VOL, CC-C-009-PER, CC-C-010-PER |
+
+**Geprüfte Sub-Aspekte (positive Befunde):**
+- ✅ Vollständigkeit Inline-Handler-Entfernung: 0 inline-onclick / onchange / oninput / style="..." verbleibt (grep-Audit + erweitertes regex-Audit clean)
+- ✅ Action-Dispatcher Switch-Case: alle 26 data-action-Werte + 3 data-change + 1 data-input gemappt, kein toter Switch-Branch, kein fehlender Branch
+- ✅ data-attr ↔ dataset.camelCase Konsistenz: alle 8 Identifier (bd-id/proj-id/task-id/task-done/ach-id/link-type/link-id/sugg-id) korrekt
+- ✅ CSS-Klassen-Coverage außer mt-8: 23/24 neue Utility-Klassen referenziert + definiert
+- ✅ CSP-Patch-Korrektheit: img-src deckt data:-URI Spinner aus qrcode.min.js, connect-src deckt http://ipc.localhost (HTTPS-Variante als defensive Bonus)
+- ✅ Programmatische `el.onclick = ...` Setzungen sind Property-Assignments (CSP-OK)
+- ✅ progress-fill dynamische Width via data-pct + applyProgressWidths-Helper sauber implementiert
+- ✅ bd-row-clickable closest-Check verhindert Detail-Open bei Inner-Button/Input-Klick (mit dokumentiertem Edge-Case CC-C-008-VOL)
+- ✅ Versions-Konsistenz: Cargo.lock-Auto-Update auf 0.1.2 entspricht Cargo.toml und tauri.conf.json
+- ✅ cargo check grün (5.16s), tauri.conf.json valid JSON
+
+**Verdikt:** ⚠️ Freigabe mit Auflage. Inhaltlich sauberer Refactor — Pflicht-Mitfix CC-C-005-VOL (1 CSS-Zeile) + 5 Folge-Sprint-Minor. Nach Mitfix kann commit+push erfolgen.
+
+**Empfehlung an Abteilungsleitung — VibeCoding:** `.mt-8 { margin-top: 8px; }` einfügen (kleiner Edit), kein Re-Review nötig (single-line CSS-Add ist trivial). Anschließend commit + push + workflow_dispatch.
+
+**WORKLOG-Ref:** AUFTRAG #19 (Phase-C-Pre-Commit-Gate)

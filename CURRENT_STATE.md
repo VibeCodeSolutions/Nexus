@@ -1,14 +1,43 @@
 # NEXUS — Current State
 
 **Stand:** 2026-05-04
-**Aktuelle Phase:** Sprint "Crystalline Crab" Phase C abgeschlossen — CSP-Compliance-Refactor + tote Toolbar-Buttons live wieder funktionsfähig in Win11-VM verifiziert. Sprint-Closure ohne Tag (Folge-Sprint-Bookmarks für Polish + LLM-Sort + Android-Findings + native E2E).
-**Phase-Status:** v0.1.0 GA-fähig, v0.1.1 PC implizit überholt, v0.1.2 Synaptic Mosaic released, **v0.1.3 Crystalline Crab Phase C closed** (Patch-Bump nach Polish-Sprint-Closure).
+**Aktuelle Phase:** Sprint "Happy Thompson" — Code-Phasen A/B/C/D abgeschlossen, wartet auf Admin-VM-Smoke-Test abends. Bei grün → `v0.1.3`-Tag.
+**Phase-Status:** v0.1.0 GA-fähig, v0.1.1 PC implizit überholt, v0.1.2 Synaptic Mosaic released, v0.1.3 Crystalline Crab Phase C closed, **v0.1.3-Kandidat Happy Thompson code-fertig (Tag wartet auf Live-Gate).**
+
+---
+
+## Sprint "Happy Thompson" (2026-05-04, code-fertig — wartet auf Admin-Smoke)
+
+Auslöser: Polish-Restbestände aus Crystalline Crab (#5 LLM-Sort, #6 Android-Footer-Spacing, #8 Footer-Version, #10 LLM-Skip im Onboarding, #11 Pairing-NAT) plus Provider-Coverage-Lücke `extract_links` (Nutzer von 7/9 LLM-Providern bekamen null Auto-Wikilinks, weil Trait-Default `Ok(Vec::new())` zurückgab). Zusammen als `v0.1.3`-Bündel.
+
+**Constraint:** Admin den ganzen Tag unterwegs → Auto-Pilot ohne Zwischen-Tests, einziger End-Test ist Admin-VM-Smoke abends nach `docs/SMOKE_HAPPY_THOMPSON.md`-Checkliste.
+
+**Cross-CLI-Aussetzung:** Memory `feedback_workflow_split.md` schreibt Android-Edits via AS-CLI vor. Da Admin abwesend ist und AS-CLI nicht starten kann, übernimmt diese CLI ausnahmsweise Android-Phase C (1 Padding-Wert + 1 String). WORKLOG-dokumentiert in `vc.md` AUFTRAG #20.
+
+**Phasen:**
+- ✅ **Phase A — Backend** (`6c137cb`): #5 LLM-Sort (`settings_models` deterministisch), #10 NoOp-Provider-Pfad (`create_provider`/`setup_status`/`onboard_set_provider`/`SetProviderRequest.api_key #[serde(default)]`), #11 `NEXUS_PAIR_HOST`-Env-Var-Override in `auth.rs`, Provider-Coverage `extract_links` für `openai_compatible` (deckt openai/mistral/groq/deepseek/openrouter), `gemini`, `zai` — alle nach Claude-Pattern mit `EXTRACT_LINKS_PROMPT` + JSON-Trim-Robustheit. cargo check + 28 Tests grün. Tuvok ✅ Pre-Commit-Diff-Review (0 Blocker / 0 Major / 3 Folge-Sprint-Minor: SH-A4 api_key-Validierung explizit, SH-A8 Z.ai system+user-Format, SH-A9 Mock-Tests).
+- ✅ **Phase B — Desktop** (`4e08a1d`): #8 Footer `index.html:1755` v0.1.0 → v0.1.2, #10 Skip-Button im Provider-Wizard mit `data-action="onboard-skip"` + `skipOnboardingProvider()`-Helper (ruft `saveProvider('noop', '')` → `screenDone`). Tauri cargo check grün. Mini-Self-Review.
+- ✅ **Phase C — Android** (`c844bd7`): #6 NexusFooter `navigationBarsPadding()` raus (Doppel-Inset mit NavigationBar im Scaffold-bottomBar) + vertical 6.dp → 2.dp; #8 strings.xml `app_footer` v0.1.0 → v0.1.2. `./gradlew assembleDebug` grün. Mini-Self-Review.
+- ⏳ **Phase D — Doku** (in Arbeit): `docs/SMOKE_HAPPY_THOMPSON.md` (NEU, 8 Test-Sektionen + CC-C-011-Coverage geschlossen + Provider-Coverage-Live-Test) + dieser CURRENT_STATE-Block + WORKLOG-Update.
+- ⏳ **Phase E — Build + Push + CI**: Push, `gh workflow run release.yml`, MSI + APK-Drop nach `/tmp/`, HTTP-Server für VM bereit.
+- ⏳ **Phase F — Admin-VM-Smoke abends**: Smoke-Checkliste durchklicken; bei grün → `bump-version.sh 0.1.3` → Tag-Push → Release.
+
+**Out of Scope (eigene Sprints):**
+- Finding #7 Dashboard-Trockenheit → eigener Design-Sprint mit Mockup-Diskussion
+- CC-C-010 qrcode-Library-Replacement → eigener Sprint mit Lib-Auswahl
+- Native Win11-Partition-E2E → manuelle Admin-Aktion nach `v0.1.3`-Tag
+
+---
+
+## Sprint "Crystalline Crab" (2026-05-03 → 2026-05-04, Phase C closed)
 
 ---
 
 ## Sprint "Crystalline Crab" (2026-05-03 → 2026-05-04, Phase C closed)
 
 Auslöser: Erster nativer Win11-Smoke-Test auf Dualboot-Partition deckte 8 Findings auf (5 Funktionsbugs, 3 Polish/UX). Reboot-pro-Test-Loop blockierte Diagnose → Strategie-Umstellung auf Microsoft-Win11-Dev-VM für Debug-Iteration, native Partition für finale E2E-Verifikation.
+
+**Folge-Sprint Happy Thompson (2026-05-04):** Bookmarks #5/#6/#8/#10/#11 + CC-C-011 in einem Auto-Pilot-Tagessprint adressiert (siehe Sprint-Block oben).
 
 **Phase-C-Befund:** Tote Toolbar-Buttons waren ein **CSP-Compliance-Bug** — Tauri injiziert beim Bundle-Build automatisch CSP-Hashes (`'sha256-...'`) für eigene Inline-Scripts. Laut CSP-Spec wird `'unsafe-inline'` ignoriert, sobald Hash/Nonce daneben steht → unsere 27 inline-`onclick` und 29 inline-`style` Attribute wurden vom WebView2 systemisch geblockt. Refactor zu globalem Action-Dispatcher (data-action / data-change / data-input) + CSS-Utility-Klassen + applyProgressWidths-Helper. CSP zusätzlich gehärtet (img-src 'self' data: für Spinner, connect-src für ipc.localhost, `'unsafe-inline'` rausgenommen für minimale CSP).
 

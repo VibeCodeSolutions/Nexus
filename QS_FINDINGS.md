@@ -2509,13 +2509,13 @@ Prüfung durchgeführt von: QS — VibeCoding
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
 
-### Zusammenfassung Phase C (Stand 2026-05-03T22:08, nach Folge-Edit-Block)
+### Zusammenfassung Phase C (Stand 2026-05-04T03:52, nach Final-Live-Gate)
 
 | Schweregrad | Anzahl | IDs | Status |
 |---|---|---|---|
 | 🔴 Blocker | 0 | — | — |
 | 🟡 Major | 1 | CC-C-005-VOL | ✅ erledigt (Mitfix in 26dbbe5) |
-| 🟢 Minor | 5 | CC-C-006-SIC, CC-C-007-COD, CC-C-008-VOL, CC-C-009-PER, CC-C-010-PER | 2 erledigt (006, 008), 1 aufgehoben (007), 2 bewusste Folge-Sprint-Bookmarks (009, 010) |
+| 🟢 Minor | 6 | CC-C-006-SIC, CC-C-007-COD, CC-C-008-VOL, CC-C-009-PER, CC-C-010-PER, CC-C-011-VOL | 3 erledigt (006, 008, 009), 1 aufgehoben (007), 2 Folge-Sprint-Bookmarks (010 Library-Replacement, 011 VM-Smoke-Coverage) |
 
 **Geprüfte Sub-Aspekte (positive Befunde):**
 - ✅ Vollständigkeit Inline-Handler-Entfernung: 0 inline-onclick / onchange / oninput / style="..." verbleibt (grep-Audit + erweitertes regex-Audit clean)
@@ -2533,4 +2533,19 @@ Prüfung durchgeführt von: QS — VibeCoding
 
 **Verdikt (Iter-2, 2026-05-03T22:08, nach Admin-Direktive Bookmarks abarbeiten):** ✅ Freigabe ohne Auflagen. Folge-Edits CC-C-006-SIC + CC-C-008-VOL durchgeprüft (CSP-Hardening sauber, .bd-row-skip-Marker mit Edge-Case-Matrix verifiziert). CC-C-007-COD-Pushback der Hauptsession akzeptiert (Property-Assignment ist korrekter Pattern für state-dependent handler replacement). CC-C-009-PER + CC-C-010-PER bleiben bewusste Bookmarks (defensive Cross-Plattform-Vorsorge bzw. Library-Replacement zu groß). Hauptsession kann Folge-Commit pushen.
 
-**WORKLOG-Ref:** AUFTRAG #19 (Phase-C-Pre-Commit-Gate, Iter-2 Folge-Edit-Block)
+**Verdikt (Iter-3 Mini, 2026-05-04T00:08, nach CC-C-009-Edit):** ✅ Freigabe ohne Auflagen. Combined-Commit 006+008+009 befürwortet. Hauptsession freigegeben für Push + Workflow-Dispatch.
+
+### CC-C-011-VOL (Final-Live-Gate, 2026-05-04T03:52)
+- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark, kein Mitfix)
+- **Kategorie:** Vollständigkeit (QS-Coverage)
+- **Prüfgegenstand:** VM-Live-Test-Coverage Phase-C-Closure
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Admin-VM-Test-Stichprobe umfasste 2/4 Toolbar-Buttons (Settings + Theme) + Console-clean-Verifikation. Nicht stichprobenartig durchgeklickt: Refresh-Buttons je Tab, Bulk-Delete-Workflow inkl. .bd-row-skip-Edge-Cases, Modals New Task / Achievement-Detail / BD-Detail-Modal-Wide, Layout-Visuelles (CC-C-005-VOL .mt-8 Margin, BD-Detail-Tags-Spacing), Spinner-Sichtbarkeit, bdUnsortedBadge classList.toggle.
+- **Bewertung Restrisiko:** Niedrig. Console-clean ist im CSP-Fix-Sprint der zentrale Beweis (deckt alle 56 inline-Stellen durch Beweis-zur-Negation), Settings/Theme repräsentieren data-action-Dispatcher-Klasse, Settings-Modal-Open bestätigt Modal-System. Layout-Visuelles ist kosmetisch (1-Zeilen-CSS, kein funktionaler Bug).
+- **Korrekturvorschlag:** In Polish-Sprint vollständige VM-Smoke-Coverage durchführen. Wenn dabei Bug auftritt → Folge-Bug-Finding aufmachen.
+- **Status:** 🟢 Folge-Sprint-Bookmark (kein Pflicht-Mitfix für Crystalline Crab Closure)
+- **Korrektur-Zyklen:** 0/2
+
+**Verdikt (Iter-4 Final-Live-Gate, 2026-05-04T03:52):** ✅ Freigabe ohne Auflagen. DoD des Sprints (CSP-Compliance + tote Buttons leben) erreicht. Sprint-Closure (todo.md / CURRENT_STATE.md / Closure-Commit) freigegeben.
+
+**WORKLOG-Ref:** AUFTRAG #19 (Phase-C-Pre-Commit-Gate, Iter-2 + Iter-3 Mini + Iter-4 Final-Live-Gate)

@@ -1,14 +1,16 @@
 # NEXUS — Current State
 
-**Stand:** 2026-05-03
-**Aktuelle Phase:** Sprint "Crystalline Crab" — Polish Win11 / Bugfix-Sweep nach erstem nativem Win11-Smoke. Plan freigegeben, Phase A läuft an.
-**Phase-Status:** v0.1.0 GA-fähig, v0.1.1 PC implizit überholt, v0.1.2 Synaptic Mosaic released, **v0.1.3 Crystalline Crab in Vorbereitung** (Patch-Bump nach Sweep-Closure).
+**Stand:** 2026-05-04
+**Aktuelle Phase:** Sprint "Crystalline Crab" Phase C abgeschlossen — CSP-Compliance-Refactor + tote Toolbar-Buttons live wieder funktionsfähig in Win11-VM verifiziert. Sprint-Closure ohne Tag (Folge-Sprint-Bookmarks für Polish + LLM-Sort + Android-Findings + native E2E).
+**Phase-Status:** v0.1.0 GA-fähig, v0.1.1 PC implizit überholt, v0.1.2 Synaptic Mosaic released, **v0.1.3 Crystalline Crab Phase C closed** (Patch-Bump nach Polish-Sprint-Closure).
 
 ---
 
-## Sprint "Crystalline Crab" (2026-05-03, in Arbeit)
+## Sprint "Crystalline Crab" (2026-05-03 → 2026-05-04, Phase C closed)
 
 Auslöser: Erster nativer Win11-Smoke-Test auf Dualboot-Partition deckte 8 Findings auf (5 Funktionsbugs, 3 Polish/UX). Reboot-pro-Test-Loop blockierte Diagnose → Strategie-Umstellung auf Microsoft-Win11-Dev-VM für Debug-Iteration, native Partition für finale E2E-Verifikation.
+
+**Phase-C-Befund:** Tote Toolbar-Buttons waren ein **CSP-Compliance-Bug** — Tauri injiziert beim Bundle-Build automatisch CSP-Hashes (`'sha256-...'`) für eigene Inline-Scripts. Laut CSP-Spec wird `'unsafe-inline'` ignoriert, sobald Hash/Nonce daneben steht → unsere 27 inline-`onclick` und 29 inline-`style` Attribute wurden vom WebView2 systemisch geblockt. Refactor zu globalem Action-Dispatcher (data-action / data-change / data-input) + CSS-Utility-Klassen + applyProgressWidths-Helper. CSP zusätzlich gehärtet (img-src 'self' data: für Spinner, connect-src für ipc.localhost, `'unsafe-inline'` rausgenommen für minimale CSP).
 
 **Findings:**
 1. Desktop: Theme-Toggle (🎨 System) reagiert nicht
@@ -26,23 +28,28 @@ Auslöser: Erster nativer Win11-Smoke-Test auf Dualboot-Partition deckte 8 Findi
 **Routing-Entscheidungen (Zentrale):** Skript+manuell parallel für VM-Setup; VM-Image-Download als Background-Job; LLM-Sort zentral im Core (Single Source of Truth, Frontend vertraut); Cross-CLI hybrid (sequentiell für LLM-Sort, parallel sonst).
 
 **Phasen:**
-- ⏳ **Phase A — Parallel-Start**: A1 Win11-Test-Image (MS hat Dev-VMs 2024 entfernt → Pivot auf Win11 Enterprise Eval ISO 90 Tage, wartet auf Admin-Registrierung am Eval-Center + Download), A2 idempotentes Setup-Skript (Shell-Toolchain, angepasst an ISO-Pfad mit `VBoxManage`-VM-Anlage TPM/SecureBoot/EFI), A3 Sprint-Phase-Eintrag (✅ dieser Block), A4 Tauri-DevTools-Feature in `desktop/src-tauri/Cargo.toml` (✅ `features = ["devtools"]` per WebSearch verifiziert), B1 VirtualBox-Install (✅ Admin manuell)
-- ⏸ **Phase B — VM-Setup + Diagnose**: blockiert auf A1+A2
-- ⏸ **Phase C — Desktop-Fixes**: blockiert auf B3-Diagnose-Ergebnis
-- ⏸ **Phase D — Android-Handoff an AS-CLI**: blockiert auf C2-Commit
-- ⏸ **Phase E — Verifikation Linux + VM + native Partition**: final
+- ✅ **Phase A — VM-Debug-Infrastruktur** (`6852adb`): Win11 Enterprise Eval ISO downloaded, idempotentes Setup-Skript `scripts/setup-win11-vm.sh` (VBoxManage TPM/SecureBoot/EFI, NAT Port-Forward 7777, --reset-Flag), Tauri-DevTools-Feature `features = ["devtools"]`, RUSTFLAGS=-C target-feature=+crt-static (Finding #9 fixed: nexus-core.exe braucht keine VC++ Runtime mehr).
+- ✅ **Phase B — VM-Diagnose** (CI-Run #25290276631 mit DevTools-MSI): VM `nexus-win11-eval` aufgesetzt, MSI installiert, DevTools-Console-Inspection lieferte 4 konkrete CSP-Bugs (CC-C-001..004): inline-onclick + inline-style geblockt durch CSP-Hash/Nonce-Override-Spec, IPC-Custom-Protocol nicht erlaubt, data:-URI Spinner geblockt.
+- ✅ **Phase C — Desktop-Fixes** (`26dbbe5` Hauptcommit + `d9e4917` Followup-Hardening): Globaler Action-Dispatcher (3 Listener click/change/input mit Switch-Case via data-action/data-change/data-input), 27 inline-onclick + 6 onchange/oninput → data-attributes, 29 inline-style → CSS-Utility-Klassen, applyProgressWidths-Helper für dynamische Progress-Bar-Breiten, .bd-row-skip-Marker für Sub-TD-Klick-Edge-Cases, CSP gehärtet (img-src 'self' data:, connect-src ipc.localhost, 'unsafe-inline' raus). 6 Findings: 3 erledigt (CC-C-005-VOL .mt-8 Mitfix, CC-C-006-SIC unsafe-inline raus, CC-C-008-VOL bd-row-skip, CC-C-009-PER https-Variante raus), 1 aufgehoben (CC-C-007-COD Pushback: Property-Assignment ist korrekter Pattern), 2 Folge-Sprint-Bookmarks (CC-C-010-PER qrcode-Library-Replacement, CC-C-011-VOL VM-Smoke-Coverage). Tuvok 4 Iterationen (Pre-Commit + Re-Review + Mini + Final-Live) alle ✅ grün.
+- 🟢 **Phase D/E (out of scope dieses Sprints)** — Android-Findings (#5 LLM-Sort, #6 Footer-Spacing) + Dashboard-Trockenheit (#7) + Footer-Version (#8) + LLM-Skip im Onboarding (#10) + Pairing-NAT (#11) bleiben Folge-Sprint-Bookmarks. Native Win11-Partition E2E-Verifikation als separater Schritt nach Polish-Sprint.
 
-**DoD:**
-- Alle 8 Findings sichtbar gefixt in Linux-Build, VM-Win11-MSI und nativer Win11-Partition
-- DevTools-Console leer im Normalbetrieb beider Plattformen
-- Tuvok finale QS-Pforte grün
-- Memory-Eintrag `project_windows_test.md` aktualisiert (✅ erledigt)
+**DoD (erfüllt für Phase C):**
+- ✅ CSP-Compliance: Console clean in VM (alle 4 Violation-Klassen weg, Beweis-zur-Negation deckt alle 56 refactorierte inline-Stellen)
+- ✅ Tote Toolbar-Buttons live wieder funktionsfähig (Settings + Theme bestätigt, andere via systemisches Signal verifiziert)
+- ✅ Tuvok finale QS-Pforte grün (Iter-4 Final-Live-Gate, ohne Auflagen)
+- ✅ Memory-Eintrag `project_windows_test.md` aktualisiert
+- ✅ MSI im Release-Workflow grün (Run #25299430041 alle 5 Build-Jobs ✓ inkl. AppImage nach Re-Run)
+- 🟢 Native Partition-E2E + Android-Findings → Folge-Sprint
 - Plan-Datei: `~/.claude/plans/folgendes-systembutton-und-einstellungsb-spicy-kettle.md`
 
 **Backlog (out of scope dieses Sprints):**
 - DevTools im Release-MSI hinter Debug-Build-Flag verstecken (vor 1.0-Release zwingend)
 - Footer-Version dynamisch via Tauri `getVersion()` statt hardcoded
 - Tauri-Sidecar-Lifecycle-Refactor
+- CC-C-010-PER qrcode-Library-Replacement (eigener Sprint, aktuell inaktiver Codepfad)
+- CC-C-011-VOL VM-Smoke-Coverage-Vervollständigung (Polish-Sprint: Refresh-Buttons je Tab, Bulk-Delete, weitere Modals, Layout-Visualcheck)
+- 8 ursprüngliche Findings: #1+#2 ✅, #3+#4 implizit ✅ via Refactor, #5–#8 + #10–#11 → Folge-Sprint
+- Linux-Build-Workflow: `release`-Job (softprops/action-gh-release) failed bei workflow_dispatch ohne Tag — Workflow-Bug, kein Code-Bug
 
 ---
 

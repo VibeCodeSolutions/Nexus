@@ -446,6 +446,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <div id="providerDetail" class="hidden"></div>
     <div class="button-row">
       <button class="btn-secondary" data-prev="screenPair">Zurück</button>
+      <button class="btn-secondary" data-action="onboard-skip" title="KI-Provider später in den Einstellungen konfigurieren">Später konfigurieren</button>
       <button class="btn-primary" id="providerNext" disabled data-next="screenDone">Weiter</button>
     </div>
   </section>
@@ -1722,8 +1723,15 @@ document.addEventListener('click', (e) => {
     case 'link-open': openLinkTarget(el.dataset.linkType, el.dataset.linkId); break;
     case 'sugg-accept': acceptSuggestion(el.dataset.suggId); break;
     case 'sugg-dismiss': dismissSuggestion(el.dataset.suggId); break;
+    case 'onboard-skip': skipOnboardingProvider(); break;
   }
 });
+
+// Happy Thompson #10: Skip-Pfad — NoOpProvider als bewusster Default,
+// User kann Provider später via Settings konfigurieren.
+async function skipOnboardingProvider() {
+  if (await saveProvider('noop', '')) showScreen('screenDone');
+}
 
 document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-change]');
@@ -1752,7 +1760,7 @@ function applyProgressWidths(root) {
 </script>
 
 <footer class="app-footer">
-  Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.0
+  Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.2
 </footer>
 
 </div><!-- /.app-shell -->

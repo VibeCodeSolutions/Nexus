@@ -781,11 +781,11 @@ function renderBraindumps(items) {
     return;
   }
   const rows = items.map(b => `<tr class="bd-row-clickable" data-action="bd-row-open" data-bd-id="${esc(b.id)}">
-    <td><input type="checkbox" class="bd-select" data-id="${esc(b.id)}" data-change="bd-select-toggle"></td>
+    <td class="bd-row-skip"><input type="checkbox" class="bd-select" data-id="${esc(b.id)}" data-change="bd-select-toggle"></td>
     <td>${b.category ? '<span class="badge badge-category">' + esc(b.category) + '</span>' : '-'}</td>
     <td>${esc((b.raw_text || '').substring(0, 120))}${(b.raw_text || '').length > 120 ? '...' : ''}</td>
     <td>${b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
-    <td><button class="btn btn-sm btn-danger" data-action="bd-delete" data-bd-id="${esc(b.id)}">Löschen</button></td>
+    <td class="bd-row-skip"><button class="btn btn-sm btn-danger" data-action="bd-delete" data-bd-id="${esc(b.id)}">Löschen</button></td>
   </tr>`).join('');
   document.getElementById('bdTable').innerHTML = `<table>
     <thead><tr><th class="col-w-40"></th><th>Kategorie</th><th>Inhalt</th><th>Datum</th><th class="col-w-90">Aktionen</th></tr></thead>
@@ -1692,7 +1692,7 @@ document.addEventListener('click', (e) => {
   if (!el) return;
   const action = el.dataset.action;
   if (action === 'bd-row-open') {
-    if (e.target.closest('button, input, [data-action]:not(.bd-row-clickable)')) return;
+    if (e.target.closest('button, input, .bd-row-skip, [data-action]:not(.bd-row-clickable)')) return;
     openBraindumpDetail(el.dataset.bdId, e);
     return;
   }

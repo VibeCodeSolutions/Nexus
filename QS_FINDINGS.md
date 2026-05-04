@@ -2456,38 +2456,38 @@ Prüfung durchgeführt von: QS — VibeCoding
 - **Erstellt von:** Hauptsession-CLI — VibeCoding
 - **Befund:** `<div id="bdDetailTags" class="mt-8">` (BD-Detail-Modal, Zeile 601) referenziert eine CSS-Klasse `.mt-8`, die im neuen Utility-Block NICHT definiert ist. Definiert sind: `.mt-4`, `.mt-6`, `.mt-12`, `.mt-16`, `.mt-20` und `.mb-8`. Pre-Refactor-Wert war `style="margin-top: 8px;"`. Effekt: bdDetailTags-Block hat nach dem Refactor keinen Top-Margin mehr → Layout-Regression: Tags kleben am bdDetailSummary-Block.
 - **Korrekturvorschlag:** Im CSS-Utility-Block die Definition `.mt-8 { margin-top: 8px; }` einfügen (zwischen `.mt-6` und `.mt-12`).
-- **Status:** offen
-- **Korrektur-Zyklen:** 0/2
+- **Status:** ✅ erledigt — Mitfix in Commit `26dbbe5` (Phase-C-Hauptcommit) eingefügt.
+- **Korrektur-Zyklen:** 1/2
 
 ### CC-C-006-SIC
-- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Schweregrad:** 🟢 Minor → erledigt
 - **Kategorie:** Sicherheit
 - **Prüfgegenstand:** CSP-Hardening nach Refactor
 - **Erstellt von:** Hauptsession-CLI — VibeCoding
 - **Befund:** `'unsafe-inline'` ist nach dem Refactor in `script-src` und `style-src` redundant — Tauri injiziert Hashes/Nonces, die `'unsafe-inline'` laut CSP-Spec ignorieren. Die Direktive ist also wirkungslos in Production-Builds. Defensives Drinlassen schadet nicht funktional, aber strengere CSP wäre besser.
-- **Korrekturvorschlag:** In Folge-Sprint nach Verifikation des Tauri-Hash-Injection-Verhaltens (DEV vs. RELEASE) entfernen. Vorher Tauri-Doku/Issue-Tracker konsultieren ob DEV-Mode auch Hashes injiziert.
-- **Status:** offen
-- **Korrektur-Zyklen:** 0/2
+- **Korrekturvorschlag:** Entfernen aus script-src + style-src.
+- **Status:** ✅ erledigt — Folge-Edit nach Admin-Direktive (alle Bookmarks abarbeiten). CSP nun: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:7777 http://localhost:7777 http://ipc.localhost https://ipc.localhost`. Restrisiko: Tauri-Edge-Cases (Plugin-Snippets ohne Hash) — Mitigation durch VM-Test.
+- **Korrektur-Zyklen:** 1/2
 
 ### CC-C-007-COD
-- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Schweregrad:** 🟢 Minor → aufgehoben (kein Bug)
 - **Kategorie:** Code-Qualität
 - **Prüfgegenstand:** Konsistenz der Event-Handler-Strategie
 - **Erstellt von:** Hauptsession-CLI — VibeCoding
 - **Befund:** Programmatische `el.onclick = ...` Property-Assignments verbleiben in `loadLlmProviders` (Z. ~1056), `renderProviderGrid` (Z. ~1357), `renderProviderDetail` (Z. ~1381, 1391, 1407, 1424). Diese sind CSP-konform (nicht Inline-HTML-Attr), aber stilinkonsistent zum neuen data-action-Dispatcher und überschreiben evtl. existierende Handler.
-- **Korrekturvorschlag:** In Folge-Sprint zu `addEventListener` migrieren oder via dynamischen `data-action`-Werten in den Dispatcher integrieren.
-- **Status:** offen
-- **Korrektur-Zyklen:** 0/2
+- **Korrekturvorschlag:** ~~In Folge-Sprint zu `addEventListener` migrieren oder via dynamischen `data-action`-Werten in den Dispatcher integrieren.~~ **Aufgehoben.**
+- **Status:** ✅ aufgehoben (Pushback der Hauptsession akzeptiert) — Property-Assignment ist hier korrekter Pattern für state-dependent handler replacement bei Provider-Wechsel im Wizard. addEventListener würde Handler-Leak verursachen ohne removeEventListener-Tracking. Original-Finding stützte sich auf "Stilinkonsistenz" (Stil-Präferenz, nicht Code-Qualitätsfehler) und "überschreiben evtl. existierender Handler" (= genau das gewünschte Verhalten). Laut Konsens-System Punkt 1 (Objektive Korrektheit vs. Stil-Präferenz) zurückgezogen. Lerneffekt für QS in Tuvok-Persona aufgenommen: Konsistenz-Findings vor dem Flag funktional auf Begründung prüfen.
+- **Korrektur-Zyklen:** 1/2 (im Pushback-Zyklus aufgehoben)
 
 ### CC-C-008-VOL
-- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Schweregrad:** 🟢 Minor → erledigt
 - **Kategorie:** Vollständigkeit (UX-Regression-Risiko)
 - **Prüfgegenstand:** Klick-Verhalten BD-Tabelle nach Refactor
 - **Erstellt von:** Hauptsession-CLI — VibeCoding
 - **Befund:** Pre-Refactor hatten Sub-TDs der `bd-row-clickable`-Zeile `onclick="event.stopPropagation()"` um zu verhindern, dass Klicks auf TD-Rand (5-10px um die Checkbox/Buttons) das Detail-Modal öffnen. Nach Refactor fängt der Action-Dispatcher via `e.target.closest('button, input, [data-action]:not(.bd-row-clickable)')` Inner-Element-Klicks korrekt ab — aber NICHT, wenn der Klick direkt auf den TD-Rand fällt (kein interaktives Inner-Element getroffen). Folge: Detail-Modal öffnet bei TD-Rand-Klick. UX-Regression-Risiko niedrig (kleine Klickfläche), Hauptfunktionen unberührt.
-- **Korrekturvorschlag:** In Folge-Sprint dedicated `.bd-row-skip` Marker-Klasse auf Sub-TDs setzen + closest-Check erweitern. Alternativ: TD-Padding minimieren bzw. Buttons full-cell-stretch.
-- **Status:** offen
-- **Korrektur-Zyklen:** 0/2
+- **Korrekturvorschlag:** Dedicated `.bd-row-skip` Marker-Klasse auf Sub-TDs setzen + closest-Check erweitern.
+- **Status:** ✅ erledigt — Folge-Edit. Sub-TDs (Checkbox-Cell + Action-Cell) mit `class="bd-row-skip"` markiert; Action-Dispatcher closest-Selector erweitert auf `'button, input, .bd-row-skip, [data-action]:not(.bd-row-clickable)'`. Edge-Case-Matrix durchgeprüft: Klicks auf Checkbox / Checkbox-TD-Rand / Delete-Button / Action-TD-Rand öffnen Detail nicht; Klicks auf Kategorie/Inhalt/Datum-TDs öffnen Detail (gewünscht).
+- **Korrektur-Zyklen:** 1/2
 
 ### CC-C-009-PER
 - **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
@@ -2509,13 +2509,13 @@ Prüfung durchgeführt von: QS — VibeCoding
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
 
-### Zusammenfassung Phase C
+### Zusammenfassung Phase C (Stand 2026-05-03T22:08, nach Folge-Edit-Block)
 
-| Schweregrad | Anzahl | IDs |
-|---|---|---|
-| 🔴 Blocker | 0 | — |
-| 🟡 Major | 1 | CC-C-005-VOL |
-| 🟢 Minor | 5 | CC-C-006-SIC, CC-C-007-COD, CC-C-008-VOL, CC-C-009-PER, CC-C-010-PER |
+| Schweregrad | Anzahl | IDs | Status |
+|---|---|---|---|
+| 🔴 Blocker | 0 | — | — |
+| 🟡 Major | 1 | CC-C-005-VOL | ✅ erledigt (Mitfix in 26dbbe5) |
+| 🟢 Minor | 5 | CC-C-006-SIC, CC-C-007-COD, CC-C-008-VOL, CC-C-009-PER, CC-C-010-PER | 2 erledigt (006, 008), 1 aufgehoben (007), 2 bewusste Folge-Sprint-Bookmarks (009, 010) |
 
 **Geprüfte Sub-Aspekte (positive Befunde):**
 - ✅ Vollständigkeit Inline-Handler-Entfernung: 0 inline-onclick / onchange / oninput / style="..." verbleibt (grep-Audit + erweitertes regex-Audit clean)
@@ -2529,8 +2529,8 @@ Prüfung durchgeführt von: QS — VibeCoding
 - ✅ Versions-Konsistenz: Cargo.lock-Auto-Update auf 0.1.2 entspricht Cargo.toml und tauri.conf.json
 - ✅ cargo check grün (5.16s), tauri.conf.json valid JSON
 
-**Verdikt:** ⚠️ Freigabe mit Auflage. Inhaltlich sauberer Refactor — Pflicht-Mitfix CC-C-005-VOL (1 CSS-Zeile) + 5 Folge-Sprint-Minor. Nach Mitfix kann commit+push erfolgen.
+**Verdikt (Iter-1, 2026-05-03T21:42):** ⚠️ Freigabe mit Auflage. Inhaltlich sauberer Refactor — Pflicht-Mitfix CC-C-005-VOL (1 CSS-Zeile) + 5 Folge-Sprint-Minor. Nach Mitfix kann commit+push erfolgen.
 
-**Empfehlung an Abteilungsleitung — VibeCoding:** `.mt-8 { margin-top: 8px; }` einfügen (kleiner Edit), kein Re-Review nötig (single-line CSS-Add ist trivial). Anschließend commit + push + workflow_dispatch.
+**Verdikt (Iter-2, 2026-05-03T22:08, nach Admin-Direktive Bookmarks abarbeiten):** ✅ Freigabe ohne Auflagen. Folge-Edits CC-C-006-SIC + CC-C-008-VOL durchgeprüft (CSP-Hardening sauber, .bd-row-skip-Marker mit Edge-Case-Matrix verifiziert). CC-C-007-COD-Pushback der Hauptsession akzeptiert (Property-Assignment ist korrekter Pattern für state-dependent handler replacement). CC-C-009-PER + CC-C-010-PER bleiben bewusste Bookmarks (defensive Cross-Plattform-Vorsorge bzw. Library-Replacement zu groß). Hauptsession kann Folge-Commit pushen.
 
-**WORKLOG-Ref:** AUFTRAG #19 (Phase-C-Pre-Commit-Gate)
+**WORKLOG-Ref:** AUFTRAG #19 (Phase-C-Pre-Commit-Gate, Iter-2 Folge-Edit-Block)

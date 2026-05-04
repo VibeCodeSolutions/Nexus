@@ -2549,3 +2549,53 @@ Prüfung durchgeführt von: QS — VibeCoding
 **Verdikt (Iter-4 Final-Live-Gate, 2026-05-04T03:52):** ✅ Freigabe ohne Auflagen. DoD des Sprints (CSP-Compliance + tote Buttons leben) erreicht. Sprint-Closure (todo.md / CURRENT_STATE.md / Closure-Commit) freigegeben.
 
 **WORKLOG-Ref:** AUFTRAG #19 (Phase-C-Pre-Commit-Gate, Iter-2 + Iter-3 Mini + Iter-4 Final-Live-Gate)
+
+---
+
+## Sprint „Happy Thompson" — Phase A (2026-05-04T11:50)
+
+### SH-A4-VOL
+- **Schweregrad:** 🟢 Minor (Folge-Sprint-Bookmark)
+- **Kategorie:** Vollständigkeit / Validierung
+- **Prüfgegenstand:** `onboard_set_provider` `core/src/handlers.rs:704+` mit `#[serde(default)]` auf `api_key`
+- **Erstellt von:** QS — VibeCoding
+- **Befund:** Schema-Lockerung `pub api_key: String` mit `#[serde(default)]` → bei fehlendem Feld läuft `set_key(provider, "")` für non-noop/non-ollama Provider durch, ohne explizite Validierung. Pre-existing Code hatte api_key als Pflichtfeld (Deserialize-Fehler → 422). Frontend-Wizard sendet api_key immer mit, also kein funktionaler Bug — aber implizite Validierungs-Schwächung.
+- **Bewertung Restrisiko:** Niedrig — `setup_status` würde danach `provider_configured: false` liefern (leerer Key + non-ollama), Wizard erkennt das und zwingt zum Re-Setup. Direkter API-Aufruf mit leerem Key war via Ollama-Pfad schon vorher möglich.
+- **Korrekturvorschlag:** Explizite Validierung in `onboard_set_provider`: `if payload.provider != "noop" && payload.provider != "ollama" && payload.api_key.trim().is_empty() { return 400 }`. Folge-Sprint nach v0.1.3.
+- **Status:** 🟢 Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+### SH-A8-COD
+- **Schweregrad:** 🟢 Minor (Konsistenz, kein Bug)
+- **Kategorie:** Code-Qualität
+- **Prüfgegenstand:** `core/src/llm/zai.rs` `complete()`-Helper
+- **Befund:** Z.ai-Adapter sendet nur eine `user`-Message, keine `system`-Message — obwohl die z.ai chat-completions-API system-Messages unterstützt. Pattern stammt aus pre-existing `categorize_and_summarize` und `suggest_projects` und wurde von `extract_links` übernommen (Konsistenz). Funktional OK (Prompt wird trotzdem ausgeführt), aber schlechtere Token-Effizienz und ggf. niedrigere Output-Qualität als bei system+user-Trennung.
+- **Korrekturvorschlag:** `complete(prompt)` zu `complete(system, user)` umstellen (analog zu `openai_compatible.rs`). Touch alle drei Provider-Methoden in zai.rs gleichzeitig.
+- **Status:** 🟢 Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+### SH-A9-VOL
+- **Schweregrad:** 🟢 Minor (Test-Coverage)
+- **Kategorie:** Vollständigkeit / Tests
+- **Prüfgegenstand:** Mock-Tests für die 3 neuen `extract_links`-Overrides (openai_compatible, gemini, zai)
+- **Befund:** Bewusst ausgelassen, weil Mock-HTTP-Server-Setup pro Provider Sprint-Sprengung wäre (mockito/wiremock-Crate, Test-Server-Lifecycle pro Test). Die Implementations sind nahezu identisch zur bereits getesteten `claude.rs`-Override und zur Trait-Default-Impl, die Code-Pfade sind durch existing handlers-Tests (`extract_links_filters_by_confidence_min`, `extract_links_writes_sentinel_on_empty_result`) am Konsumenten-Ende verifiziert.
+- **Bewertung Restrisiko:** Niedrig. JSON-Trim-Logic ist parallel zur Claude-Implementierung (die Tests hat); HTTP-Layer-Bugs würden die existing `categorize_and_summarize`/`suggest_projects` ebenso treffen und wären dort schon aufgefallen.
+- **Korrekturvorschlag:** Folge-Sprint mit gemeinsamem Mock-HTTP-Setup-Modul (einmal eingerichtet, deckt alle Provider-Tests ab).
+- **Status:** 🟢 Folge-Sprint-Bookmark
+- **Korrektur-Zyklen:** 0/2
+
+### Geprüft + ✅ OK Phase A
+- ✅ A1 Sort: `Vec<&str>` aus `&[&str]`-slice → `.sort()` deterministisch + alphabetisch, Lifetime-OK (static-str-Refs aus dem match)
+- ✅ A2 NoOp create_provider: trivialer match-arm, kein Side-Effect
+- ✅ A3 setup_status NoOp-aware: vor ollama-Branch korrekt eingehängt, kein Conflict mit OAuth/Key-Branch
+- ✅ A4 onboard_set_provider Skip-Pfad: Early-Return ohne set_key, keystore::set_default_provider("noop") sauber
+- ✅ A5 NEXUS_PAIR_HOST: trim()-defensiv, Match-Guard `Ok(host) if !host.trim().is_empty()` korrekt, Fallback-Reihenfolge Env > LocalIP > 127.0.0.1
+- ✅ A6 openai_compatible.extract_links: nutzt `complete(system, user)` mit EXTRACT_LINKS_PROMPT als system, candidates_text-Format identisch zu Claude
+- ✅ A7 gemini.extract_links: Inline-HTTP (Gemini-API-Format-spezifisch), Prompt-Konkatenation analog zu suggest_projects, JSON-Trim mit `[`/`]`-Indices defensiv
+- ✅ A8 zai.extract_links: nutzt `complete(prompt)` (Pattern-Konsistenz), JSON-Trim wie andere
+- ✅ Konsistenz: alle drei nutzen identisches User-Format `Quell-Text:\n{}\n\nKandidaten:\n{}` und identisches JSON-Trim-Pattern aus Claude
+- ✅ cargo check (1.67s) + cargo test (28 passed, 0 failed) keine Regression
+
+**Verdikt (Phase-A-Pre-Commit-Gate, 2026-05-04T11:50):** ✅ **Freigabe ohne Auflagen.** 0 Blocker / 0 Major / 3 Minor (alle Folge-Sprint-Bookmarks). Hauptsession-CLI freigegeben für Phase-A-Commit.
+
+**WORKLOG-Ref:** AUFTRAG #20

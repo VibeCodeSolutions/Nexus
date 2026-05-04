@@ -124,6 +124,7 @@ impl LlmProvider for NoOpProvider {
 
 pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, String> {
     match provider_name {
+        "noop" => Ok(Box::new(NoOpProvider)),
         "claude" => {
             // OAuth zuerst, dann API-Key als Fallback
             if let Ok(tokens) = keystore::get_oauth("claude") {

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::keystore;
 use crate::models::BrainDumpEntry;
-use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
+use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
 
 const DEFAULT_GEMINI_MODEL: &str = "gemini-1.5-flash";
 
@@ -158,6 +158,66 @@ impl LlmProvider for GeminiProvider {
             .trim();
 
         serde_json::from_str(cleaned)
+            .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw_text}"))
+    }
+
+    /// Provider-Coverage Polish-Sprint.
+    async fn extract_links(
+        &self,
+        source_text: &str,
+        candidates: &[NodeRef],
+    ) -> Result<Vec<LinkSuggestion>, String> {
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let candidates_text = candidates.iter()
+            .map(|n| format!("- {} (id={}, type={})", n.label, n.id, n.node_type))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let prompt = format!(
+            "{EXTRACT_LINKS_PROMPT}\n\nQuell-Text:\n{}\n\nKandidaten:\n{}",
+            source_text, candidates_text
+        );
+
+        let request = GeminiRequest {
+            contents: vec![Content { parts: vec![Part { text: prompt }] }],
+        };
+
+        let url = format!("{}?key={}", gemini_url(), self.api_key);
+
+        let response = self.client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| format!("Gemini API Fehler: {e}"))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("Gemini API {status}: {body}"));
+        }
+
+        let gemini_resp: GeminiResponse = response.json().await
+            .map_err(|e| format!("Gemini Response-Parse Fehler: {e}"))?;
+
+        let raw_text = gemini_resp.candidates.first()
+            .and_then(|c| c.content.parts.first())
+            .ok_or("Keine Antwort von Gemini")?
+            .text.clone();
+
+        let cleaned = raw_text
+            .trim()
+            .trim_start_matches("```json")
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim();
+        let json = if let (Some(start), Some(end)) = (cleaned.find('['), cleaned.rfind(']')) {
+            &cleaned[start..=end]
+        } else {
+            cleaned
+        };
+        serde_json::from_str(json)
             .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw_text}"))
     }
 }

@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::models::BrainDumpEntry;
-use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
+use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
 
 const ENDPOINT: &str = "https://api.z.ai/api/paas/v4/chat/completions";
 const MODEL: &str = "glm-4.6";
@@ -98,6 +98,34 @@ impl LlmProvider for ZaiProvider {
         let prompt = format!("{PROJECT_SUGGEST_PROMPT}\n\n{}", entries_text.join("\n\n---\n\n"));
         let raw = self.complete(prompt).await?;
         serde_json::from_str(clean_json(&raw))
+            .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw}"))
+    }
+
+    /// Provider-Coverage Polish-Sprint.
+    async fn extract_links(
+        &self,
+        source_text: &str,
+        candidates: &[NodeRef],
+    ) -> Result<Vec<LinkSuggestion>, String> {
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let candidates_text = candidates.iter()
+            .map(|n| format!("- {} (id={}, type={})", n.label, n.id, n.node_type))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let prompt = format!(
+            "{EXTRACT_LINKS_PROMPT}\n\nQuell-Text:\n{}\n\nKandidaten:\n{}",
+            source_text, candidates_text
+        );
+        let raw = self.complete(prompt).await?;
+        let cleaned = clean_json(&raw);
+        let json = if let (Some(start), Some(end)) = (cleaned.find('['), cleaned.rfind(']')) {
+            &cleaned[start..=end]
+        } else {
+            cleaned
+        };
+        serde_json::from_str(json)
             .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw}"))
     }
 }

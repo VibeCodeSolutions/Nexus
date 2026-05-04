@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::models::BrainDumpEntry;
-use super::{Classification, LlmProvider, ProjectSuggestion, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
+use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
 
 pub struct OpenAiCompatibleProvider {
     pub base_url: String,
@@ -127,6 +127,36 @@ impl LlmProvider for OpenAiCompatibleProvider {
         let user = entries_text.join("\n\n---\n\n");
         let raw = self.complete(PROJECT_SUGGEST_PROMPT, user).await?;
         serde_json::from_str(clean_json(&raw))
+            .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw}"))
+    }
+
+    /// Provider-Coverage Polish-Sprint: deckt openai/mistral/groq/deepseek/openrouter
+    /// auf einen Schlag ab (gemeinsamer Chat-Completions-Adapter).
+    async fn extract_links(
+        &self,
+        source_text: &str,
+        candidates: &[NodeRef],
+    ) -> Result<Vec<LinkSuggestion>, String> {
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let candidates_text = candidates.iter()
+            .map(|n| format!("- {} (id={}, type={})", n.label, n.id, n.node_type))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let user = format!(
+            "Quell-Text:\n{}\n\nKandidaten:\n{}",
+            source_text, candidates_text
+        );
+        let raw = self.complete(EXTRACT_LINKS_PROMPT, user).await?;
+        let cleaned = clean_json(&raw);
+        // Robust gegen extra Text vor/nach dem JSON-Array
+        let json = if let (Some(start), Some(end)) = (cleaned.find('['), cleaned.rfind(']')) {
+            &cleaned[start..=end]
+        } else {
+            cleaned
+        };
+        serde_json::from_str(json)
             .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw}"))
     }
 }

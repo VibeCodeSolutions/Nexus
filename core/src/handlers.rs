@@ -675,7 +675,10 @@ pub async fn setup_status() -> Json<SetupStatus> {
     // Andere Provider brauchen einen NICHT-leeren API-Key oder OAuth-Token.
     let default = cfg.default_provider.clone();
     let ollama_reachable = check_ollama().await;
-    let provider_configured = if default == "ollama" {
+    let provider_configured = if default == "noop" {
+        // Onboarding-Skip: NoOpProvider gilt als bewusst gewählter Default.
+        true
+    } else if default == "ollama" {
         ollama_reachable
     } else {
         let has_nonempty_key = crate::keystore::get_key(&default)
@@ -698,12 +701,19 @@ pub async fn setup_status() -> Json<SetupStatus> {
 #[derive(Deserialize)]
 pub struct SetProviderRequest {
     pub provider: String,
+    #[serde(default)]
     pub api_key: String,
 }
 
 pub async fn onboard_set_provider(
     Json(payload): Json<SetProviderRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    if payload.provider == "noop" {
+        // Skip-Pfad: kein API-Key, nur Default-Marker setzen.
+        crate::keystore::set_default_provider("noop")
+            .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_default_provider: {}", e)))?;
+        return Ok(Json(json!({"status": "ok", "provider": "noop"})));
+    }
     crate::keystore::set_key(&payload.provider, &payload.api_key)
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_key: {}", e)))?;
     crate::keystore::set_default_provider(&payload.provider)
@@ -793,9 +803,11 @@ pub async fn settings_models(
         }
     };
     let current = crate::keystore::get_model(&q.provider);
+    let mut sorted: Vec<&str> = models.to_vec();
+    sorted.sort();
     Ok(Json(json!({
         "provider": q.provider,
-        "models": models,
+        "models": sorted,
         "current": current,
     })))
 }

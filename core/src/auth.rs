@@ -86,9 +86,15 @@ pub fn pairing_uri(bind_addr: &str) -> Result<String, String> {
     let token = get_or_create_token()?;
 
     let port = bind_addr.split(':').next_back().unwrap_or("7777");
-    let url = match local_ip_address::local_ip() {
-        Ok(ip) => format!("http://{}:{}", ip, port),
-        Err(_) => format!("http://127.0.0.1:{}", port),
+    // NEXUS_PAIR_HOST überschreibt die automatische LAN-IP-Erkennung — gedacht für
+    // VM-NAT-Setups (Host-IP statt 10.0.2.x) und Multi-Interface-Hosts, wo
+    // local_ip() das falsche Interface wählt.
+    let url = match std::env::var("NEXUS_PAIR_HOST") {
+        Ok(host) if !host.trim().is_empty() => format!("http://{}:{}", host.trim(), port),
+        _ => match local_ip_address::local_ip() {
+            Ok(ip) => format!("http://{}:{}", ip, port),
+            Err(_) => format!("http://127.0.0.1:{}", port),
+        },
     };
 
     let url_enc = urlencoding::encode(&url);

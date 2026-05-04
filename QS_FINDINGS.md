@@ -1,5 +1,68 @@
 # QS Findings — NEXUS v0.1.0 Release
 
+## Phase Obsidian-Briefkasten A — Foundation (Migration + Config + Keystore + Models) — 2026-05-03
+**Status: ✅ FREIGABE OHNE AUFLAGEN** (0 Blocker / 0 Major / 2 Minor — Folge-Sprint-Bookmarks)
+
+Prüfung durchgeführt von: QS — VibeCoding
+WORKLOG-Ref: AUFTRAG #23
+
+### Was geprüft wurde
+- Migration `migrations/20260503_001_obsidian_briefkasten.sql` (komplett gelesen)
+- `core/src/config.rs` (komplett gelesen, post-Edit-State)
+- Diff-Reports zu `models.rs` / `repo.rs` / `handlers.rs` / `keystore.rs` / `Cargo.toml` (gegen Auftragsbeschreibung verifiziert)
+- cargo check + cargo test (Implementer-Report: 28/0 grün, eigenständig nicht reproduziert da keine Code-Änderung erfolgt)
+
+### Findings
+
+**OB-A1. Migration-Idempotenz via sqlx_migrations-Tracking** — PASS
+- `ALTER TABLE ADD COLUMN` ist in SQLite NICHT idempotent (ohne `IF NOT EXISTS`-Variante). Korrekt — sqlx-Migrate-Runner persistiert Filename-Hash in `_sqlx_migrations`-Tabelle und führt jede Migration genau einmal aus. Solange die Datei post-Initial-Run nicht editiert wird (Hash-Check schlägt sonst an), ist Re-Run-Sicherheit gegeben. Pattern entspricht den 7 vorhandenen Migrationen.
+- Partielle Indizes (`WHERE != 'done'`, `WHERE NOT NULL`) verwenden `IF NOT EXISTS` — defensiv korrekt, blockt keinen Re-Run falls Migration aus irgendeinem Grund manuell wiederholt wird.
+
+**OB-A2. Schema-Backward-Compat — Test-Setup vs. Migration** — PASS
+- `handlers.rs:1352-1364` Test-Setup-CREATE-TABLE wurde um `classification_status TEXT NOT NULL DEFAULT 'done'` + `nexus_inbox_id TEXT` (NULLable) ergänzt → identisch mit Migration-Resultat. Tests laufen ohne Migration-Layer (in-memory CREATE TABLE direkt) — Pattern war pre-existing, durch das Schema-Match keine Regression.
+- Indizes fehlen im Test-Setup. Kein Finding: Indizes sind reine Performance-Optimierung, Tests prüfen Korrektheit, nicht Query-Plan.
+
+**OB-A3. serde-Kompatibilität bei BrainDumpEntry** — PASS
+- `classification_status: String` mit `#[serde(default = "default_classification_status")]` → Deserialisierung von Pre-Migration-JSON-Payloads ohne dieses Feld liefert `"done"` (semantisch korrekt, da bestehende Rows synchron klassifiziert wurden).
+- `nexus_inbox_id: Option<String>` mit `#[serde(default)]` → fehlend = None (Option-Default). Korrekt.
+
+**OB-A4. Keystore-Backward-Compat** — PASS
+- `Store::vault_path: Option<String>` mit `#[serde(default, skip_serializing_if = "Option::is_none")]` → bestehende `keys.json` ohne Feld deserialisiert sauber (Option-Default = None), neue Stores ohne gesetzten Vault-Pfad serialisieren das Feld nicht (kein dead JSON). Pattern identisch zu `default_provider`-Feld → konsistent.
+- `set_vault_path` mit Trim+Empty-Validation. `clear_vault_path` vorhanden für Wizard-Phase D „Vault entfernen".
+
+**OB-A5. Config-Präzedenz NEXUS_VAULT_PATH > Keystore > None** — PASS
+- `env::var(...).ok().filter(|s| !s.trim().is_empty())` filtert Leerstring/Whitespace explizit aus. Verhindert dass `NEXUS_VAULT_PATH=""` ein gültiges Keystore-Setting maskiert. Doc-Comment in config.rs erklärt das Pattern. Gut dokumentiert.
+- Helper `inbox_dir()/outbox_dir()/outbox_processed_dir()` returnen `Option<PathBuf>` — korrekt fail-soft falls vault_path None.
+
+**OB-A6. Zweiter `impl Config`-Block** — PASS (Stilfrage, akzeptabel)
+- Helpers + Konstanten in eigenem `impl`-Block mit `#[allow(dead_code)]`. Rust erlaubt mehrere impl-Blöcke pro Typ, das ist idiomatisch und hier sinnvoll, weil das `#[allow]` nur für die Phase-B-Konsumenten gilt, nicht für `load()`. Saubere Trennung.
+
+**OB-A7. Dead-Code-Markierungen** — PASS
+- `classification_status::PENDING/FAILED`, `keystore::set_vault_path`, `keystore::clear_vault_path`, `Config`-Helper alle mit `#[allow(dead_code)]` versehen. Konvention analog `keystore::clear_default_provider`. Keine clippy-Lärm-Risiken.
+
+### Minor Findings (Folge-Sprint-Bookmarks, nicht commit-blockierend)
+
+**OB-A-MIN-1 — Crate-Version `gray_matter = "0.2"`** — 🟢 Minor
+- **Befund:** Pinned auf 0.2.x, aktuell verfügbar 0.3.2. cargo-update-Output meldet das explizit. Phase B konsumiert die Crate (Inbox-Writer + Outbox-Importer-Frontmatter-Parsing). Wenn die 0.3-API breaking changes hat, muss Phase B doppelt migrieren.
+- **Korrekturvorschlag:** Vor Phase-B-Start auf `gray_matter = "0.3"` heben und API-Smoke prüfen. Kein Blocker für Phase A — wird hier nicht verwendet.
+- **Status:** Bookmark für Phase B Kickoff.
+
+**OB-A-MIN-2 — Migration-Roundtrip-Test fehlt** — 🟢 Minor
+- **Befund:** Es gibt keinen automatisierten Test, der die Migration auf einer pre-existing DB (mit Daten in der `done`-Default-Spalte) ausführt und verifiziert. cargo test bypasst Migrations via Test-CREATE-TABLE-Setup.
+- **Korrekturvorschlag:** Phase B: Integration-Test der `db::init_pool` gegen eine Vorlage-DB im Pre-Migration-State, prüfen dass `classification_status` aller Rows = 'done' nach Migration. Kein Blocker — Migration ist trivial (zwei ADD COLUMN), Risiko gering.
+- **Status:** Bookmark für Phase B oder Phase E (Cross-Platform-Smoke).
+
+### Was OK ist
+- Migration sauber und chronologisch (`20260503_*` post `20260502_*`).
+- Alle 5 SELECT-Statements (3 in repo.rs + 3 in handlers.rs ergibt 6 — Auftrag erwähnt 3+3=6, alle gefunden) konsistent erweitert.
+- Test-Setup-Schema-Match wurde nicht vergessen → 0 Test-Regressionen.
+- Doc-Comments auf neuen Public-Items (Config-Felder, Konstanten) vorhanden.
+- Memory `feedback_qs_tuvok.md` respektiert: User committet selbst.
+
+**Empfehlung:** ✅ Freigabe ohne Auflagen. Hauptsession-CLI darf staged-diff Admin zur Commit-Freigabe vorlegen, sobald Admin zurück ist.
+
+---
+
 ## Phase 0 — Windows-Portabilität Core — 2026-04-24
 **Status: PASS (mit 1 MINOR Backlog-Notiz)**
 

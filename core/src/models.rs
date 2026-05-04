@@ -34,6 +34,17 @@ pub struct Achievement {
 
 // --- Domain ---
 
+/// Klassifikations-Status eines BrainDumps. Konstanten statt Enum, damit
+/// die SQLite-Spalte (TEXT) nahtlos via FromRow zurückkommt — analog zur
+/// bestehenden String-Konvention für `category` und `Task::status`.
+pub mod classification_status {
+    pub const DONE: &str = "done";
+    #[allow(dead_code)]
+    pub const PENDING: &str = "pending";
+    #[allow(dead_code)]
+    pub const FAILED: &str = "failed";
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct BrainDumpEntry {
     pub id: String,
@@ -43,6 +54,14 @@ pub struct BrainDumpEntry {
     pub category: String,
     pub summary: Option<String>,
     pub tags_json: String,
+    #[serde(default = "default_classification_status")]
+    pub classification_status: String,
+    #[serde(default)]
+    pub nexus_inbox_id: Option<String>,
+}
+
+fn default_classification_status() -> String {
+    classification_status::DONE.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

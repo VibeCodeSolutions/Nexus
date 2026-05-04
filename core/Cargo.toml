@@ -30,6 +30,7 @@ dirs = "5"
 webbrowser = "1"
 urlencoding = "2"
 tower-http = { version = "0.6", features = ["cors"] }
+gray_matter = "0.2"
 
 
 [dev-dependencies]

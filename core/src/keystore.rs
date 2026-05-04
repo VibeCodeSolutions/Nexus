@@ -32,6 +32,12 @@ struct Store {
     default_provider: Option<String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     models: HashMap<String, String>,
+    /// Optionaler Obsidian-Vault-Pfad (User-Wahl im Wizard). Wird
+    /// mit dem Rest der Konfig in `~/.nexus/keys.json` (mode 0o600)
+    /// persistiert, damit die Setting-Hoheit beim User bleibt und
+    /// nicht in einer separaten Config-Datei dupliziert wird.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    vault_path: Option<String>,
 }
 
 fn store_path() -> PathBuf {
@@ -160,6 +166,28 @@ pub struct ProviderStatus {
     pub has_key: bool,
     pub has_model: bool,
     pub is_default: bool,
+}
+
+#[allow(dead_code)] // wired in Phase D (Wizard)
+pub fn set_vault_path(path: &str) -> Result<(), String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("Vault-Pfad darf nicht leer sein".into());
+    }
+    let mut store = load();
+    store.vault_path = Some(trimmed.to_string());
+    save(&store)
+}
+
+pub fn get_vault_path() -> Option<String> {
+    load().vault_path
+}
+
+#[allow(dead_code)] // wired in Phase D (Wizard) für „Vault entfernen"
+pub fn clear_vault_path() -> Result<(), String> {
+    let mut store = load();
+    store.vault_path = None;
+    save(&store)
 }
 
 pub fn list_providers_with_status() -> Vec<ProviderStatus> {

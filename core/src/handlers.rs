@@ -552,7 +552,7 @@ pub async fn recategorize_unsorted_inner(
 ) -> Result<RecategorizeStats, sqlx::Error> {
     let clamped = limit.clamp(1, 200);
     let entries = sqlx::query_as::<_, crate::models::BrainDumpEntry>(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps WHERE category = 'Unsorted' OR category IS NULL LIMIT ?"
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id FROM braindumps WHERE category = 'Unsorted' OR category IS NULL LIMIT ?"
     )
     .bind(clamped as i64)
     .fetch_all(pool)
@@ -1110,7 +1110,7 @@ pub async fn extract_links_for_recent(
 
     // Hole BrainDumps, die noch keine LLM-erzeugten Links als source haben
     let candidates: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
-        "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, b.tags_json \
+        "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, b.tags_json, b.classification_status, b.nexus_inbox_id \
          FROM braindumps b \
          WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.source_type='braindump' AND l.source_id=b.id AND l.created_by='llm') \
          ORDER BY b.created_at DESC \
@@ -1131,7 +1131,7 @@ pub async fn extract_links_for_recent(
     .fetch_all(pool)
     .await?;
     let recent_bds: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps ORDER BY created_at DESC LIMIT 30",
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id FROM braindumps ORDER BY created_at DESC LIMIT 30",
     )
     .fetch_all(pool)
     .await?;
@@ -1226,7 +1226,7 @@ pub async fn suggest_auto_projects(
     let mut stats = AutoProjectStats::default();
 
     let entries: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json FROM braindumps \
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id FROM braindumps \
          WHERE category IN ('Random', 'Unsorted') OR category IS NULL \
          ORDER BY created_at DESC LIMIT 20",
     )
@@ -1357,7 +1357,9 @@ mod synaptic_phase_b_tests {
                 transcript TEXT,
                 category TEXT NOT NULL DEFAULT 'Unsorted',
                 summary TEXT,
-                tags_json TEXT NOT NULL DEFAULT '[]'
+                tags_json TEXT NOT NULL DEFAULT '[]',
+                classification_status TEXT NOT NULL DEFAULT 'done',
+                nexus_inbox_id TEXT
             )",
         ).execute(&pool).await.unwrap();
         sqlx::query(

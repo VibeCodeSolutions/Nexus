@@ -17,6 +17,17 @@ const VALID_PROVIDERS: &[&str] = &[
     "openrouter",
 ];
 
+/// Provider, die als Default-Marker erlaubt sind, aber KEINE API-Keys oder
+/// Modelle im Store haben. `set_key`/`set_model` lehnen sie weiterhin ab —
+/// nur `set_default_provider` akzeptiert sie. Halten wir bewusst getrennt von
+/// VALID_PROVIDERS, damit das Dropdown unter `/api/settings/providers`
+/// sauber bleibt (Skip-Provider sind keine echten LLM-Endpoints).
+const SKIP_PROVIDERS: &[&str] = &["noop", "obsidian"];
+
+fn is_acceptable_default(provider: &str) -> bool {
+    VALID_PROVIDERS.contains(&provider) || SKIP_PROVIDERS.contains(&provider)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthTokens {
     pub access_token: String,
@@ -119,10 +130,15 @@ pub fn delete_oauth(provider: &str) -> Result<(), String> {
 }
 
 pub fn set_default_provider(provider: &str) -> Result<(), String> {
-    if !VALID_PROVIDERS.contains(&provider) {
+    // Akzeptiert sowohl echte LLM-Provider (VALID_PROVIDERS) als auch
+    // Skip-Marker (noop / obsidian) — sonst scheitert der Onboarding-
+    // Skip-Pfad beziehungsweise die Obsidian-Briefkasten-Wahl, die
+    // beide bewusst keinen API-Key kennen.
+    if !is_acceptable_default(provider) {
         return Err(format!(
-            "Unbekannter Provider: {provider}. Erlaubt: {}",
-            VALID_PROVIDERS.join(", ")
+            "Unbekannter Provider: {provider}. Erlaubt: {} (oder Skip-Marker: {})",
+            VALID_PROVIDERS.join(", "),
+            SKIP_PROVIDERS.join(", ")
         ));
     }
     let mut store = load();
@@ -202,4 +218,32 @@ pub fn list_providers_with_status() -> Vec<ProviderStatus> {
             is_default: default == Some(*p),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn skip_providers_pass_default_validation() {
+        // OB-B-MAJ-1 (Tuvok): Skip-Marker wie "noop" und "obsidian" müssen
+        // als Default akzeptiert werden, ohne in VALID_PROVIDERS zu stehen.
+        // Bug zuvor: set_default_provider lehnte beide ab → onboard-Skip-
+        // und Obsidian-Pfad antworteten mit HTTP 400.
+        assert!(is_acceptable_default("noop"));
+        assert!(is_acceptable_default("obsidian"));
+    }
+
+    #[test]
+    fn real_providers_pass_default_validation() {
+        for p in VALID_PROVIDERS {
+            assert!(is_acceptable_default(p), "{p} must be acceptable");
+        }
+    }
+
+    #[test]
+    fn unknown_provider_rejected() {
+        assert!(!is_acceptable_default("definitely-not-a-provider"));
+        assert!(!is_acceptable_default(""));
+    }
 }

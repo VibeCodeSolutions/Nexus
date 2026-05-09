@@ -43,29 +43,60 @@ pub async fn post_braindump(
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
         })?;
 
-    // LLM-Kategorisierung versuchen
-    let (category, summary, tags_json) = match state.llm.categorize_and_summarize(&payload.text).await {
-        Ok(classification) => {
-            let tags = serde_json::to_string(&classification.tags).unwrap_or_else(|_| "[]".to_string());
-            (classification.category, Some(classification.summary), tags)
-        }
-        Err(e) => {
-            tracing::warn!("LLM-Kategorisierung fehlgeschlagen: {e}");
-            ("Unsorted".to_string(), None, "[]".to_string())
-        }
-    };
+    // LLM-Kategorisierung versuchen. `inbox_id` ist nur beim
+    // Obsidian-Provider gesetzt (Pending-Pattern, Phase B): die
+    // Klassifikation läuft asynchron via Vault-Sortier-Skill, hier
+    // persistieren wir nur die Pending-Markierung.
+    let (category, summary, tags_json, status, inbox_id) =
+        match state.llm.categorize_and_summarize(&payload.text).await {
+            Ok(classification) => {
+                let tags = serde_json::to_string(&classification.tags)
+                    .unwrap_or_else(|_| "[]".to_string());
+                let status = if classification.inbox_id.is_some() {
+                    crate::models::classification_status::PENDING
+                } else {
+                    crate::models::classification_status::DONE
+                };
+                (
+                    classification.category,
+                    Some(classification.summary),
+                    tags,
+                    status,
+                    classification.inbox_id,
+                )
+            }
+            Err(e) => {
+                tracing::warn!("LLM-Kategorisierung fehlgeschlagen: {e}");
+                (
+                    "Unsorted".to_string(),
+                    None,
+                    "[]".to_string(),
+                    crate::models::classification_status::DONE,
+                    None,
+                )
+            }
+        };
 
-    // Entry mit Kategorisierung updaten
-    sqlx::query("UPDATE braindumps SET category = ?, summary = ?, tags_json = ? WHERE id = ?")
-        .bind(&category)
-        .bind(&summary)
-        .bind(&tags_json)
-        .bind(&entry.id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
-        })?;
+    // Entry mit Kategorisierung updaten (inkl. Pending-Status + Inbox-ID
+    // wenn der Provider dafür einen Wert geliefert hat).
+    sqlx::query(
+        "UPDATE braindumps SET category = ?, summary = ?, tags_json = ?, \
+         classification_status = ?, nexus_inbox_id = ? WHERE id = ?",
+    )
+    .bind(&category)
+    .bind(&summary)
+    .bind(&tags_json)
+    .bind(status)
+    .bind(&inbox_id)
+    .bind(&entry.id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
 
     let updated = repo::get_by_id(&state.pool, &entry.id)
         .await
@@ -566,12 +597,20 @@ pub async fn recategorize_unsorted_inner(
         match llm.categorize_and_summarize(&entry.raw_text).await {
             Ok(classification) => {
                 let tags = serde_json::to_string(&classification.tags).unwrap_or_else(|_| "[]".to_string());
+                let status = if classification.inbox_id.is_some() {
+                    crate::models::classification_status::PENDING
+                } else {
+                    crate::models::classification_status::DONE
+                };
                 let result = sqlx::query(
-                    "UPDATE braindumps SET category = ?, summary = ?, tags_json = ? WHERE id = ?"
+                    "UPDATE braindumps SET category = ?, summary = ?, tags_json = ?, \
+                     classification_status = ?, nexus_inbox_id = ? WHERE id = ?",
                 )
                 .bind(&classification.category)
                 .bind(&classification.summary)
                 .bind(&tags)
+                .bind(status)
+                .bind(&classification.inbox_id)
                 .bind(&entry.id)
                 .execute(pool)
                 .await;
@@ -678,6 +717,14 @@ pub async fn setup_status() -> Json<SetupStatus> {
     let provider_configured = if default == "noop" {
         // Onboarding-Skip: NoOpProvider gilt als bewusst gewählter Default.
         true
+    } else if default == "obsidian" {
+        // Obsidian-Briefkasten: braucht keinen API-Key, aber einen Vault-Pfad.
+        // Quelle analog Config::load (env > keystore).
+        std::env::var("NEXUS_VAULT_PATH")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(crate::keystore::get_vault_path)
+            .is_some()
     } else if default == "ollama" {
         ollama_reachable
     } else {
@@ -713,6 +760,13 @@ pub async fn onboard_set_provider(
         crate::keystore::set_default_provider("noop")
             .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_default_provider: {}", e)))?;
         return Ok(Json(json!({"status": "ok", "provider": "noop"})));
+    }
+    if payload.provider == "obsidian" {
+        // Obsidian-Briefkasten: kein API-Key, Vault-Pfad muss separat
+        // gesetzt sein (env oder Wizard in Phase D). Hier nur Default-Marker.
+        crate::keystore::set_default_provider("obsidian")
+            .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_default_provider: {}", e)))?;
+        return Ok(Json(json!({"status": "ok", "provider": "obsidian"})));
     }
     crate::keystore::set_key(&payload.provider, &payload.api_key)
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_key: {}", e)))?;
@@ -795,6 +849,10 @@ pub async fn settings_models(
         "deepseek" => &["deepseek-chat"],
         "openrouter" => &["openrouter/auto"],
         "zai" => &["glm-4-plus", "glm-4-flash"],
+        // Obsidian-Briefkasten hat keine LLM-Modelle — Sortierung passiert
+        // Vault-seitig durch das obsidian-skill (kepano). Frontend zeigt
+        // dann einen Hinweis statt eines Modell-Dropdowns.
+        "obsidian" => &[],
         _ => {
             return Err((
                 StatusCode::BAD_REQUEST,

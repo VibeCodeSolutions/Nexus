@@ -1,5 +1,6 @@
 pub mod claude;
 pub mod gemini;
+pub mod obsidian;
 pub mod ollama;
 pub mod openai_compatible;
 pub mod zai;
@@ -15,6 +16,14 @@ pub struct Classification {
     pub category: String,
     pub summary: String,
     pub tags: Vec<String>,
+    /// Obsidian-Briefkasten Pending-Pattern (Phase B):
+    /// Wenn `Some`, hat der Provider eine Inbox-Datei im Vault geschrieben
+    /// und gibt nur einen Pending-Marker zurück. Der Aufrufer setzt dann
+    /// `braindumps.classification_status = 'pending'` und persistiert die
+    /// `inbox_id` in `braindumps.nexus_inbox_id`. Klassische LLM-Provider
+    /// lassen das Feld leer (serde-default → `None`).
+    #[serde(default)]
+    pub inbox_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,6 +134,21 @@ impl LlmProvider for NoOpProvider {
 pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, String> {
     match provider_name {
         "noop" => Ok(Box::new(NoOpProvider)),
+        "obsidian" => {
+            // Vault-Pfad analog zur Config-Logik: env > keystore > Fehler.
+            let vault = std::env::var("NEXUS_VAULT_PATH")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .or_else(crate::keystore::get_vault_path)
+                .ok_or_else(|| {
+                    "Obsidian-Provider: kein Vault-Pfad konfiguriert. \
+                     Setze NEXUS_VAULT_PATH oder konfiguriere via Wizard (Phase D)."
+                        .to_string()
+                })?;
+            Ok(Box::new(obsidian::ObsidianProvider::new(
+                std::path::PathBuf::from(vault),
+            )?))
+        }
         "claude" => {
             // OAuth zuerst, dann API-Key als Fallback
             if let Ok(tokens) = keystore::get_oauth("claude") {

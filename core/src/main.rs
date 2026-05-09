@@ -9,6 +9,7 @@ mod links;
 mod llm;
 mod models;
 mod oauth;
+mod obsidian;
 mod repo;
 mod suggestions;
 

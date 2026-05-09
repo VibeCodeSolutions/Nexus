@@ -1,8 +1,8 @@
 # NEXUS — Current State
 
 **Stand:** 2026-05-09
-**Aktuelle Phase:** Sprint "Obsidian-Briefkasten" — Phase A+B code-fertig, Phase C/D/E offen. Parallel: Sprint "Happy Thompson" wartet weiterhin auf Admin-VM-Smoke (`v0.1.3`-Tag-Kandidat).
-**Phase-Status:** v0.1.0 GA-fähig, v0.1.2 released, v0.1.3-Kandidat Happy Thompson code-fertig, **Obsidian-Briefkasten Phase B Tuvok-grün nach Auflagen-Fix, bereit für Commit + Phase C.**
+**Aktuelle Phase:** Sprint "Obsidian-Briefkasten" — Phase A+B+C code-fertig, Phase D/E offen. Parallel: Sprint "Happy Thompson" wartet weiterhin auf Admin-VM-Smoke (`v0.1.3`-Tag-Kandidat).
+**Phase-Status:** v0.1.0 GA-fähig, v0.1.2 released, v0.1.3-Kandidat Happy Thompson code-fertig, **Obsidian-Briefkasten Backend (Phase A–C) komplett: BrainDump → Inbox-File → Vault-Skill → Outbox → Sync-Endpoint zurück in Nexus-DB. Wizard (Phase D) und Cross-Platform-Smoke (Phase E) offen.**
 
 ---
 
@@ -13,14 +13,20 @@ Auslöser: File-basierte LLM-Bridge zwischen Nexus und Obsidian-Vault. Statt syn
 **Phasen:**
 - ✅ **Phase A — Foundation** (`5b1ef45`): Migration `20260503_001_obsidian_briefkasten.sql` mit `classification_status` + `nexus_inbox_id`, BrainDumpEntry-Erweiterung, Config + Keystore-Hooks für `vault_path`, `gray_matter = "0.2"`. Tuvok ✅ ohne Auflagen, 2 Minor-Bookmarks (OB-A-MIN-1 gray_matter-Bump, OB-A-MIN-2 Migration-Roundtrip-Test).
 - ✅ **Phase B — Inbox-Writer + Provider** (uncommitted, bereit): Pre-Step OB-A-MIN-1 erledigt (`gray_matter = "0.3"`). Neuer Modul-Baum `core/src/obsidian/{mod,frontmatter,mailbox}.rs` (atomic write via tmp+rename, YAML-Quoting injection-safe, gray_matter-Roundtrip-Test). `core/src/llm/obsidian.rs` ObsidianProvider mit Pending-Pattern: classify schreibt Inbox-File und gibt sofort `Classification{category:"Pending",inbox_id:Some(uuid)}` zurück. `Classification.inbox_id: Option<String>` mit `#[serde(default)]` → bestehende JSON-Provider unverändert kompatibel. `handlers::post_braindump` + `recategorize_unsorted_inner` persistieren `classification_status` + `nexus_inbox_id`. `setup_status`/`onboard_set_provider`/`settings_models` haben obsidian-Arme analog noop. Tuvok-Iter-1 (qs-20260509-001) Auflagen-Verdikt mit 1 Major (OB-B-MAJ-1 obsidian/noop nicht in `set_default_provider`-Validation) + 2 Minor → Findings-Gate-Fix: neue `SKIP_PROVIDERS`-Konstante + `is_acceptable_default`-Helper in keystore.rs, 3 neue Unit-Tests. cargo test 42/42 grün, clippy clean. Freigabe erteilt.
-- ⏳ **Phase C — Outbox-Importer**: `obsidian/importer.rs` Outbox-Scanner + `/api/obsidian/sync`-Endpoint, Frontmatter-Parser, Dispatch nach `nexus_type`, Archivierung in `_processed/`. Inkl. End-to-End-Test mit post_braindump → Outbox-Sync → status flip done (deckt OB-B-MIN-1 ab).
-- ⏳ **Phase D — Wizard-Erweiterung**: `cli.rs` Picker + Tauri Folder-Dialog im Setup-Wizard, „Obsidian"-Option im LLM-Auswahlscreen.
-- ⏳ **Phase E — Cross-Platform-Smoke**: Win11-Pfade, NTFS-Permissions auf Vault-Ordner (durch Barclay).
+- ✅ **Phase C — Outbox-Importer** (uncommitted, bereit): Typisierter Frontmatter-Parser (`OutboxFrontmatter` + `NexusType`-Enum + `parse_outbox_typed`). Neue `obsidian/importer.rs` mit Scanner (md-only, ignoriert .tmp + _processed/), Dispatcher (Task→repo::create_task, Project→create_project mit body als description, Note→nur Status-Flip, Habit/Journal→Skipped wegen fehlendem DB-Schema), `flip_source_braindump` (UPDATE braindumps SET classification_status='done' + Category/Summary/Tags aus Outbox-Frontmatter, idempotent via `AND classification_status='pending'`-Klausel), Best-Effort Wikilink-Resolution (eindeutige Name-Matches), Atomic Archive nach `_processed/` mit `.dup-N`-Schutz vor Überschreibung. Neuer Endpoint `POST /api/obsidian/sync` (Bearer-pflichtig, 412 PRECONDITION_FAILED ohne Vault-Pfad). 60/60 Tests grün (18 neu für Phase C: 7 frontmatter, 11 importer), clippy clean. Tuvok-Iter-1 (qs-20260509-002) ✅ Freigabe — 0 Blocker / 0 Major / 7 Minor (alle Folge-Sprint-Bookmarks).
+- ⏳ **Phase D — Wizard-Erweiterung**: `cli.rs` Picker + Tauri Folder-Dialog im Setup-Wizard, „Obsidian"-Option im LLM-Auswahlscreen. Hier auch OB-C-MIN-4/5 (nexus_id-Dedup + Singleflight-Lock im Sync-Endpoint) mitnehmen.
+- ⏳ **Phase E — Cross-Platform-Smoke**: Win11-Pfade, NTFS-Permissions auf Vault-Ordner, EXDEV-Test bei cross-mount _processed/ (durch Barclay).
 
-**Folge-Sprint-Bookmarks:**
-- OB-A-MIN-2 Migration-Roundtrip-Test (Phase B oder E)
-- OB-B-MIN-1 post_braindump-Integration-Test mit Obsidian (Phase C als Roundtrip-Teil)
+**Folge-Sprint-Bookmarks (Phase D/E):**
+- OB-A-MIN-2 Migration-Roundtrip-Test
 - OB-B-MIN-2 gray_matter 0.4+ beim nächsten Dependency-Bump checken
+- OB-C-MIN-1 Symlink-Annahme „Vault ist trusted" als Doc-Comment in scan_outbox
+- OB-C-MIN-2 archive cross-mount: rename-Fail → copy+remove als Fallback, Win11-Smoke
+- OB-C-MIN-3 OutboxFrontmatter::nexus_type als typed enum statt String (toter Err-Pfad in dispatch)
+- OB-C-MIN-4 nexus_id-Dedup beim repo::create_task/create_project (Crash-Robustheit)
+- OB-C-MIN-5 Singleflight-Lock auf /api/obsidian/sync (Race-Robustheit, ~5 Zeilen)
+- OB-C-MIN-6 HTTP-Endpoint-Test-Infrastruktur (reqwest + spawned axum) — gilt allgemein für post_braindump+Obsidian + sync-Endpoint
+- OB-C-MIN-7 „note ohne nexus_source_inbox" semantisch klären — Failed oder explizit „Vault-only Note" loggen
 
 ---
 

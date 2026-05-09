@@ -3,4 +3,5 @@
 //! Phase C ergänzt den Outbox-Importer.
 
 pub mod frontmatter;
+pub mod importer;
 pub mod mailbox;

@@ -82,15 +82,112 @@ fn yaml_quote(s: &str) -> String {
     out
 }
 
-/// Outbox-Parser-Stub (Phase C konsumiert den `Pod`-Wert und mapped auf
-/// typisierte Outbox-Frontmatter). Verifiziert in Phase B nur, dass
-/// `gray_matter` 0.3 die erwartete API exposed.
-#[allow(dead_code)]
+/// Roher Outbox-Parse (Phase B-Stub, von Phase C weitergenutzt für
+/// Body-Extraktion). Liefert `gray_matter`s `ParsedEntity` — die
+/// typisierte Frontmatter-Struktur erzeugt [`parse_outbox_typed`].
 pub fn parse_outbox(input: &str) -> Result<gray_matter::ParsedEntity, String> {
     use gray_matter::engine::YAML;
     use gray_matter::Matter;
     let matter: Matter<YAML> = Matter::new();
     matter.parse(input).map_err(|e| e.to_string())
+}
+
+/// Eindeutiger nexus_type-Wert eines Outbox-Files. Phase C unterstützt
+/// `task`, `project` und `note`. `habit`/`journal` sind im Vault-Vertrag
+/// vorgesehen, aber noch ohne DB-Schema in Nexus — der Importer wirft
+/// dafür einen klaren Fehler statt stiller Fehlinterpretation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NexusType {
+    Task,
+    Project,
+    Note,
+    Habit,
+    Journal,
+}
+
+impl NexusType {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "task" => Ok(NexusType::Task),
+            "project" => Ok(NexusType::Project),
+            "note" => Ok(NexusType::Note),
+            "habit" => Ok(NexusType::Habit),
+            "journal" => Ok(NexusType::Journal),
+            other => Err(format!(
+                "Unbekannter nexus_type '{other}'. Erlaubt: task, project, note, habit, journal."
+            )),
+        }
+    }
+}
+
+/// Typisiertes Frontmatter eines Outbox-Files. Alle Felder außer
+/// `nexus_type` sind optional, weil das Vault-Skill je nach `nexus_type`
+/// nur eine Teilmenge füllt (z.B. `priority`/`due` nur bei Tasks).
+/// Validation pro Typ macht der Importer.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct OutboxFrontmatter {
+    pub nexus_type: String,
+    /// Vault-seitige UUID. In Phase C nicht konsumiert (Nexus generiert
+    /// eigene IDs beim DB-Insert), aber bewusst im Schema gehalten —
+    /// Phase D/E können das als Trace-ID für bidirektionale Sync-Paare nutzen.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub nexus_id: Option<String>,
+    /// Inbox-File-Name (mit oder ohne `.md`), referenziert die ursprüngliche
+    /// BrainDump-Row über `braindumps.nexus_inbox_id`. Wenn vorhanden,
+    /// flippt der Importer den Status von 'pending' auf 'done'.
+    #[serde(default)]
+    pub nexus_source_inbox: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Task-Fälligkeit (ISO 8601, nur bei nexus_type=task). Phase C ignoriert
+    /// das Feld — Task-Modell hat aktuell keine due-Spalte. Schema-Erweiterung
+    /// in einem späteren Sprint („Tasks-Phase") wird es konsumieren.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub due: Option<String>,
+    #[serde(default)]
+    pub priority: Option<String>,
+    /// Wikilink-Form `"[[Project X]]"` (Phase D resolved den Namen zu einer
+    /// project_id; Phase C nimmt den Roh-String und lässt `project_id=None`,
+    /// wenn sich kein eindeutiger Match ergibt).
+    #[serde(default)]
+    pub project: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    /// Zeitstempel aus dem Vault-Skill (ISO 8601). Informational; Nexus
+    /// nutzt eigene `created_at`-Timestamps beim DB-Insert.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub created: Option<String>,
+}
+
+/// Typisierter Outbox-Parse: Frontmatter-Struktur + roher Body. Body wird
+/// ohne führenden Leerzeilen-Trim zurückgegeben — für `nexus_type=project`
+/// landet er als description, für `task`/`note` ist er informational.
+#[derive(Debug, Clone)]
+pub struct OutboxParsed {
+    pub frontmatter: OutboxFrontmatter,
+    pub body: String,
+}
+
+pub fn parse_outbox_typed(input: &str) -> Result<OutboxParsed, String> {
+    let parsed = parse_outbox(input)?;
+    let data = parsed
+        .data
+        .ok_or_else(|| "Outbox-Datei ohne YAML-Frontmatter".to_string())?;
+    let fm: OutboxFrontmatter = data
+        .deserialize()
+        .map_err(|e| format!("Outbox-Frontmatter konnte nicht deserialisiert werden: {e}"))?;
+    // nexus_type wird hier validiert, damit der Importer schon vor dem
+    // Dispatch eine klare Fehlermeldung bekommt.
+    NexusType::from_str(&fm.nexus_type)?;
+    Ok(OutboxParsed {
+        frontmatter: fm,
+        body: parsed.content,
+    })
 }
 
 #[cfg(test)]
@@ -142,5 +239,97 @@ mod tests {
             "01HZ1A2B3C4D5E6F7G8H9JKLMN"
         );
         assert_eq!(parsed.content.trim(), "BrainDump-Body");
+    }
+
+    #[test]
+    fn nexus_type_parses_known_values_case_insensitive() {
+        assert_eq!(NexusType::from_str("task").unwrap(), NexusType::Task);
+        assert_eq!(NexusType::from_str("PROJECT").unwrap(), NexusType::Project);
+        assert_eq!(NexusType::from_str(" Note ").unwrap(), NexusType::Note);
+        assert_eq!(NexusType::from_str("habit").unwrap(), NexusType::Habit);
+        assert_eq!(NexusType::from_str("journal").unwrap(), NexusType::Journal);
+    }
+
+    #[test]
+    fn nexus_type_rejects_unknown() {
+        let err = NexusType::from_str("widget").unwrap_err();
+        assert!(err.contains("widget"));
+        assert!(err.contains("Erlaubt"));
+    }
+
+    #[test]
+    fn parse_outbox_typed_task_full() {
+        let input = r#"---
+nexus_type: task
+nexus_id: 01HZ-task-001
+nexus_source_inbox: 01HZ-inbox-001.md
+title: Marie anrufen
+tags:
+  - call
+  - personal
+due: 2026-05-10
+priority: high
+project: "[[Project X]]"
+status: todo
+created: 2026-05-09T10:00:00Z
+---
+Optional body for the task.
+"#;
+        let p = parse_outbox_typed(input).expect("must parse");
+        assert_eq!(p.frontmatter.nexus_type, "task");
+        assert_eq!(p.frontmatter.nexus_id.as_deref(), Some("01HZ-task-001"));
+        assert_eq!(
+            p.frontmatter.nexus_source_inbox.as_deref(),
+            Some("01HZ-inbox-001.md")
+        );
+        assert_eq!(p.frontmatter.title.as_deref(), Some("Marie anrufen"));
+        assert_eq!(p.frontmatter.tags, vec!["call".to_string(), "personal".to_string()]);
+        assert_eq!(p.frontmatter.due.as_deref(), Some("2026-05-10"));
+        assert_eq!(p.frontmatter.priority.as_deref(), Some("high"));
+        assert_eq!(p.frontmatter.project.as_deref(), Some("[[Project X]]"));
+        assert_eq!(p.frontmatter.status.as_deref(), Some("todo"));
+        assert!(p.body.contains("Optional body"));
+    }
+
+    #[test]
+    fn parse_outbox_typed_project_minimal() {
+        let input = r#"---
+nexus_type: project
+title: Vault-Migration
+---
+Beschreibung als Body.
+"#;
+        let p = parse_outbox_typed(input).unwrap();
+        assert_eq!(p.frontmatter.nexus_type, "project");
+        assert_eq!(p.frontmatter.title.as_deref(), Some("Vault-Migration"));
+        assert!(p.frontmatter.priority.is_none());
+        assert!(p.body.contains("Beschreibung"));
+    }
+
+    #[test]
+    fn parse_outbox_typed_note_with_source_inbox() {
+        let input = r#"---
+nexus_type: note
+nexus_source_inbox: abc.md
+tags: [random, idea]
+---
+Body egal.
+"#;
+        let p = parse_outbox_typed(input).unwrap();
+        assert_eq!(p.frontmatter.nexus_type, "note");
+        assert_eq!(p.frontmatter.tags, vec!["random".to_string(), "idea".to_string()]);
+    }
+
+    #[test]
+    fn parse_outbox_typed_rejects_missing_frontmatter() {
+        let err = parse_outbox_typed("kein YAML hier\n").unwrap_err();
+        assert!(err.contains("ohne YAML-Frontmatter"));
+    }
+
+    #[test]
+    fn parse_outbox_typed_rejects_unknown_nexus_type() {
+        let input = "---\nnexus_type: widget\n---\nfoo\n";
+        let err = parse_outbox_typed(input).unwrap_err();
+        assert!(err.contains("widget"));
     }
 }

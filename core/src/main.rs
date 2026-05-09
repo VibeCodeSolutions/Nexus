@@ -183,6 +183,8 @@ async fn main() {
                 .route("/projects/suggestions", get(handlers::list_project_suggestions))
                 .route("/projects/suggestions/{id}/accept", post(handlers::accept_project_suggestion))
                 .route("/projects/suggestions/{id}/dismiss", post(handlers::dismiss_project_suggestion))
+                // Obsidian-Briefkasten Phase C
+                .route("/api/obsidian/sync", post(handlers::obsidian_sync))
                 .layer(middleware::from_fn(auth::require_token))
                 .layer(
                     CorsLayer::new()

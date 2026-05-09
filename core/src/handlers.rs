@@ -633,6 +633,37 @@ pub async fn recategorize_unsorted_inner(
     Ok(RecategorizeStats { total, updated, failed })
 }
 
+/// Obsidian-Briefkasten Phase C: Outbox-Sync.
+/// Scannt `<vault>/Nexus/Outbox/`, importiert jedes File nach
+/// `nexus_type` (task/project/note → DB-Mutation; habit/journal →
+/// skip mit Begründung), flippt source-BrainDumps von 'pending' auf
+/// 'done', archiviert erfolgreiche Files in `_processed/`.
+///
+/// 412 PRECONDITION_FAILED, wenn kein Vault-Pfad konfiguriert ist
+/// (vermeidet stille Fehlermaskierung — der Aufrufer weiß sofort,
+/// dass er den Vault einrichten muss).
+pub async fn obsidian_sync(
+    State(_state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let cfg = Config::load();
+    let vault = cfg.vault_path.ok_or((
+        StatusCode::PRECONDITION_FAILED,
+        Json(json!({
+            "error": "Kein Obsidian-Vault konfiguriert. Setze NEXUS_VAULT_PATH oder konfiguriere via Wizard (Phase D)."
+        })),
+    ))?;
+    let pool = _state.pool.clone();
+    let summary = crate::obsidian::importer::import_outbox(&pool, &vault)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e })),
+            )
+        })?;
+    Ok(Json(json!(summary)))
+}
+
 pub async fn recategorize_unsorted(
     State(state): State<AppState>,
     Query(q): Query<RecategorizeQuery>,

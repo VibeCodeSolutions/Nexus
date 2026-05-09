@@ -1163,6 +1163,7 @@ const PROVIDERS = [
   { id: 'deepseek',   name: 'DeepSeek',   cost: 'Pay-per-Token',                type: 'api_key',      docs: 'https://platform.deepseek.com/api_keys' },
   { id: 'openrouter', name: 'OpenRouter', cost: 'Pay-per-Token',                type: 'api_key',      docs: 'https://openrouter.ai/keys' },
   { id: 'zai',        name: 'z.ai (GLM)', cost: 'Free Tier verfügbar',          type: 'api_key',      docs: 'https://open.bigmodel.cn/' },
+  { id: 'obsidian',   name: 'Obsidian-Briefkasten', cost: 'Lokal, File-Bridge zu Obsidian', type: 'obsidian', docs: 'https://obsidian.md/' },
 ];
 
 let onboardCoreUrl = coreUrl;
@@ -1435,6 +1436,24 @@ function renderProviderDetail() {
       const btn = document.getElementById('recheckOllamaBtn');
       if (btn) btn.onclick = recheckOllama;
     }
+  } else if (selectedProvider.type === 'obsidian') {
+    const currentVault = (setupStatus && setupStatus.vault_path) || '';
+    detail.innerHTML = `
+      <p><strong>Obsidian-Briefkasten</strong></p>
+      <p>Nexus schreibt deine BrainDumps als Markdown-Dateien in <code>&lt;Vault&gt;/Nexus/Inbox/</code>. Ein Vault-seitiges Sortier-Skill (z.&nbsp;B. <code>kepano/obsidian-skills</code>) erzeugt Outbox-Dateien — beim nächsten Sync (manuell via <code>POST /api/obsidian/sync</code>) zieht Nexus die Ergebnisse zurück in seine Datenbank.</p>
+      <input type="text" placeholder="Absoluter Pfad, z.B. /home/du/Vaults/MeinVault" id="vaultPath" autocomplete="off" value="${esc(currentVault)}" />
+      <button class="btn-secondary" data-action="pick-vault" type="button">Ordner wählen…</button>
+      <p class="subtle">Der Pfad muss bereits existieren und ein Verzeichnis sein. Die <code>Nexus/Inbox</code>-Hierarchie wird beim ersten BrainDump automatisch angelegt.</p>
+    `;
+    const input = document.getElementById('vaultPath');
+    const updateBtn = () => { nextBtn.disabled = !input.value.trim(); };
+    input.addEventListener('input', updateBtn);
+    updateBtn();
+    nextBtn.onclick = async () => {
+      const vault = input.value.trim();
+      if (!vault) return;
+      if (await saveProvider('obsidian', '', vault)) showScreen('screenDone');
+    };
   } else if (selectedProvider.type === 'oauth_or_key') {
     detail.innerHTML = `
       <p><strong>Claude einrichten</strong></p>
@@ -1472,15 +1491,17 @@ function renderProviderDetail() {
   }
 }
 
-async function saveProvider(provider, apiKey) {
+async function saveProvider(provider, apiKey, vaultPath) {
   try {
+    const body = { provider, api_key: apiKey };
+    if (vaultPath) body.vault_path = vaultPath;
     const r = await fetch(`${onboardCoreUrl}/api/onboard/set-provider`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${onboardCoreToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ provider, api_key: apiKey })
+      body: JSON.stringify(body)
     });
     if (!r.ok) {
       const t = await r.text();
@@ -1724,6 +1745,7 @@ document.addEventListener('click', (e) => {
     case 'sugg-accept': acceptSuggestion(el.dataset.suggId); break;
     case 'sugg-dismiss': dismissSuggestion(el.dataset.suggId); break;
     case 'onboard-skip': skipOnboardingProvider(); break;
+    case 'pick-vault': pickVaultFolder(); break;
   }
 });
 
@@ -1731,6 +1753,30 @@ document.addEventListener('click', (e) => {
 // User kann Provider später via Settings konfigurieren.
 async function skipOnboardingProvider() {
   if (await saveProvider('noop', '')) showScreen('screenDone');
+}
+
+// Phase D Obsidian-Briefkasten: nativen Folder-Dialog via Tauri öffnen,
+// wenn verfügbar. Im reinen Browser-Kontext (oder wenn das dialog-Plugin
+// deaktiviert ist) bleibt das Text-Input das Eingabe-Mittel.
+async function pickVaultFolder() {
+  const input = document.getElementById('vaultPath');
+  if (!input) return;
+  const tauri = window.__TAURI__;
+  if (!tauri || !tauri.dialog || typeof tauri.dialog.open !== 'function') {
+    alert('Folder-Dialog nicht verfügbar — bitte Pfad direkt eintippen.');
+    input.focus();
+    return;
+  }
+  try {
+    const picked = await tauri.dialog.open({ directory: true, multiple: false, title: 'Obsidian-Vault auswählen' });
+    if (typeof picked === 'string' && picked) {
+      input.value = picked;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  } catch (e) {
+    console.warn('Folder-Dialog-Fehler:', e);
+    alert('Folder-Dialog konnte nicht geöffnet werden — bitte Pfad direkt eintippen.');
+  }
 }
 
 document.addEventListener('change', (e) => {

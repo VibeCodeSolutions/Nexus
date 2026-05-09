@@ -184,7 +184,6 @@ pub struct ProviderStatus {
     pub is_default: bool,
 }
 
-#[allow(dead_code)] // wired in Phase D (Wizard)
 pub fn set_vault_path(path: &str) -> Result<(), String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {

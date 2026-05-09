@@ -35,6 +35,12 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub llm: Arc<dyn LlmProvider>,
     pub started_at: std::time::Instant,
+    /// Singleflight-Lock für `/api/obsidian/sync` (OB-C-MIN-5).
+    /// `try_lock` im Handler → bei laufendem Sync 409 CONFLICT, statt
+    /// parallel zwei Importer auf denselben Outbox-Files anzusetzen
+    /// (würde Doppel-Inserts erzeugen, weil aktuell kein nexus_id-Dedup
+    /// auf Task/Project-Inserts existiert — siehe OB-C-MIN-4 für Phase E).
+    pub obsidian_sync_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 #[tokio::main]
@@ -136,6 +142,7 @@ async fn main() {
                 pool,
                 llm: llm_provider,
                 started_at: std::time::Instant::now(),
+                obsidian_sync_lock: Arc::new(tokio::sync::Mutex::new(())),
             };
 
             // Clone für Background-Recategorize-Task (Phase D / JJ-D2) — VOR with_state(state)
@@ -356,6 +363,7 @@ async fn run_onboard() -> Result<(), String> {
         "Groq",
         "DeepSeek",
         "OpenRouter",
+        "Obsidian-Briefkasten (File-Bridge, kein Cloud-LLM)",
     ];
     let provider_idx = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Welchen LLM-Provider möchtest du nutzen?")
@@ -373,8 +381,34 @@ async fn run_onboard() -> Result<(), String> {
         5 => "groq",
         6 => "deepseek",
         7 => "openrouter",
+        8 => "obsidian",
         _ => "zai",
     };
+
+    if provider == "obsidian" {
+        println!(
+            "ℹ️  Obsidian-Briefkasten: Nexus schreibt BrainDumps als Markdown-Dateien\n   in <Vault>/Nexus/Inbox/. Ein Vault-seitiges Sortier-Skill erzeugt\n   Outbox-Dateien, die Nexus per `POST /api/obsidian/sync` zurückzieht.\n"
+        );
+        let vault_input: String = Input::with_theme(&ColorfulTheme::default())
+            .with_prompt("Absoluter Pfad zum Obsidian-Vault")
+            .interact_text()
+            .map_err(|e| e.to_string())?;
+        let trimmed = vault_input.trim();
+        if trimmed.is_empty() {
+            return Err("Vault-Pfad darf nicht leer sein".to_string());
+        }
+        let path = std::path::Path::new(trimmed);
+        if !path.is_dir() {
+            return Err(format!(
+                "Vault-Pfad '{trimmed}' existiert nicht oder ist kein Verzeichnis"
+            ));
+        }
+        keystore::set_vault_path(trimmed)?;
+        keystore::set_default_provider("obsidian")?;
+        println!("✅ Obsidian-Vault gesetzt: {trimmed}");
+        println!("\nFertig! Starte den Server mit: nexus serve");
+        return Ok(());
+    }
 
     if provider == "claude" {
         let methods = vec![

@@ -643,17 +643,30 @@ pub async fn recategorize_unsorted_inner(
 /// (vermeidet stille Fehlermaskierung — der Aufrufer weiß sofort,
 /// dass er den Vault einrichten muss).
 pub async fn obsidian_sync(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let cfg = Config::load();
     let vault = cfg.vault_path.ok_or((
         StatusCode::PRECONDITION_FAILED,
         Json(json!({
-            "error": "Kein Obsidian-Vault konfiguriert. Setze NEXUS_VAULT_PATH oder konfiguriere via Wizard (Phase D)."
+            "error": "Kein Obsidian-Vault konfiguriert. Setze NEXUS_VAULT_PATH oder konfiguriere via Wizard."
         })),
     ))?;
-    let pool = _state.pool.clone();
-    let summary = crate::obsidian::importer::import_outbox(&pool, &vault)
+
+    // Singleflight (OB-C-MIN-5): kein paralleler Sync. Bei laufendem
+    // Sync gibt der Endpoint 409 CONFLICT zurück, statt zu blockieren —
+    // der Aufrufer kann sofort wieder anbieten und der User sieht den
+    // Status, statt einen hängenden Request.
+    let _guard = state.obsidian_sync_lock.try_lock().map_err(|_| {
+        (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": "Outbox-Sync läuft bereits — bitte warten und erneut versuchen."
+            })),
+        )
+    })?;
+
+    let summary = crate::obsidian::importer::import_outbox(&state.pool, &vault)
         .await
         .map_err(|e| {
             (
@@ -702,6 +715,11 @@ pub struct SetupStatus {
     pub default_provider: String,
     pub ollama_reachable: bool,
     pub version: String,
+    /// Phase D: aktueller Vault-Pfad, falls konfiguriert. Frontend zeigt
+    /// ihn im Settings-Modal an, damit der User sieht, *welcher* Vault
+    /// aktiv ist (nicht nur „obsidian: konfiguriert").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vault_path: Option<String>,
 }
 
 async fn check_ollama() -> bool {
@@ -766,6 +784,11 @@ pub async fn setup_status() -> Json<SetupStatus> {
         has_nonempty_key || has_oauth
     };
 
+    let vault_path = std::env::var("NEXUS_VAULT_PATH")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .or_else(crate::keystore::get_vault_path);
+
     Json(SetupStatus {
         paired,
         paired_at,
@@ -773,6 +796,7 @@ pub async fn setup_status() -> Json<SetupStatus> {
         default_provider: default,
         ollama_reachable,
         version: env!("CARGO_PKG_VERSION").to_string(),
+        vault_path,
     })
 }
 
@@ -781,6 +805,12 @@ pub struct SetProviderRequest {
     pub provider: String,
     #[serde(default)]
     pub api_key: String,
+    /// Phase D: nur für `provider="obsidian"` ausgewertet — absoluter
+    /// Vault-Pfad. Wird per `keystore::set_vault_path` persistiert,
+    /// damit der `ObsidianProvider` ihn beim nächsten `create_provider`
+    /// laden kann.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vault_path: Option<String>,
 }
 
 pub async fn onboard_set_provider(
@@ -793,11 +823,41 @@ pub async fn onboard_set_provider(
         return Ok(Json(json!({"status": "ok", "provider": "noop"})));
     }
     if payload.provider == "obsidian" {
-        // Obsidian-Briefkasten: kein API-Key, Vault-Pfad muss separat
-        // gesetzt sein (env oder Wizard in Phase D). Hier nur Default-Marker.
+        // Obsidian-Briefkasten: kein API-Key, aber Vault-Pfad ist Pflicht.
+        // Wenn der Aufrufer einen Pfad mitschickt → persistieren. Wenn nicht,
+        // muss er bereits via env oder vorigem Aufruf gesetzt sein — sonst
+        // schlägt der spätere create_provider fehl.
+        if let Some(raw) = payload.vault_path.as_deref() {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "vault_path darf nicht leer sein".to_string(),
+                ));
+            }
+            // Existenz-Check als frühe Diagnose. Wir verlangen ein
+            // Verzeichnis (kein File), damit der Provider später nicht
+            // bei jedem BrainDump auf einer kaputten Pfad-Annahme bricht.
+            let p = std::path::Path::new(trimmed);
+            if !p.is_dir() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    format!(
+                        "vault_path '{trimmed}' existiert nicht oder ist kein Verzeichnis"
+                    ),
+                ));
+            }
+            crate::keystore::set_vault_path(trimmed).map_err(|e| {
+                (StatusCode::BAD_REQUEST, format!("set_vault_path: {}", e))
+            })?;
+        }
         crate::keystore::set_default_provider("obsidian")
             .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_default_provider: {}", e)))?;
-        return Ok(Json(json!({"status": "ok", "provider": "obsidian"})));
+        return Ok(Json(json!({
+            "status": "ok",
+            "provider": "obsidian",
+            "vault_path": crate::keystore::get_vault_path(),
+        })));
     }
     crate::keystore::set_key(&payload.provider, &payload.api_key)
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("set_key: {}", e)))?;
@@ -1503,7 +1563,12 @@ mod synaptic_phase_b_tests {
     }
 
     fn make_state(pool: SqlitePool, llm: Arc<dyn LlmProvider>) -> AppState {
-        AppState { pool, llm, started_at: std::time::Instant::now() }
+        AppState {
+            pool,
+            llm,
+            started_at: std::time::Instant::now(),
+            obsidian_sync_lock: std::sync::Arc::new(tokio::sync::Mutex::new(())),
+        }
     }
 
     /// SM-B-002: POST /links überschreibt client-controllable created_by auf "user".

@@ -47,6 +47,15 @@ pub struct ImportSummary {
 /// Listet alle `*.md`-Dateien direkt unter `<vault>/Nexus/Outbox/`. Files
 /// im `_processed/`-Subordner werden ignoriert (per Pfad-Filter, weil
 /// read_dir nicht-rekursiv läuft).
+///
+/// **Vertrauensmodell:** Der Vault wird als User-Owned und nicht-feindlich
+/// betrachtet (lokales Tool, kein Multi-Tenant-Server). `entry.path()` wird
+/// nicht canonicalize-ed — Symlinks innerhalb des Outbox-Ordners werden
+/// verfolgt. Wer einen Symlink auf z.B. `/etc/passwd` legen würde, könnte
+/// das parsen lassen (Frontmatter-Parse würde scheitern, kein Daten-Leak),
+/// aber das ist keine relevante Bedrohung für die aktuelle Single-User-
+/// Architektur. Sollte Nexus jemals in einem Multi-User-Kontext laufen
+/// (geplant: nicht), gehört hier ein Symlink-Check hin.
 pub fn scan_outbox(vault_path: &Path) -> Result<Vec<PathBuf>, String> {
     let outbox = vault_path.join(Config::OUTBOX_SUBDIR);
     if !outbox.exists() {
@@ -94,14 +103,64 @@ fn archive_to_processed(vault_path: &Path, file: &Path) -> Result<(), String> {
     // Vault-Skill ein File neu erzeugt hat): hänge `.dup-<n>` an, statt zu
     // überschreiben — Datenverlust wäre der schlimmere Fehlermodus.
     let final_target = unique_target(&target);
-    std::fs::rename(file, &final_target).map_err(|e| {
+    move_or_copy_remove(file, &final_target)
+}
+
+/// Verschiebt ein File primär per `rename` (atomar, schnell). Wenn das
+/// scheitert, weil Quelle und Ziel auf unterschiedlichen Mounts liegen
+/// (POSIX `EXDEV` / Windows `ERROR_NOT_SAME_DEVICE`), fällt die Funktion
+/// auf `copy + remove` zurück. OB-C-MIN-2: relevant bei Vaults, in denen
+/// `_processed/` ein Bind-Mount oder Symlink auf ein anderes Volume ist.
+fn move_or_copy_remove(src: &Path, dst: &Path) -> Result<(), String> {
+    match std::fs::rename(src, dst) {
+        Ok(()) => return Ok(()),
+        Err(e) if is_cross_device(&e) => {
+            tracing::info!(
+                "rename {} → {} cross-device, falle auf copy+remove zurück",
+                src.display(),
+                dst.display()
+            );
+        }
+        Err(e) => {
+            return Err(format!(
+                "Archivierung fehlgeschlagen ({} → {}): {}",
+                src.display(),
+                dst.display(),
+                e
+            ));
+        }
+    }
+    std::fs::copy(src, dst).map_err(|e| {
         format!(
-            "Archivierung fehlgeschlagen ({} → {}): {}",
-            file.display(),
-            final_target.display(),
+            "Archivierung-Copy fehlgeschlagen ({} → {}): {}",
+            src.display(),
+            dst.display(),
             e
         )
-    })
+    })?;
+    std::fs::remove_file(src).map_err(|e| {
+        // copy ist erfolgreich; remove failed → Quelle bleibt liegen.
+        // Das ist akzeptabel: Re-Lauf scannt sie erneut, OB-C-MIN-4-Dedup
+        // verhindert Doppel-Inserts.
+        format!(
+            "Archivierung-Remove fehlgeschlagen nach Copy ({}): {}",
+            src.display(),
+            e
+        )
+    })?;
+    Ok(())
+}
+
+fn is_cross_device(err: &std::io::Error) -> bool {
+    // `ErrorKind::CrossesDevices` ist erst in stable seit 1.85; auf
+    // älteren Toolchains liefert std::io für EXDEV `ErrorKind::Other`.
+    // Wir matchen daher zusätzlich auf den Raw-OS-Errno (Linux: 18,
+    // macOS: 18, Windows: 17 = ERROR_NOT_SAME_DEVICE).
+    if matches!(err.raw_os_error(), Some(18) | Some(17)) {
+        return true;
+    }
+    let kind_name = format!("{:?}", err.kind());
+    kind_name == "CrossesDevices"
 }
 
 fn unique_target(path: &Path) -> PathBuf {
@@ -160,10 +219,26 @@ async fn dispatch(pool: &SqlitePool, parsed: OutboxParsed) -> ImportOutcome {
     match kind {
         NexusType::Task => dispatch_task(pool, &parsed.frontmatter).await,
         NexusType::Project => dispatch_project(pool, &parsed.frontmatter, &parsed.body).await,
-        NexusType::Note => ImportOutcome::Imported {
-            kind,
-            ref_id: parsed.frontmatter.nexus_source_inbox.clone(),
-        },
+        NexusType::Note => {
+            // OB-C-MIN-7: Eine Note ohne nexus_source_inbox hat keine
+            // BrainDump-Zuordnung in Nexus — der Status-Flip oben ist
+            // No-Op, der Importer würde das File sonst stillschweigend
+            // ins _processed/ verschieben. Klarere Semantik: Skipped
+            // mit explizitem Hinweis, das File bleibt im Outbox sichtbar.
+            // Mit nexus_source_inbox ist alles OK: der Status-Flip war
+            // der eigentliche Zweck, ImportOutcome::Imported signalisiert
+            // den erfolgreichen Roundtrip.
+            if parsed.frontmatter.nexus_source_inbox.is_none() {
+                ImportOutcome::Skipped {
+                    reason: "nexus_type=note ohne nexus_source_inbox — Vault-only Note, in Nexus existiert kein passendes BrainDump zum Status-Flip. File bleibt im Outbox liegen.".to_string(),
+                }
+            } else {
+                ImportOutcome::Imported {
+                    kind,
+                    ref_id: parsed.frontmatter.nexus_source_inbox.clone(),
+                }
+            }
+        }
         NexusType::Habit | NexusType::Journal => ImportOutcome::Skipped {
             reason: format!(
                 "nexus_type='{}' ist im Vault-Vertrag vorgesehen, hat aber noch kein DB-Schema in Nexus.",
@@ -182,10 +257,41 @@ async fn dispatch_task(pool: &SqlitePool, fm: &OutboxFrontmatter) -> ImportOutco
             }
         }
     };
+
+    // OB-C-MIN-4 Dedup: Wenn der Vault-Skill eine nexus_id mitgibt und
+    // diese bereits in der DB existiert, ist es ein Re-Import (z.B. nach
+    // Importer-Crash zwischen DB-Commit und Archivierung). Skip statt
+    // Doppel-Insert.
+    if let Some(ext_id) = fm.nexus_id.as_deref().filter(|s| !s.trim().is_empty()) {
+        match crate::repo::find_task_by_external_id(pool, ext_id).await {
+            Ok(Some(existing)) => {
+                return ImportOutcome::Imported {
+                    kind: NexusType::Task,
+                    ref_id: Some(existing.id),
+                };
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return ImportOutcome::Failed {
+                    reason: format!("find_task_by_external_id: {e}"),
+                }
+            }
+        }
+    }
+
     let project_id = resolve_project_wikilink(pool, fm.project.as_deref()).await;
     let priority = fm.priority.as_deref().and_then(normalize_priority);
+    let external_id = fm.nexus_id.as_deref().filter(|s| !s.trim().is_empty());
 
-    let task = match crate::repo::create_task(pool, title, project_id.as_deref(), priority).await {
+    let task = match crate::repo::create_task_with_external_id(
+        pool,
+        title,
+        project_id.as_deref(),
+        priority,
+        external_id,
+    )
+    .await
+    {
         Ok(t) => t,
         Err(e) => {
             return ImportOutcome::Failed {
@@ -221,15 +327,38 @@ async fn dispatch_project(
             }
         }
     };
-    let description = body.trim();
-    let project = match crate::repo::create_project(pool, name, description).await {
-        Ok(p) => p,
-        Err(e) => {
-            return ImportOutcome::Failed {
-                reason: format!("create_project: {e}"),
+
+    // OB-C-MIN-4 Dedup analog dispatch_task.
+    if let Some(ext_id) = fm.nexus_id.as_deref().filter(|s| !s.trim().is_empty()) {
+        match crate::repo::find_project_by_external_id(pool, ext_id).await {
+            Ok(Some(existing)) => {
+                return ImportOutcome::Imported {
+                    kind: NexusType::Project,
+                    ref_id: Some(existing.id),
+                };
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return ImportOutcome::Failed {
+                    reason: format!("find_project_by_external_id: {e}"),
+                }
             }
         }
-    };
+    }
+
+    let description = body.trim();
+    let external_id = fm.nexus_id.as_deref().filter(|s| !s.trim().is_empty());
+    let project =
+        match crate::repo::create_project_with_external_id(pool, name, description, external_id)
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => {
+                return ImportOutcome::Failed {
+                    reason: format!("create_project: {e}"),
+                }
+            }
+        };
     ImportOutcome::Imported {
         kind: NexusType::Project,
         ref_id: Some(project.id),
@@ -447,6 +576,24 @@ priority: high
     }
 
     #[tokio::test]
+    async fn import_file_skips_note_without_source_inbox() {
+        // OB-C-MIN-7: Vault-only Notes ohne BrainDump-Quelle bleiben
+        // sichtbar im Outbox liegen, statt stumm archiviert zu werden.
+        let tmp = TempDir::new().unwrap();
+        let pool = fresh_pool().await;
+        let p = write_outbox_file(
+            tmp.path(),
+            "noteonly.md",
+            "---\nnexus_type: note\ntitle: Eine Idee\n---\nText.\n",
+        );
+        let outcome = import_file(&pool, &p).await;
+        match outcome {
+            ImportOutcome::Skipped { reason } => assert!(reason.contains("Vault-only")),
+            other => panic!("expected Skipped, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn import_file_skips_habit_and_journal() {
         let tmp = TempDir::new().unwrap();
         let pool = fresh_pool().await;
@@ -554,6 +701,71 @@ priority: high
         assert_eq!(normalize_priority("medium"), Some("med"));
         assert_eq!(normalize_priority("high"), Some("high"));
         assert_eq!(normalize_priority("urgent"), None);
+    }
+
+    #[tokio::test]
+    async fn import_file_dedupes_task_via_nexus_id() {
+        // OB-C-MIN-4: Re-Import desselben Outbox-Files (z.B. nach
+        // Importer-Crash zwischen DB-Commit und Archivierung) darf keine
+        // Doppel-Task erzeugen, sondern muss die existierende Row
+        // wiederverwenden.
+        let tmp = TempDir::new().unwrap();
+        let pool = fresh_pool().await;
+        let content = r#"---
+nexus_type: task
+nexus_id: vault-task-42
+title: Marie anrufen
+priority: high
+---
+"#;
+        let p1 = write_outbox_file(tmp.path(), "first.md", content);
+        let first = import_file(&pool, &p1).await;
+        let ImportOutcome::Imported { ref_id: Some(first_id), .. } = first else {
+            panic!("first import must succeed: {first:?}");
+        };
+
+        let p2 = write_outbox_file(tmp.path(), "second.md", content);
+        let second = import_file(&pool, &p2).await;
+        let ImportOutcome::Imported { ref_id: Some(second_id), .. } = second else {
+            panic!("re-import must succeed: {second:?}");
+        };
+
+        assert_eq!(first_id, second_id, "dedup must return same row id");
+        let tasks = crate::repo::list_tasks(&pool, None, None).await.unwrap();
+        assert_eq!(tasks.len(), 1, "no duplicate task row");
+    }
+
+    #[tokio::test]
+    async fn import_file_dedupes_project_via_nexus_id() {
+        let tmp = TempDir::new().unwrap();
+        let pool = fresh_pool().await;
+        let content = "---\nnexus_type: project\nnexus_id: vault-project-99\ntitle: Vault-Migration\n---\nBeschreibung.\n";
+        let _ = import_file(&pool, &write_outbox_file(tmp.path(), "p1.md", content)).await;
+        let _ = import_file(&pool, &write_outbox_file(tmp.path(), "p2.md", content)).await;
+        let projects = crate::repo::list_projects(&pool).await.unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].nexus_external_id.as_deref(), Some("vault-project-99"));
+    }
+
+    #[test]
+    fn move_or_copy_remove_works_within_same_mount() {
+        // Happy-Pfad: rename greift, ohne Fallback.
+        let tmp = TempDir::new().unwrap();
+        let src = tmp.path().join("a.md");
+        let dst = tmp.path().join("sub/b.md");
+        fs::create_dir_all(dst.parent().unwrap()).unwrap();
+        fs::write(&src, "x").unwrap();
+        move_or_copy_remove(&src, &dst).unwrap();
+        assert!(!src.exists());
+        assert!(dst.exists());
+    }
+
+    #[test]
+    fn is_cross_device_detects_exdev_errno() {
+        let err = std::io::Error::from_raw_os_error(18);
+        assert!(is_cross_device(&err));
+        let other = std::io::Error::from_raw_os_error(2); // ENOENT
+        assert!(!is_cross_device(&other));
     }
 
     #[test]

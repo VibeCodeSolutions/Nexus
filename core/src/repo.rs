@@ -28,23 +28,49 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<BrainDumpEntry>, sqlx::Error>
 }
 
 pub async fn create_project(pool: &SqlitePool, name: &str, description: &str) -> Result<Project, sqlx::Error> {
+    create_project_with_external_id(pool, name, description, None).await
+}
+
+/// Phase E (OB-C-MIN-4): Variante für den Obsidian-Outbox-Importer. Setzt
+/// `nexus_external_id`, der beim Re-Import per [`find_project_by_external_id`]
+/// als Dedup-Key dient.
+pub async fn create_project_with_external_id(
+    pool: &SqlitePool,
+    name: &str,
+    description: &str,
+    nexus_external_id: Option<&str>,
+) -> Result<Project, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
 
-    sqlx::query("INSERT INTO projects (id, name, description) VALUES (?, ?, ?)")
+    sqlx::query("INSERT INTO projects (id, name, description, nexus_external_id) VALUES (?, ?, ?, ?)")
         .bind(&id)
         .bind(name)
         .bind(description)
+        .bind(nexus_external_id)
         .execute(pool)
         .await?;
 
-    sqlx::query_as::<_, Project>("SELECT id, name, description, created_at, status FROM projects WHERE id = ?")
+    sqlx::query_as::<_, Project>("SELECT id, name, description, created_at, status, nexus_external_id FROM projects WHERE id = ?")
         .bind(&id)
         .fetch_one(pool)
         .await
 }
 
+pub async fn find_project_by_external_id(
+    pool: &SqlitePool,
+    nexus_external_id: &str,
+) -> Result<Option<Project>, sqlx::Error> {
+    sqlx::query_as::<_, Project>(
+        "SELECT id, name, description, created_at, status, nexus_external_id \
+         FROM projects WHERE nexus_external_id = ?",
+    )
+    .bind(nexus_external_id)
+    .fetch_optional(pool)
+    .await
+}
+
 pub async fn list_projects(pool: &SqlitePool) -> Result<Vec<Project>, sqlx::Error> {
-    sqlx::query_as::<_, Project>("SELECT id, name, description, created_at, status FROM projects ORDER BY created_at DESC")
+    sqlx::query_as::<_, Project>("SELECT id, name, description, created_at, status, nexus_external_id FROM projects ORDER BY created_at DESC")
         .fetch_all(pool)
         .await
 }
@@ -92,25 +118,51 @@ pub async fn get_project_braindumps(pool: &SqlitePool, project_id: &str) -> Resu
 }
 
 pub async fn create_task(pool: &SqlitePool, title: &str, project_id: Option<&str>, priority: Option<&str>) -> Result<Task, sqlx::Error> {
+    create_task_with_external_id(pool, title, project_id, priority, None).await
+}
+
+/// Phase E (OB-C-MIN-4): Variante für den Obsidian-Outbox-Importer. Setzt
+/// `nexus_external_id` analog [`create_project_with_external_id`].
+pub async fn create_task_with_external_id(
+    pool: &SqlitePool,
+    title: &str,
+    project_id: Option<&str>,
+    priority: Option<&str>,
+    nexus_external_id: Option<&str>,
+) -> Result<Task, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
     let prio = priority.unwrap_or("medium");
 
-    sqlx::query("INSERT INTO tasks (id, title, project_id, priority) VALUES (?, ?, ?, ?)")
+    sqlx::query("INSERT INTO tasks (id, title, project_id, priority, nexus_external_id) VALUES (?, ?, ?, ?, ?)")
         .bind(&id)
         .bind(title)
         .bind(project_id)
         .bind(prio)
+        .bind(nexus_external_id)
         .execute(pool)
         .await?;
 
-    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at FROM tasks WHERE id = ?")
+    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id FROM tasks WHERE id = ?")
         .bind(&id)
         .fetch_one(pool)
         .await
 }
 
+pub async fn find_task_by_external_id(
+    pool: &SqlitePool,
+    nexus_external_id: &str,
+) -> Result<Option<Task>, sqlx::Error> {
+    sqlx::query_as::<_, Task>(
+        "SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id \
+         FROM tasks WHERE nexus_external_id = ?",
+    )
+    .bind(nexus_external_id)
+    .fetch_optional(pool)
+    .await
+}
+
 pub async fn list_tasks(pool: &SqlitePool, project_id_filter: Option<&str>, status_filter: Option<&str>) -> Result<Vec<Task>, sqlx::Error> {
-    let mut sql = String::from("SELECT id, title, project_id, priority, status, created_at, updated_at FROM tasks WHERE 1=1");
+    let mut sql = String::from("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id FROM tasks WHERE 1=1");
     let mut binds: Vec<String> = Vec::new();
 
     if let Some(pid) = project_id_filter {
@@ -146,7 +198,7 @@ pub async fn update_task(pool: &SqlitePool, id: &str, status: Option<&str>, titl
             .await?;
     }
 
-    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at FROM tasks WHERE id = ?")
+    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id FROM tasks WHERE id = ?")
         .bind(id)
         .fetch_one(pool)
         .await

@@ -71,6 +71,11 @@ pub struct Project {
     pub description: String,
     pub created_at: String,
     pub status: String,
+    /// Phase E (OB-C-MIN-4): vault-seitige `nexus_id` aus dem Outbox-File.
+    /// Wenn gesetzt, sperrt der UNIQUE-Index Doppel-Inserts beim Re-Import.
+    /// Manuell angelegte Projekte (POST /projects) lassen das Feld leer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nexus_external_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -82,4 +87,7 @@ pub struct Task {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    /// Phase E (OB-C-MIN-4): siehe `Project::nexus_external_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nexus_external_id: Option<String>,
 }

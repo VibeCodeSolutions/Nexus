@@ -127,11 +127,11 @@ impl NexusType {
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct OutboxFrontmatter {
     pub nexus_type: String,
-    /// Vault-seitige UUID. In Phase C nicht konsumiert (Nexus generiert
-    /// eigene IDs beim DB-Insert), aber bewusst im Schema gehalten —
-    /// Phase D/E können das als Trace-ID für bidirektionale Sync-Paare nutzen.
+    /// Vault-seitige UUID. Phase E nutzt das Feld als Dedup-Key beim
+    /// Re-Import (OB-C-MIN-4): wenn die nexus_id bereits einer Task/Project-
+    /// Row zugeordnet ist (`nexus_external_id`-Spalte), wird der Re-Import
+    /// als Imported-No-Op behandelt statt Doppel-Insert.
     #[serde(default)]
-    #[allow(dead_code)]
     pub nexus_id: Option<String>,
     /// Inbox-File-Name (mit oder ohne `.md`), referenziert die ursprüngliche
     /// BrainDump-Row über `braindumps.nexus_inbox_id`. Wenn vorhanden,

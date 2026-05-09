@@ -1275,7 +1275,7 @@ pub async fn extract_links_for_recent(
 
     // Kontext: alle Projekte + die letzten 30 BrainDumps insgesamt
     let projects: Vec<crate::models::Project> = sqlx::query_as(
-        "SELECT id, name, description, created_at, status FROM projects ORDER BY created_at DESC LIMIT 50",
+        "SELECT id, name, description, created_at, status, nexus_external_id FROM projects ORDER BY created_at DESC LIMIT 50",
     )
     .fetch_all(pool)
     .await?;
@@ -1517,7 +1517,8 @@ mod synaptic_phase_b_tests {
                 name TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                status TEXT NOT NULL DEFAULT 'active'
+                status TEXT NOT NULL DEFAULT 'active',
+                nexus_external_id TEXT
             )",
         ).execute(&pool).await.unwrap();
         sqlx::query(

@@ -75,7 +75,53 @@ Restbestand aus dem CC-Final-Live-Gate, der nur via Console-clean abgedeckt war:
   - [ ] BrainDump-Detail (Klick auf eine BrainDump-Tabellen-Zeile, **NICHT** auf den Lösch-Button → öffnet Detail-Modal)
 - [ ] **Layout-Visualcheck:** BD-Detail-Modal-Tags-Block hat Margin-Top (`.mt-8 = 8px`), keine optischen Glitches
 
-## 8. Regression-Schutz (Crystalline Crab Phase C)
+## 8. Obsidian-Briefkasten (Phase A–E) — NEU für v0.1.3
+
+> Voraussetzung: Im Vault-Setup hast du einen Test-Vault unter `C:\Vaults\NexusSmoke` (oder beliebigem absoluten Pfad) angelegt.
+
+### 8a. Provider-Auswahl im Frontend
+- [ ] Wizard erneut starten (Settings-Reset oder frische VM-Profil-Snapshot)
+- [ ] Provider-Card „Obsidian-Briefkasten" sichtbar in der Liste
+- [ ] Auswählen → Vault-Pfad-Input + „Ordner wählen…"-Button erscheinen
+- [ ] „Ordner wählen…" öffnet nativen Folder-Dialog **oder** zeigt Alert-Fallback (Tauri-Dialog-Plugin-Verfügbarkeit)
+- [ ] Pfad eingeben (`C:\Vaults\NexusSmoke`) → „Weiter" → screenDone, kein 4xx in DevTools auf `/api/onboard/set-provider`
+- [ ] Settings-Modal zeigt Vault-Pfad jetzt prominent (Frontend liest `setup_status.vault_path`)
+
+### 8b. Inbox-Roundtrip (Pending-Pattern)
+- [ ] BrainDump im Dashboard erstellen → Antwort `category: "Pending"`, `classification_status: "pending"`
+- [ ] In Windows-Explorer: `C:\Vaults\NexusSmoke\Nexus\Inbox\<uuid>.md` existiert mit YAML-Frontmatter (`nexus_inbox_id`, `nexus_received`, `nexus_instructions`) + dem BrainDump-Text als Body
+
+### 8c. Outbox-Manual-Sortierung + Sync
+- [ ] Im Vault: Inbox-File kopieren nach `C:\Vaults\NexusSmoke\Nexus\Outbox\<uuid>.md`, im neuen File Frontmatter ändern auf:
+  ```yaml
+  ---
+  nexus_type: note
+  nexus_source_inbox: <uuid>.md
+  title: Smoke-Test-Note
+  tags: [smoke, e2e]
+  ---
+  ```
+- [ ] In PowerShell: `Invoke-RestMethod -Method POST -Uri http://localhost:7777/api/obsidian/sync -Headers @{Authorization="Bearer $env:NEXUS_TOKEN"}`
+- [ ] Antwort: `{"total":1,"imported":1,"failed":0,"skipped":0}`
+- [ ] Outbox-File wurde nach `Nexus\Outbox\_processed\<uuid>.md` verschoben
+- [ ] Dashboard-BrainDump ist jetzt `Note` mit Summary „Smoke-Test-Note" und Tags `[smoke, e2e]`, `classification_status: done`
+
+### 8d. Singleflight-Lock + Dedup
+- [ ] Outbox-File mit `nexus_type: task` + `nexus_id: smoke-task-1` + `title: Test-Task` ablegen → Sync → 1 Task in DB erstellt
+- [ ] Identisches File ein zweites Mal in Outbox legen → Sync → keine zweite Task-Row in DB (Dedup via `nexus_external_id`)
+- [ ] (Optional, paralleler Test:) zwei PowerShell-Tabs feuern `POST /api/obsidian/sync` gleichzeitig → einer der beiden bekommt `409 CONFLICT` mit „Outbox-Sync läuft bereits…"
+
+### 8e. Skipped/Failed bleiben sichtbar
+- [ ] Outbox-File mit `nexus_type: habit` (kein DB-Schema) → Sync → `skipped: 1`, File bleibt im Outbox liegen (NICHT in `_processed/`)
+- [ ] Outbox-File mit `nexus_type: task` ohne `title` → `failed: 1`, File bleibt im Outbox liegen
+- [ ] Outbox-File mit `nexus_type: note` ohne `nexus_source_inbox` → `skipped: 1`, Reason enthält „Vault-only Note" (Logs prüfen)
+
+### 8f. Cross-Mount-Fallback (optional, nur wenn Vault auf externer Festplatte)
+- [ ] Vault auf `D:\` (USB-Stick), `Nexus\Outbox\_processed` symlinken auf `C:\Vaults\Processed` (cross-volume) → Sync läuft trotzdem grün, copy+remove-Fallback im Tracing-Log sichtbar (`rename ... cross-device, falle auf copy+remove zurück`)
+
+---
+
+## 9. Regression-Schutz (Crystalline Crab Phase C)
 
 - [ ] **DevTools-Console:** während aller obigen Schritte komplett clean
   - Keine `Refused to execute inline script ...`-Meldungen

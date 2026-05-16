@@ -3,7 +3,9 @@ package com.vibecode.nexus.ui.screen
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +34,6 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
     var projects by remember { mutableStateOf<List<ProjectResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-    var showOnlyUnsorted by remember { mutableStateOf(false) }
     var detailEntry by remember { mutableStateOf<BrainDumpResponse?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -49,9 +50,18 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
     LaunchedEffect(Unit) { load() }
 
     val unsortedCount = entries.count { it.category.isNullOrBlank() || it.category == "Unsorted" }
-    val visibleEntries = if (showOnlyUnsorted) {
-        entries.filter { it.category.isNullOrBlank() || it.category == "Unsorted" }
-    } else entries
+    // Dynamische Kategorien aus den Daten (Spec §4.6 Filter Pills, single-select).
+    val categories = remember(entries) {
+        entries.mapNotNull { it.category?.takeIf { c -> c.isNotBlank() && c != "Unsorted" } }
+            .distinct()
+            .sorted()
+    }
+    var activeFilter by remember { mutableStateOf<String?>(null) } // null = "Alle"
+    val visibleEntries = when (activeFilter) {
+        null -> entries
+        "__unsorted__" -> entries.filter { it.category.isNullOrBlank() || it.category == "Unsorted" }
+        else -> entries.filter { it.category.equals(activeFilter, ignoreCase = true) }
+    }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(
@@ -67,13 +77,35 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
                 modifier = Modifier.padding(vertical = 16.dp)
             )
 
-            if (unsortedCount > 0) {
+            // Filter-Pills (Spec §4.6): Alle / <dynamische Kategorien> / Unsortiert
+            val filterScroll = rememberScrollState()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(filterScroll)
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 FilterChip(
-                    selected = showOnlyUnsorted,
-                    onClick = { showOnlyUnsorted = !showOnlyUnsorted },
-                    label = { Text("Unsortiert ($unsortedCount)") },
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    selected = activeFilter == null,
+                    onClick = { activeFilter = null },
+                    label = { Text("Alle (${entries.size})") }
                 )
+                categories.forEach { cat ->
+                    val n = entries.count { it.category.equals(cat, ignoreCase = true) }
+                    FilterChip(
+                        selected = activeFilter == cat,
+                        onClick = { activeFilter = cat },
+                        label = { Text("$cat ($n)") }
+                    )
+                }
+                if (unsortedCount > 0) {
+                    FilterChip(
+                        selected = activeFilter == "__unsorted__",
+                        onClick = { activeFilter = "__unsorted__" },
+                        label = { Text("Unsortiert ($unsortedCount)") }
+                    )
+                }
             }
 
             when {
@@ -82,8 +114,11 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
                 }
                 errorMsg != null -> Text("Fehler: $errorMsg", color = MaterialTheme.colorScheme.error)
                 visibleEntries.isEmpty() -> Text(
-                    if (showOnlyUnsorted) "Keine unsortierten Einträge."
-                    else "Keine BrainDumps vorhanden.",
+                    when (activeFilter) {
+                        null -> "Keine BrainDumps vorhanden."
+                        "__unsorted__" -> "Keine unsortierten Einträge."
+                        else -> "Keine Einträge in „$activeFilter\"."
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vibecode.nexus.data.NexusApiClient
 import com.vibecode.nexus.data.model.ProjectResponse
+import com.vibecode.nexus.ui.theme.NexusAccent
 import com.vibecode.nexus.data.model.TaskCreateRequest
 import com.vibecode.nexus.data.model.TaskResponse
 import com.vibecode.nexus.data.model.TaskUpdateRequest
@@ -279,10 +280,10 @@ private fun SwipeableTaskCard(
 private fun TaskCard(task: TaskResponse) {
     val isDone = task.status == "done"
     val priorityColor = when (task.priority) {
-        "high" -> Color(0xFFF44336)
-        "medium" -> Color(0xFFFF9800)
-        "low" -> Color(0xFF4CAF50)
-        else -> Color.Gray
+        "high" -> NexusAccent.PriorityHigh
+        "medium" -> NexusAccent.PriorityMedium
+        "low" -> NexusAccent.PriorityLow
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Card(

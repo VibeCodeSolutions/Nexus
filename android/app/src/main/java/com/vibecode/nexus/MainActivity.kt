@@ -11,10 +11,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -44,6 +45,7 @@ import com.vibecode.nexus.speech.SpeechRecognizerManager
 import com.vibecode.nexus.ui.components.NexusFooter
 import com.vibecode.nexus.ui.screen.BrainDumpHistoryScreen
 import com.vibecode.nexus.ui.screen.BrainDumpScreen
+import com.vibecode.nexus.ui.screen.DashboardScreen
 import com.vibecode.nexus.ui.screen.PairScreen
 import com.vibecode.nexus.ui.screen.ProjectsScreen
 import com.vibecode.nexus.ui.screen.SettingsScreen
@@ -63,12 +65,14 @@ data class BottomNavItem(
 
 class MainActivity : ComponentActivity() {
 
+    // Sprint Nightvision: Dashboard als Home, BrainDumps (History) statt Recording-Screen
+    // in der Nav. Recording bleibt per Deep-Link/QuickAction vom Dashboard erreichbar.
     private val bottomNavItems = listOf(
-        BottomNavItem("braindump", "BrainDump", Icons.Default.Mic),
-        BottomNavItem("history", "Verlauf", Icons.Default.History),
+        BottomNavItem("dashboard", "Home", Icons.Default.Home),
+        BottomNavItem("history", "Braindumps", Icons.Default.Psychology),
         BottomNavItem("tasks", "Aufgaben", Icons.Default.Checklist),
-        BottomNavItem("projects", "Projekte", Icons.AutoMirrored.Filled.TrendingUp),
-        BottomNavItem("settings", "Einstellungen", Icons.Default.Settings),
+        BottomNavItem("projects", "Projekte", Icons.Default.Folder),
+        BottomNavItem("settings", "Settings", Icons.Default.Settings),
     )
 
     // Holds a raw pairing URI that needs to be consumed by the UI layer.
@@ -155,7 +159,7 @@ class MainActivity : ComponentActivity() {
                     }
                     val currentRoute = navController.currentDestination?.route
                     if (currentRoute in listOf("welcome", "pair")) {
-                        navController.navigate("braindump") {
+                        navController.navigate("dashboard") {
                             popUpTo("welcome") { inclusive = true }
                         }
                     }
@@ -191,7 +195,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
-                    val startDest = if (connectionSettings.isPaired) "braindump" else "welcome"
+                    val startDest = if (connectionSettings.isPaired) "dashboard" else "welcome"
                     NavHost(
                         navController = navController,
                         startDestination = startDest,
@@ -207,11 +211,35 @@ class MainActivity : ComponentActivity() {
                                 connectionSettings = connectionSettings,
                                 onPaired = {
                                     isPaired = true
-                                    navController.navigate("braindump") {
+                                    navController.navigate("dashboard") {
                                         popUpTo("welcome") { inclusive = true }
                                     }
                                 },
                                 onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable("dashboard") {
+                            DashboardScreen(
+                                apiClient = apiClient,
+                                isPaired = isPaired,
+                                onNavigate = { route ->
+                                    navController.navigate(route) {
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                onCreateTask = {
+                                    navController.navigate("tasks") {
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                         }
                         composable("braindump") {

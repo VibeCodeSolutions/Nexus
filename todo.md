@@ -5,6 +5,76 @@
 
 ---
 
+## 🚀 Nächste Features (Priorisiert 2026-05-16, Admin)
+
+### FEAT-001 — KI-Aufgabensplitting aus Braindumps
+
+**Idee:** Ein Spracheintrag kann mehrere Themen enthalten. Aktuell wird der gesamte Text als ein Eintrag gespeichert und mit einer Kategorie versehen. Mit diesem Feature analysiert die KI den Braindump und extrahiert automatisch einzelne Action-Items als Tasks.
+
+**Aktueller Stand:** 1 Spracheingabe → 1 DB-Eintrag → 1 LLM-Call → 1 Kategorie. Kein Splitting, keine automatische Task-Erstellung.
+
+**Gewünschtes Verhalten:**
+- Nutzer spricht 1 Minute über 5 Themen → App erstellt 5 Tasks mit Titel, Kategorie und optionalem Fälligkeitsdatum
+- Der ursprüngliche Braindump-Text bleibt als Quelle erhalten
+- Splitting passiert im Hintergrund (analog zu `recategorize_unsorted`)
+
+**Umsetzungsplan:**
+- [ ] **FEAT-001-A** — Neuer LLM-Prompt `extract_action_items(text) -> Vec<ActionItem>` (Titel, Priorität, Fälligkeitsdatum optional, Kategorie)
+  - Datei: `core/src/llm/mod.rs` (neuer Trait-Default), alle Provider-Implementierungen
+  - DoD: Prompt extrahiert aus "Kauf Milch, ruf Kai an, Todo-App fixen bis Freitag" → 3 Tasks korrekt
+
+- [ ] **FEAT-001-B** — Neuer Endpoint `POST /braindump/{id}/extract-tasks`
+  - Datei: `core/src/handlers.rs`, `core/src/main.rs` (Route)
+  - Response: `{ "created": [task_id, ...], "count": N }`
+  - DoD: Call auf bestehenden Braindump → Tasks in DB, Antwort in <3s
+
+- [ ] **FEAT-001-C** — Optionaler Auto-Extract nach `POST /braindump` (Query-Param `?auto_extract=true` oder Settings-Toggle)
+  - Datei: `core/src/handlers.rs::create_braindump`
+  - DoD: Mobile App kann Auto-Extract aktivieren; Desktop-Settings-Modal hat Toggle
+
+- [ ] **FEAT-001-D** — UI: "Tasks extrahieren"-Button im Braindump-Detail (Desktop + Android)
+  - Dateien: `desktop/src/index.html` (Detail-Modal), `android/.../BrainDumpHistoryScreen.kt`
+  - DoD: Button sichtbar, Klick → Tasks erscheinen in Tasks-Tab ohne Reload
+
+**Aufwand:** ~3–5 Tage (Backend + beide UIs). Infrastruktur (Tasks-Tabelle, LLM-Anbindung, Background-Tasks) bereits vorhanden.
+
+---
+
+### FEAT-002 — Kalender-Integration
+
+**Idee:** NEXUS hat aktuell keine Kalender-Anbindung. Tasks mit Fälligkeitsdatum sollen optional in einen externen Kalender exportiert/synchronisiert werden können.
+
+**Aktueller Stand:** Kein einziger `calendar`/`gcal`/`ical`-Treffer im Repo. Vollständige Neuimplementierung nötig.
+
+**Gewünschter Scope (MVP):**
+- Google Calendar OAuth-Flow (ähnlich wie geplanter Claude-OAuth, E9)
+- Tasks mit `due_date` als Kalender-Events exportieren (kein Sync, nur Push)
+- iCal-Export als Alternative ohne OAuth (`.ics`-Datei download)
+
+**Umsetzungsplan:**
+- [ ] **FEAT-002-A** — `GET /braindump/export.ics` — iCal-Feed aller Braindumps mit Datum
+  - Datei: `core/src/handlers.rs`, Crate: `icalendar` (crates.io)
+  - DoD: URL in Kalender-App eingetragen → Events sichtbar, Bearer-geschützt
+
+- [ ] **FEAT-002-B** — `GET /tasks/export.ics` — iCal-Feed aller offenen Tasks mit `due_date`
+  - Datei: `core/src/handlers.rs`
+  - DoD: Tasks mit Fälligkeitsdatum erscheinen als Kalender-Events
+
+- [ ] **FEAT-002-C** — Google Calendar Push via OAuth
+  - Dateien: `core/src/llm/` (neues Modul `gcal.rs`), `core/src/keystore.rs` (OAuth-Tokens)
+  - Abhängigkeit: E9 (Claude OAuth Desktop) als Blaupause
+  - DoD: Settings-Screen → "Mit Google Kalender verbinden" → Tasks werden bei Erstellung gepusht
+
+- [ ] **FEAT-002-D** — UI: Kalender-Einstellungen (Desktop + Android)
+  - Dateien: `desktop/src/index.html` (Settings-Modal), `android/.../SettingsScreen.kt`
+  - DoD: iCal-URL kopierbar, GCal-Verbinden-Button, Sync-Status sichtbar
+
+**Aufwand:** FEAT-002-A+B (~1–2 Tage, einfacher iCal-Export), FEAT-002-C+D (~5–7 Tage mit GCal-OAuth).
+
+---
+
+---
+
 ## 🔴 Vor v0.1.0 GA (Blocker)
 
 - [x] **N-001-SIC** — Dashboard `/` Bearer-pflichtig machen

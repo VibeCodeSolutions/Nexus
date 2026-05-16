@@ -194,7 +194,7 @@ pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, Stri
             let key = keystore::get_key("groq")?;
             Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
                 "https://api.groq.com/openai/v1/chat/completions",
-                "llama-3.1-70b-versatile",
+                "llama-3.3-70b-versatile",
                 key,
             )))
         }
@@ -211,6 +211,14 @@ pub fn create_provider(provider_name: &str) -> Result<Box<dyn LlmProvider>, Stri
             Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
                 "https://openrouter.ai/api/v1/chat/completions",
                 "openai/gpt-4o-mini",
+                key,
+            )))
+        }
+        "xai" => {
+            let key = keystore::get_key("xai")?;
+            Ok(Box::new(openai_compatible::OpenAiCompatibleProvider::new(
+                "https://api.x.ai/v1/chat/completions",
+                "grok-3-mini",
                 key,
             )))
         }

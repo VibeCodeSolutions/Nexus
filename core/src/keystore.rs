@@ -15,6 +15,7 @@ const VALID_PROVIDERS: &[&str] = &[
     "groq",
     "deepseek",
     "openrouter",
+    "xai",
 ];
 
 /// Provider, die als Default-Marker erlaubt sind, aber KEINE API-Keys oder

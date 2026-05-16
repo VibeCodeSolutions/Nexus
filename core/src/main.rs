@@ -17,6 +17,7 @@ use axum::middleware;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use tower_http::cors::{Any, CorsLayer};
+use axum::http::header;
 use clap::Parser;
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
@@ -197,7 +198,11 @@ async fn main() {
                     CorsLayer::new()
                         .allow_origin(Any)
                         .allow_methods(Any)
-                        .allow_headers(Any),
+                        .allow_headers([
+                            header::AUTHORIZATION,
+                            header::CONTENT_TYPE,
+                            header::ACCEPT,
+                        ]),
                 )
                 .with_state(state);
 

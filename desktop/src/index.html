@@ -536,17 +536,17 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <div class="modal-overlay hidden" id="settingsModal">
   <div class="modal">
     <h2>Einstellungen</h2>
-    <label>Core-Server-URL</label>
+    <label for="settingUrl">Core-Server-URL</label>
     <input type="text" id="settingUrl" placeholder="http://127.0.0.1:7777">
-    <label>Bearer-Token</label>
+    <label for="settingToken">Bearer-Token</label>
     <input type="password" id="settingToken" placeholder="API-Token eingeben">
 
     <h3 class="h3-llm">LLM-Konfiguration</h3>
-    <label>Provider</label>
+    <label for="settingProvider">Provider</label>
     <select id="settingProvider"><option value="">(lädt…)</option></select>
-    <label>Modell</label>
+    <label for="settingModel">Modell</label>
     <select id="settingModel"><option value="">(zuerst Provider wählen)</option></select>
-    <label>API-Key (leer = unverändert)</label>
+    <label for="settingApiKey">API-Key (leer = unverändert)</label>
     <input type="password" id="settingApiKey" placeholder="">
     <button class="btn btn-ghost btn-sm mt-6" data-action="llm-save">LLM speichern</button>
 
@@ -561,13 +561,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <div class="modal-overlay hidden" id="newTaskModal">
   <div class="modal">
     <h2>Neue Aufgabe</h2>
-    <label>Titel</label>
+    <label for="newTaskTitle">Titel</label>
     <input type="text" id="newTaskTitle" placeholder="Aufgabentitel">
-    <label>Projekt (optional)</label>
+    <label for="newTaskProject">Projekt (optional)</label>
     <select id="newTaskProject">
       <option value="">— kein Projekt —</option>
     </select>
-    <label>Priorität</label>
+    <label for="newTaskPriority">Priorität</label>
     <select id="newTaskPriority">
       <option value="low">Niedrig</option>
       <option value="medium" selected>Mittel</option>
@@ -1155,6 +1155,7 @@ function initDashboard() {
 // --- Onboarding ---
 const PROVIDERS = [
   { id: 'claude',     name: 'Claude',     cost: 'Anthropic Pro / API',          type: 'oauth_or_key', docs: 'https://console.anthropic.com/' },
+  { id: 'xai',        name: 'Grok (xAI)', cost: 'Pay-per-Token',                type: 'api_key',      docs: 'https://console.x.ai/' },
   { id: 'gemini',     name: 'Gemini',     cost: 'Google AI Studio (Free Tier)', type: 'api_key',      docs: 'https://aistudio.google.com/app/apikey' },
   { id: 'ollama',     name: 'Ollama',     cost: 'Lokal, kostenlos',             type: 'ollama',       docs: 'https://ollama.com/' },
   { id: 'openai',     name: 'OpenAI',     cost: 'Pay-per-Token',                type: 'api_key',      docs: 'https://platform.openai.com/api-keys' },

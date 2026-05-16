@@ -207,6 +207,104 @@ body {
 .view { display: none; padding: var(--sp-6); max-width: 1200px; margin: 0 auto; }
 .view.active { display: block; }
 
+/* ── Dashboard ─────────────────────────────────── */
+.dash-greeting {
+  margin-bottom: var(--sp-6);
+}
+.dash-greeting h2 {
+  font-size: 22px; font-weight: 700; margin-bottom: 2px;
+}
+.dash-greeting p { font-size: 13px; color: var(--text-dim); }
+
+.quick-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
+}
+.quick-action {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.quick-action:hover:not(.disabled) {
+  background: var(--primary-tint);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+.quick-action.disabled { opacity: 0.35; cursor: not-allowed; }
+
+.alert-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-card);
+  border: 1px solid rgba(245,158,11,.30);
+  background: rgba(245,158,11,.08);
+  margin-bottom: var(--sp-6);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.alert-card:hover { background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.50); }
+.alert-card[hidden] { display: none; }
+.alert-icon { font-size: 18px; flex-shrink: 0; }
+.alert-body { flex: 1; }
+.alert-body strong { display: block; font-size: 13px; font-weight: 600; color: var(--warning); }
+.alert-sub { font-size: 12px; color: var(--text-dim); }
+.alert-arrow { color: var(--warning); font-size: 18px; flex-shrink: 0; }
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
+}
+.overview-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  transition: border-color 0.15s, transform 0.15s;
+  min-height: 110px;
+  position: relative;
+}
+.overview-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+.overview-count {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+.overview-icon {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  font-size: 22px;
+  opacity: 0.5;
+}
+.overview-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: auto;
+}
+
 /* Footer */
 .app-footer {
   grid-area: footer;
@@ -588,7 +686,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 
 <aside class="sidebar">
   <nav class="nav-list" role="navigation" aria-label="Hauptnavigation">
-    <button class="nav-item active" data-view="braindumps" aria-current="page">
+    <button class="nav-item active" data-view="dashboard" aria-current="page">
+      <span class="nav-icon" aria-hidden="true">🏠</span>
+      <span class="nav-label">Dashboard</span>
+    </button>
+    <button class="nav-item" data-view="braindumps">
       <span class="nav-icon" aria-hidden="true">🧠</span>
       <span class="nav-label">Braindumps</span>
       <span class="nav-badge hidden" id="navBadgeBraindumps" aria-label="Unsortierte Einträge"></span>
@@ -631,8 +733,55 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <main class="main-content">
 <div id="globalBanner" class="banner error hidden" role="alert"></div>
 
+<!-- Dashboard View -->
+<section class="view active" id="view-dashboard">
+  <div class="dash-greeting">
+    <h2>Guten Tag 👋</h2>
+    <p>Was liegt heute an?</p>
+  </div>
+
+  <div class="quick-actions">
+    <button class="quick-action" data-action="nav-braindumps" aria-label="Braindumps öffnen" title="Braindumps">🧠</button>
+    <button class="quick-action" data-action="task-new" aria-label="Neue Aufgabe erstellen" title="Neue Aufgabe">✏️</button>
+    <button class="quick-action" data-action="nav-projects" aria-label="Projekte öffnen" title="Projekte">📁</button>
+    <button class="quick-action disabled" aria-label="Suche (bald verfügbar)" title="Suche — bald verfügbar" aria-disabled="true">🔍</button>
+  </div>
+
+  <div class="alert-card" id="dashAlertCard" hidden data-action="dash-alert-click">
+    <span class="alert-icon" aria-hidden="true">⚠</span>
+    <div class="alert-body">
+      <strong id="dashAlertText">Braindumps unsortiert</strong>
+      <span class="alert-sub">Jetzt ansehen →</span>
+    </div>
+    <span class="alert-arrow" aria-hidden="true">›</span>
+  </div>
+
+  <div class="overview-grid">
+    <button class="overview-card" data-action="nav-braindumps" aria-label="Braindumps öffnen">
+      <span class="overview-count" id="dashCountBraindumps">—</span>
+      <span class="overview-icon" aria-hidden="true">🧠</span>
+      <span class="overview-label">Braindumps</span>
+    </button>
+    <button class="overview-card" data-action="nav-tasks" aria-label="Aufgaben öffnen">
+      <span class="overview-count" id="dashCountTasks">—</span>
+      <span class="overview-icon" aria-hidden="true">✅</span>
+      <span class="overview-label">Offen</span>
+    </button>
+    <button class="overview-card" data-action="nav-projects" aria-label="Projekte öffnen">
+      <span class="overview-count" id="dashCountProjects">—</span>
+      <span class="overview-icon" aria-hidden="true">📁</span>
+      <span class="overview-label">Projekte</span>
+    </button>
+    <button class="overview-card" data-action="nav-achievements" aria-label="Erfolge öffnen">
+      <span class="overview-count" id="dashCountAchievements">—</span>
+      <span class="overview-icon" aria-hidden="true">🏆</span>
+      <span class="overview-label">Erfolge</span>
+    </button>
+  </div>
+</section>
+
 <!-- Braindumps View -->
-<section class="view active" id="view-braindumps">
+<section class="view" id="view-braindumps">
   <div class="toolbar">
     <input type="text" id="bdSearch" placeholder="BrainDumps suchen…" data-input="bd-search">
     <select id="bdCategory" data-change="bd-filter">
@@ -863,6 +1012,10 @@ async function checkConnection() {
 
 // --- Navigation (Views module pattern — UI_SPEC.md Section 5) ---
 const Views = {
+  dashboard: {
+    init() { refreshDashboard(); },
+    destroy() {},
+  },
   braindumps:   { init() { refreshBraindumps(); },   destroy() {} },
   tasks:        { init() { refreshTasks(); },         destroy() {} },
   projects:     { init() { refreshProjects(); },      destroy() {} },
@@ -1320,11 +1473,59 @@ function esc(s) {
   return d.innerHTML;
 }
 
-// --- Dashboard Init (called after onboarding or if already onboarded) ---
+// --- Dashboard View ---
+async function refreshDashboard() {
+  checkConnection();
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+  // Load all counts in parallel
+  const [bds, ts, ps, as, unsorted] = await Promise.allSettled([
+    api('/braindump',                  {}, { silent: true }),
+    api('/tasks',                      {}, { silent: true }),
+    api('/projects',                   {}, { silent: true }),
+    api('/achievements',               {}, { silent: true }),
+    api('/braindump/unsorted/count',   {}, { silent: true }),
+  ]);
+
+  if (bds.status === 'fulfilled') {
+    const arr = Array.isArray(bds.value) ? bds.value : (bds.value?.data || []);
+    set('dashCountBraindumps', arr.length);
+  }
+  if (ts.status === 'fulfilled') {
+    const arr = Array.isArray(ts.value) ? ts.value : (ts.value?.data || []);
+    const open = arr.filter(t => t.status !== 'done' && t.status !== 'completed').length;
+    set('dashCountTasks', open);
+  }
+  if (ps.status === 'fulfilled') {
+    const arr = Array.isArray(ps.value) ? ps.value : (ps.value?.data || []);
+    set('dashCountProjects', arr.length);
+  }
+  if (as.status === 'fulfilled') {
+    const arr = Array.isArray(as.value) ? as.value : (as.value?.data || []);
+    const unlocked = arr.filter(a => !!a.unlocked_at).length;
+    set('dashCountAchievements', unlocked + '/' + arr.length);
+  }
+
+  // Alert card + nav badge
+  const n = unsorted.status === 'fulfilled' ? (unsorted.value?.count || 0) : 0;
+  const alertCard = document.getElementById('dashAlertCard');
+  const alertText = document.getElementById('dashAlertText');
+  const navBadge  = document.getElementById('navBadgeBraindumps');
+  if (alertCard) {
+    if (n > 0) {
+      if (alertText) alertText.textContent = `${n} Braindump${n === 1 ? '' : 's'} unsortiert`;
+      alertCard.removeAttribute('hidden');
+    } else {
+      alertCard.setAttribute('hidden', '');
+    }
+  }
+  if (navBadge) { navBadge.textContent = n > 0 ? n : ''; navBadge.classList.toggle('hidden', n === 0); }
+}
+
+// --- App Init (called after onboarding or if already onboarded) ---
 function initDashboard() {
   applyTheme(currentTheme);
-  checkConnection();
-  navigate('braindumps');
+  navigate('dashboard');
 }
 
 // --- Onboarding ---
@@ -1894,6 +2095,11 @@ document.addEventListener('click', (e) => {
     return;
   }
   switch (action) {
+    case 'nav-braindumps':   navigate('braindumps'); break;
+    case 'nav-tasks':        navigate('tasks'); break;
+    case 'nav-projects':     navigate('projects'); break;
+    case 'nav-achievements': navigate('achievements'); break;
+    case 'dash-alert-click': navigate('braindumps'); filterUnsorted(); break;
     case 'theme-cycle': cycleTheme(); break;
     case 'settings-open': openSettings(); break;
     case 'settings-close': closeSettings(); break;

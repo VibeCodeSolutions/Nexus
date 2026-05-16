@@ -9,27 +9,34 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root, [data-theme="dark"] {
-  --bg: #0F1115;
-  --bg-card: #181B22;
+  --bg: #09090F;
+  --bg-card: #111318;
+  --bg-surface: #181C25;
   --bg-input: #11141A;
   --primary: #8C9EFF;
   --primary-hover: #B0BCFF;
-  --primary-tint: rgba(140, 158, 255, 0.14);
+  --primary-tint: rgba(140, 158, 255, 0.12);
   --secondary: #4DB6AC;
   --text: #E8EAF0;
-  --text-dim: #8B92A1;
-  --border: #262A33;
-  --success: #66BB6A;
-  --warning: #FFB74D;
+  --text-dim: #6B7280;
+  --border: #1C2030;
+  --success: #4CAF50;
+  --warning: #F59E0B;
   --danger: #EF5350;
+  /* legacy aliases */
   --radius-card: 16px;
   --radius-btn: 10px;
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.45);
+  /* spacing scale */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px;
+  /* radius scale */
+  --r-pill: 999px; --r-card: 16px; --r-btn: 10px; --r-badge: 8px; --r-sm: 6px;
 }
 
 [data-theme="light"] {
   --bg: #F7F8FB;
   --bg-card: #FFFFFF;
+  --bg-surface: #F0F2F7;
   --bg-input: #F0F2F7;
   --primary: #3D5AFE;
   --primary-hover: #2F46D8;
@@ -39,7 +46,7 @@
   --text-dim: #5A6172;
   --border: #E1E5EE;
   --success: #2E7D32;
-  --warning: #ED6C02;
+  --warning: #D97706;
   --danger: #C62828;
   --shadow-soft: 0 1px 2px rgba(61, 90, 254, 0.18);
 }
@@ -50,65 +57,167 @@ body {
   color: var(--text);
   min-height: 100vh;
 }
+
+/* App Shell — 3-row grid: topbar | sidebar+main | footer */
 .app-shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 56px 1fr auto;
+  grid-template-areas:
+    "topbar  topbar"
+    "sidebar main"
+    "footer  footer";
   min-height: 100vh;
 }
-.app-shell > .tabs ~ .content,
-.app-shell > .content { flex: 1; }
-.app-footer {
+
+/* Topbar */
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-6);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
   position: sticky;
-  bottom: 0;
+  top: 0;
+  z-index: 50;
+  gap: var(--sp-4);
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.topbar-brand .brand-dot { color: var(--primary); font-size: 8px; line-height: 1; }
+.topbar-status { display: flex; gap: var(--sp-2); align-items: center; flex: 1; justify-content: center; }
+.topbar-actions { display: flex; gap: var(--sp-2); align-items: center; flex-shrink: 0; }
+
+/* Status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  transition: border-color 0.2s, color 0.2s;
+}
+.status-pill .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.status-pill .dot.success { background: var(--success); }
+.status-pill .dot.warning { background: var(--warning); }
+.status-pill .dot.danger  { background: var(--danger); }
+.status-pill.connected { color: var(--success); border-color: rgba(76,175,80,.35); }
+.status-pill.offline   { color: var(--danger);  border-color: rgba(239,83,80,.35); }
+.status-pill.warning   { color: var(--warning); border-color: rgba(245,158,11,.35); }
+
+/* Sidebar */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-3) 0;
+  overflow-y: auto;
+  position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+}
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 var(--sp-2);
+  flex: 1;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 9px var(--sp-3);
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 0 var(--r-btn) var(--r-btn) 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nav-item:hover:not(.disabled) { background: var(--bg-surface); color: var(--text); }
+.nav-item.active {
+  background: var(--primary-tint);
+  color: var(--primary);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+.nav-item.disabled { opacity: 0.35; cursor: not-allowed; }
+.nav-icon { font-size: 15px; flex-shrink: 0; width: 20px; text-align: center; }
+.nav-label { flex: 1; }
+.nav-badge {
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
+}
+.nav-soon {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: var(--bg-surface);
+  padding: 1px 5px;
+  border-radius: var(--r-pill);
+}
+.nav-divider { height: 1px; background: var(--border); margin: var(--sp-2) var(--sp-1); }
+
+/* Main content */
+.main-content {
+  grid-area: main;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+/* Views */
+.view { display: none; padding: var(--sp-6); max-width: 1200px; margin: 0 auto; }
+.view.active { display: block; }
+
+/* Footer */
+.app-footer {
+  grid-area: footer;
   padding: 8px 16px;
-  font-size: 12px;
+  font-size: 11px;
   text-align: center;
   color: var(--text-dim);
   background: var(--bg-card);
   border-top: 1px solid var(--border);
-  z-index: 50;
 }
 .app-footer strong { color: var(--primary); font-weight: 600; }
-
-/* Header */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
-}
-.header h1 { font-size: 20px; font-weight: 600; }
-.header h1 span { color: var(--primary); }
-.header-actions { display: flex; gap: 12px; align-items: center; }
-.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); display: inline-block; }
-.status-dot.connected { background: var(--success); }
-
-/* Tabs */
-.tabs {
-  display: flex;
-  gap: 0;
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
-}
-.tab {
-  padding: 12px 24px;
-  cursor: pointer;
-  border: none;
-  background: none;
-  color: var(--text-dim);
-  font-size: 14px;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-}
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-tint); }
-
-/* Content */
-.content { padding: 24px; max-width: 1200px; margin: 0 auto; }
 
 /* Buttons */
 .btn {
@@ -460,26 +569,70 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   </section>
 </div>
 
-<div class="header">
-  <h1><span>NEXUS</span> Dashboard</h1>
-  <div class="header-actions">
-    <span class="status-dot" id="statusDot" title="Nicht verbunden"></span>
-    <button class="btn btn-ghost btn-sm" id="themeToggle" data-action="theme-cycle" title="Theme wechseln (Hell / Dunkel / System)">🎨 System</button>
-    <button class="btn btn-ghost" data-action="settings-open">Einstellungen</button>
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="brand-dot">●</span>
+    <span>NEXUS</span>
   </div>
-</div>
+  <div class="topbar-status" id="topbarStatus">
+    <span class="status-pill offline" id="statusPill">
+      <span class="dot danger" id="statusDot"></span>
+      <span id="statusText">OFFLINE</span>
+    </span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost btn-sm" id="themeToggle" data-action="theme-cycle" title="Theme wechseln">🌙 Dunkel</button>
+    <button class="btn btn-ghost btn-sm" data-action="settings-open" title="Einstellungen">⚙</button>
+  </div>
+</header>
 
-<div class="tabs">
-  <button class="tab active" data-tab="braindumps">BrainDumps</button>
-  <button class="tab" data-tab="projects">Projekte</button>
-  <button class="tab" data-tab="tasks">Aufgaben</button>
-  <button class="tab" data-tab="achievements">Erfolge</button>
-</div>
+<aside class="sidebar">
+  <nav class="nav-list" role="navigation" aria-label="Hauptnavigation">
+    <button class="nav-item active" data-view="braindumps" aria-current="page">
+      <span class="nav-icon" aria-hidden="true">🧠</span>
+      <span class="nav-label">Braindumps</span>
+      <span class="nav-badge hidden" id="navBadgeBraindumps" aria-label="Unsortierte Einträge"></span>
+    </button>
+    <button class="nav-item" data-view="tasks">
+      <span class="nav-icon" aria-hidden="true">✅</span>
+      <span class="nav-label">Aufgaben</span>
+    </button>
+    <button class="nav-item" data-view="projects">
+      <span class="nav-icon" aria-hidden="true">📁</span>
+      <span class="nav-label">Projekte</span>
+    </button>
 
+    <div class="nav-divider" role="separator"></div>
+
+    <button class="nav-item disabled" tabindex="-1" aria-disabled="true" title="Bald verfügbar — Kalender (FEAT-002)">
+      <span class="nav-icon" aria-hidden="true">🗓️</span>
+      <span class="nav-label">Kalender</span>
+      <span class="nav-soon">bald</span>
+    </button>
+    <button class="nav-item disabled" tabindex="-1" aria-disabled="true" title="Bald verfügbar — Globale Suche">
+      <span class="nav-icon" aria-hidden="true">🔍</span>
+      <span class="nav-label">Suche</span>
+      <span class="nav-soon">bald</span>
+    </button>
+    <button class="nav-item" data-view="achievements">
+      <span class="nav-icon" aria-hidden="true">🏆</span>
+      <span class="nav-label">Erfolge</span>
+    </button>
+
+    <div class="nav-divider" role="separator"></div>
+
+    <button class="nav-item" data-action="settings-open">
+      <span class="nav-icon" aria-hidden="true">⚙️</span>
+      <span class="nav-label">Einstellungen</span>
+    </button>
+  </nav>
+</aside>
+
+<main class="main-content">
 <div id="globalBanner" class="banner error hidden" role="alert"></div>
 
-<!-- BrainDumps Tab -->
-<div class="content tab-content" id="tab-braindumps">
+<!-- Braindumps View -->
+<section class="view active" id="view-braindumps">
   <div class="toolbar">
     <input type="text" id="bdSearch" placeholder="BrainDumps suchen…" data-input="bd-search">
     <select id="bdCategory" data-change="bd-filter">
@@ -490,19 +643,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <button class="btn btn-danger" id="bdBulkDelete" data-action="bd-bulk-delete" disabled>Ausgewählte löschen</button>
   </div>
   <div id="bdTable"></div>
-</div>
+</section>
 
-<!-- Projects Tab -->
-<div class="content tab-content hidden" id="tab-projects">
+<!-- Projects View -->
+<section class="view" id="view-projects">
   <div class="toolbar">
     <button class="btn btn-primary" data-action="proj-refresh">Aktualisieren</button>
   </div>
   <div id="suggestionsBanner" class="banner suggestion hidden"></div>
   <div class="card-grid" id="projectCards"></div>
-</div>
+</section>
 
-<!-- Tasks Tab -->
-<div class="content tab-content hidden" id="tab-tasks">
+<!-- Tasks View -->
+<section class="view" id="view-tasks">
   <div class="toolbar">
     <button class="btn btn-primary" data-action="task-new">+ Neue Aufgabe</button>
     <button class="btn btn-primary" id="taskRefreshBtn" data-action="task-refresh">Aktualisieren</button>
@@ -522,15 +675,17 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     </select>
   </div>
   <div id="taskList"></div>
-</div>
+</section>
 
-<!-- Achievements Tab -->
-<div class="content tab-content hidden" id="tab-achievements">
+<!-- Achievements View -->
+<section class="view" id="view-achievements">
   <div class="toolbar">
     <button class="btn btn-primary" data-action="ach-refresh">Aktualisieren</button>
   </div>
   <div class="card-grid" id="achievementGrid"></div>
-</div>
+</section>
+
+</main>
 
 <!-- Settings Modal -->
 <div class="modal-overlay hidden" id="settingsModal">
@@ -691,29 +846,48 @@ async function api(path, opts = {}, control = {}) {
 }
 
 async function checkConnection() {
+  const dot  = document.getElementById('statusDot');
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
   try {
     await api('/health', {}, { silent: true });
-    document.getElementById('statusDot').classList.add('connected');
-    document.getElementById('statusDot').title = 'Verbunden mit ' + coreUrl;
+    if (dot)  { dot.className = 'dot success'; }
+    if (pill) { pill.className = 'status-pill connected'; }
+    if (text) { text.textContent = 'VERBUNDEN'; }
   } catch {
-    document.getElementById('statusDot').classList.remove('connected');
-    document.getElementById('statusDot').title = 'Nicht verbunden';
+    if (dot)  { dot.className = 'dot danger'; }
+    if (pill) { pill.className = 'status-pill offline'; }
+    if (text) { text.textContent = 'OFFLINE'; }
   }
 }
 
-// --- Tabs ---
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-    tab.classList.add('active');
-    document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
-    const name = tab.dataset.tab;
-    if (name === 'braindumps') refreshBraindumps();
-    else if (name === 'projects') refreshProjects();
-    else if (name === 'tasks') refreshTasks();
-    else if (name === 'achievements') refreshAchievements();
+// --- Navigation (Views module pattern — UI_SPEC.md Section 5) ---
+const Views = {
+  braindumps:   { init() { refreshBraindumps(); },   destroy() {} },
+  tasks:        { init() { refreshTasks(); },         destroy() {} },
+  projects:     { init() { refreshProjects(); },      destroy() {} },
+  achievements: { init() { refreshAchievements(); },  destroy() {} },
+};
+
+let _activeView = null;
+
+function navigate(viewId) {
+  if (!Views[viewId]) return;
+  _activeView?.destroy();
+  document.querySelectorAll('.view').forEach(v =>
+    v.classList.toggle('active', v.id === `view-${viewId}`)
+  );
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => {
+    const isActive = n.dataset.view === viewId;
+    n.classList.toggle('active', isActive);
+    isActive ? n.setAttribute('aria-current', 'page') : n.removeAttribute('aria-current');
   });
+  Views[viewId].init();
+  _activeView = Views[viewId];
+}
+
+document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+  item.addEventListener('click', () => navigate(item.dataset.view));
 });
 
 // --- BrainDumps ---
@@ -732,14 +906,15 @@ async function refreshBraindumps() {
 
 async function refreshUnsortedBadge() {
   const btn = document.getElementById('bdUnsortedBadge');
-  if (!btn) return;
+  const navBadge = document.getElementById('navBadgeBraindumps');
   try {
     const data = await api('/braindump/unsorted/count');
     const n = data.count || 0;
-    btn.textContent = `Unsortiert (${n})`;
-    btn.classList.toggle('hidden', n === 0);
+    if (btn) { btn.textContent = `Unsortiert (${n})`; btn.classList.toggle('hidden', n === 0); }
+    if (navBadge) { navBadge.textContent = n > 0 ? n : ''; navBadge.classList.toggle('hidden', n === 0); }
   } catch {
-    btn.classList.add('hidden');
+    if (btn) btn.classList.add('hidden');
+    if (navBadge) navBadge.classList.add('hidden');
   }
 }
 
@@ -1149,7 +1324,7 @@ function esc(s) {
 function initDashboard() {
   applyTheme(currentTheme);
   checkConnection();
-  refreshBraindumps();
+  navigate('braindumps');
 }
 
 // --- Onboarding ---
@@ -1619,10 +1794,9 @@ function wikiLabelFor(type, id) {
 function openLinkTarget(type, id) {
   if (type === 'project') {
     closeBraindumpDetail();
-    document.querySelector('.tab[data-tab="projects"]').click();
+    navigate('projects');
     return;
   }
-  // Re-Open BrainDump-Detail mit dem Target
   openBraindumpDetail(id);
 }
 
@@ -1807,7 +1981,7 @@ function applyProgressWidths(root) {
 </script>
 
 <footer class="app-footer">
-  Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.2
+  Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.3
 </footer>
 
 </div><!-- /.app-shell -->

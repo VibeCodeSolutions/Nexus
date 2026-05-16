@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# scripts/bump-version.sh — bumpt Version in core, desktop, android synchron.
+﻿#!/usr/bin/env bash
+# scripts/bump-version.sh â€” bumpt Version in core, desktop, android synchron.
 # Usage: scripts/bump-version.sh 0.1.1
 
 set -euo pipefail
@@ -57,7 +57,7 @@ fi
 ANDROID_GRADLE="$ROOT/android/app/build.gradle.kts"
 sed -i -E "s/versionName = \"[^\"]*\"/versionName = \"$NEW_VERSION\"/" "$ANDROID_GRADLE"
 echo "  [android]  $ANDROID_GRADLE"
-echo "             (versionCode NICHT geändert — manuell in $ANDROID_GRADLE erhöhen!)"
+echo "             (versionCode NICHT geÃ¤ndert â€” manuell in $ANDROID_GRADLE erhÃ¶hen!)"
 
 echo ""
 echo "Version $NEW_VERSION gesetzt. Review mit:"

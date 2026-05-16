@@ -146,6 +146,11 @@ async fn main() {
                 obsidian_sync_lock: Arc::new(tokio::sync::Mutex::new(())),
             };
 
+            // Einmalig: Tasks aus Braindumps mit category='Task' nachträglich anlegen.
+            if let Ok(n) = repo::backfill_tasks_from_braindumps(&state.pool).await {
+                if n > 0 { tracing::info!("Backfill: {n} Task(s) aus Braindumps migriert."); }
+            }
+
             // Clone für Background-Recategorize-Task (Phase D / JJ-D2) — VOR with_state(state)
             let bg_pool = state.pool.clone();
             let bg_llm = state.llm.clone();
@@ -155,6 +160,7 @@ async fn main() {
                 .route("/health", get(health_check))
                 .route("/braindump", post(handlers::post_braindump))
                 .route("/braindump", get(handlers::list_braindumps))
+                .route("/braindump/ideas", get(handlers::list_ideas))
                 .route("/braindump/{id}", get(handlers::get_braindump))
                 .route("/braindump/{id}", delete(handlers::delete_braindump))
                 .route("/braindump/recategorize", post(handlers::recategorize_unsorted))

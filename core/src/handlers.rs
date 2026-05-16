@@ -104,6 +104,21 @@ pub async fn post_braindump(
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
         })?;
 
+    // Wenn als Task klassifiziert: automatisch einen echten Task anlegen (idempotent via nexus_external_id).
+    if category.eq_ignore_ascii_case("task") {
+        let ext_id = format!("bd:{}", &entry.id);
+        let existing = repo::find_task_by_external_id(&state.pool, &ext_id).await.unwrap_or(None);
+        if existing.is_none() {
+            let summary_str = summary.as_deref().unwrap_or("");
+            let task_title = if summary_str.trim().is_empty() {
+                entry.raw_text.chars().take(120).collect::<String>()
+            } else {
+                summary_str.to_string()
+            };
+            let _ = repo::create_task_with_external_id(&state.pool, &task_title, None, Some("medium"), Some(&ext_id)).await;
+        }
+    }
+
     // Gamification: XP + Achievements
     let new_achievements = repo::on_braindump_created(&state.pool, &updated.id).await.unwrap_or_default();
     let stats = repo::get_user_stats(&state.pool).await.ok();
@@ -118,6 +133,22 @@ pub async fn post_braindump(
     }
 
     Ok(Json(response))
+}
+
+pub async fn list_ideas(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let rows = repo::list_ideas_with_project(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    let items: Vec<Value> = rows.into_iter().map(|(bd, project_id)| {
+        let mut v = json!(bd);
+        v["project_id"] = json!(project_id);
+        v
+    }).collect();
+
+    Ok(Json(json!(items)))
 }
 
 pub async fn list_braindumps(
@@ -616,7 +647,22 @@ pub async fn recategorize_unsorted_inner(
                 .await;
 
                 match result {
-                    Ok(_) => updated += 1,
+                    Ok(_) => {
+                        updated += 1;
+                        // Auto-Task bei Task-Klassifizierung (idempotent)
+                        if classification.category.eq_ignore_ascii_case("task") {
+                            let ext_id = format!("bd:{}", &entry.id);
+                            let exists = crate::repo::find_task_by_external_id(pool, &ext_id).await.unwrap_or(None);
+                            if exists.is_none() {
+                                let title = if classification.summary.trim().is_empty() {
+                                    entry.raw_text.chars().take(120).collect::<String>()
+                                } else {
+                                    classification.summary.clone()
+                                };
+                                let _ = crate::repo::create_task_with_external_id(pool, &title, None, Some("medium"), Some(&ext_id)).await;
+                            }
+                        }
+                    }
                     Err(e) => {
                         tracing::warn!("DB-Update fehlgeschlagen für {}: {e}", entry.id);
                         failed += 1;

@@ -9,27 +9,34 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root, [data-theme="dark"] {
-  --bg: #0F1115;
-  --bg-card: #181B22;
+  --bg: #09090F;
+  --bg-card: #111318;
+  --bg-surface: #181C25;
   --bg-input: #11141A;
   --primary: #8C9EFF;
   --primary-hover: #B0BCFF;
-  --primary-tint: rgba(140, 158, 255, 0.14);
+  --primary-tint: rgba(140, 158, 255, 0.12);
   --secondary: #4DB6AC;
   --text: #E8EAF0;
-  --text-dim: #8B92A1;
-  --border: #262A33;
-  --success: #66BB6A;
-  --warning: #FFB74D;
+  --text-dim: #6B7280;
+  --border: #1C2030;
+  --success: #4CAF50;
+  --warning: #F59E0B;
   --danger: #EF5350;
+  /* legacy aliases */
   --radius-card: 16px;
   --radius-btn: 10px;
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.45);
+  /* spacing scale */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px;
+  /* radius scale */
+  --r-pill: 999px; --r-card: 16px; --r-btn: 10px; --r-badge: 8px; --r-sm: 6px;
 }
 
 [data-theme="light"] {
   --bg: #F7F8FB;
   --bg-card: #FFFFFF;
+  --bg-surface: #F0F2F7;
   --bg-input: #F0F2F7;
   --primary: #3D5AFE;
   --primary-hover: #2F46D8;
@@ -39,7 +46,7 @@
   --text-dim: #5A6172;
   --border: #E1E5EE;
   --success: #2E7D32;
-  --warning: #ED6C02;
+  --warning: #D97706;
   --danger: #C62828;
   --shadow-soft: 0 1px 2px rgba(61, 90, 254, 0.18);
 }
@@ -50,65 +57,435 @@ body {
   color: var(--text);
   min-height: 100vh;
 }
+
+/* App Shell — 3-row grid: topbar | sidebar+main | footer */
 .app-shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 56px 1fr auto;
+  grid-template-areas:
+    "topbar  topbar"
+    "sidebar main"
+    "footer  footer";
   min-height: 100vh;
 }
-.app-shell > .tabs ~ .content,
-.app-shell > .content { flex: 1; }
-.app-footer {
+
+/* Topbar */
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-6);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
   position: sticky;
-  bottom: 0;
-  padding: 8px 16px;
+  top: 0;
+  z-index: 50;
+  gap: var(--sp-4);
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.topbar-brand .brand-dot { color: var(--primary); font-size: 8px; line-height: 1; }
+.topbar-status { display: flex; gap: var(--sp-2); align-items: center; flex: 1; justify-content: center; }
+.topbar-actions { display: flex; gap: var(--sp-2); align-items: center; flex-shrink: 0; }
+
+/* Status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  transition: border-color 0.2s, color 0.2s;
+}
+.status-pill .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.status-pill .dot.success { background: var(--success); }
+.status-pill .dot.warning { background: var(--warning); }
+.status-pill .dot.danger  { background: var(--danger); }
+.status-pill.connected { color: var(--success); border-color: rgba(76,175,80,.35); }
+.status-pill.offline   { color: var(--danger);  border-color: rgba(239,83,80,.35); }
+.status-pill.warning   { color: var(--warning); border-color: rgba(245,158,11,.35); }
+
+/* Sidebar */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-3) 0;
+  overflow-y: auto;
+  position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+}
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 var(--sp-2);
+  flex: 1;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 9px var(--sp-3);
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 0 var(--r-btn) var(--r-btn) 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nav-item:hover:not(.disabled) { background: var(--bg-surface); color: var(--text); }
+.nav-item.active {
+  background: var(--primary-tint);
+  color: var(--primary);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+.nav-item.disabled { opacity: 0.35; cursor: not-allowed; }
+.nav-icon { font-size: 15px; flex-shrink: 0; width: 20px; text-align: center; }
+.nav-label { flex: 1; }
+.nav-badge {
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
+}
+.nav-soon {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: var(--bg-surface);
+  padding: 1px 5px;
+  border-radius: var(--r-pill);
+}
+.nav-divider { height: 1px; background: var(--border); margin: var(--sp-2) var(--sp-1); }
+
+/* Main content */
+.main-content {
+  grid-area: main;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+/* Views */
+.view { display: none; padding: var(--sp-6); max-width: 1200px; margin: 0 auto; }
+.view.active { display: block; }
+
+/* ── M3: Braindump View ─────────────────────────── */
+#view-braindumps { max-width: none; }
+#view-braindumps.active {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: flex-start;
+}
+.view-main { flex: 1; min-width: 0; }
+
+.bd-toolbar-top {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-bottom: var(--sp-3);
+}
+.bd-search {
+  flex: 1;
+  padding: 7px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 13px;
+}
+.bd-search:focus { border-color: var(--primary); outline: none; }
+.bd-toolbar-actions { display: flex; gap: var(--sp-2); align-items: center; }
+
+.filter-pills {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.filter-pill {
+  padding: 5px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-dim);
   font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.filter-pill:hover { border-color: var(--primary); color: var(--text); }
+.filter-pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.btn-cta {
+  width: 100%;
+  border-radius: var(--r-pill);
+  padding: 13px var(--sp-6);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  margin-bottom: var(--sp-4);
+  transition: background 0.15s, transform 0.1s;
+}
+.btn-cta:hover { background: var(--primary-hover); transform: translateY(-1px); }
+
+.bd-quick-create {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.bd-quick-create textarea {
+  width: 100%; resize: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text); font-size: 14px;
+  padding: var(--sp-3); font-family: inherit; line-height: 1.5;
+}
+.bd-quick-create textarea:focus { border-color: var(--primary); outline: none; }
+.bd-quick-footer { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
+
+.entry-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.entry-card-list {
+  display: flex; flex-direction: column;
+  gap: var(--sp-2); padding: var(--sp-2) 0;
+}
+.entry-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.12s;
+}
+.text-dim { color: var(--text-dim); font-size: 12px; }
+.entry-card:hover { border-color: var(--primary); transform: translateY(-1px); }
+.entry-card.selected { border-color: var(--primary); background: var(--primary-tint); }
+.entry-header {
+  display: flex; align-items: center;
+  gap: var(--sp-2); margin-bottom: var(--sp-2);
+}
+.entry-badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: var(--r-badge);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--primary-tint); color: var(--primary);
+  flex-shrink: 0;
+}
+.entry-badge.unsorted { background: rgba(245,158,11,.15); color: var(--warning); }
+.entry-date { font-size: 11px; color: var(--text-dim); margin-left: auto; flex-shrink: 0; }
+.entry-menu {
+  background: none; border: none; color: var(--text-dim);
+  cursor: pointer; padding: 0 var(--sp-1); font-size: 16px;
+  flex-shrink: 0; border-radius: var(--r-sm);
+}
+.entry-menu:hover { color: var(--text); background: var(--bg-surface); }
+.entry-body {
+  font-size: 13px; color: var(--text-dim); line-height: 1.5;
+  overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+
+.detail-panel {
+  width: 380px; flex-shrink: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  position: sticky;
+  top: calc(56px + var(--sp-6));
+  max-height: calc(100vh - 56px - var(--sp-8));
+  overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.detail-panel[hidden] { display: none; }
+.panel-header {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-4); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; position: sticky; top: 0;
+  background: var(--bg-card); z-index: 1;
+}
+.panel-header-left { display: flex; align-items: center; gap: var(--sp-2); flex: 1; flex-wrap: wrap; }
+.panel-date { font-size: 11px; color: var(--text-dim); }
+.panel-close {
+  background: none; border: none; color: var(--text-dim);
+  cursor: pointer; font-size: 14px; padding: 4px 8px;
+  border-radius: var(--r-sm); flex-shrink: 0; line-height: 1;
+}
+.panel-close:hover { color: var(--text); background: var(--bg-surface); }
+.panel-content { padding: var(--sp-4); flex: 1; }
+.panel-text {
+  font-size: 14px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+  color: var(--text); margin-bottom: var(--sp-4);
+}
+.panel-summary {
+  font-size: 12px; color: var(--text-dim);
+  padding: var(--sp-3); background: var(--bg-surface);
+  border-radius: var(--r-sm); margin-bottom: var(--sp-3);
+}
+.panel-tags { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-bottom: var(--sp-4); }
+.panel-section { padding-top: var(--sp-4); border-top: 1px solid var(--border); margin-top: var(--sp-4); }
+.panel-section h3 {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: var(--sp-3);
+}
+.panel-footer-actions { padding-top: var(--sp-4); border-top: 1px solid var(--border); margin-top: var(--sp-4); }
+
+/* ── Dashboard ─────────────────────────────────── */
+.dash-greeting {
+  margin-bottom: var(--sp-6);
+}
+.dash-greeting h2 {
+  font-size: 22px; font-weight: 700; margin-bottom: 2px;
+}
+.dash-greeting p { font-size: 13px; color: var(--text-dim); }
+
+.quick-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
+}
+.quick-action {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.quick-action:hover:not(.disabled) {
+  background: var(--primary-tint);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+.quick-action.disabled { opacity: 0.35; cursor: not-allowed; }
+
+.alert-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-card);
+  border: 1px solid rgba(245,158,11,.30);
+  background: rgba(245,158,11,.08);
+  margin-bottom: var(--sp-6);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.alert-card:hover { background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.50); }
+.alert-card[hidden] { display: none; }
+.alert-icon { font-size: 18px; flex-shrink: 0; }
+.alert-body { flex: 1; }
+.alert-body strong { display: block; font-size: 13px; font-weight: 600; color: var(--warning); }
+.alert-sub { font-size: 12px; color: var(--text-dim); }
+.alert-arrow { color: var(--warning); font-size: 18px; flex-shrink: 0; }
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
+}
+.overview-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  transition: border-color 0.15s, transform 0.15s;
+  min-height: 110px;
+  position: relative;
+}
+.overview-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+.overview-count {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+.overview-icon {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  font-size: 22px;
+  opacity: 0.5;
+}
+.overview-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: auto;
+}
+
+/* Footer */
+.app-footer {
+  grid-area: footer;
+  padding: 8px 16px;
+  font-size: 11px;
   text-align: center;
   color: var(--text-dim);
   background: var(--bg-card);
   border-top: 1px solid var(--border);
-  z-index: 50;
 }
 .app-footer strong { color: var(--primary); font-weight: 600; }
-
-/* Header */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
-}
-.header h1 { font-size: 20px; font-weight: 600; }
-.header h1 span { color: var(--primary); }
-.header-actions { display: flex; gap: 12px; align-items: center; }
-.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); display: inline-block; }
-.status-dot.connected { background: var(--success); }
-
-/* Tabs */
-.tabs {
-  display: flex;
-  gap: 0;
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
-}
-.tab {
-  padding: 12px 24px;
-  cursor: pointer;
-  border: none;
-  background: none;
-  color: var(--text-dim);
-  font-size: 14px;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-}
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-tint); }
-
-/* Content */
-.content { padding: 24px; max-width: 1200px; margin: 0 auto; }
 
 /* Buttons */
 .btn {
@@ -212,33 +589,74 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 
 /* Task list */
-.task-group { margin-bottom: 24px; }
-.task-group-title {
-  font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;
-  color: var(--text-dim); margin-bottom: 8px; font-weight: 600;
-  padding: 4px 0;
+/* ── M4: Task View ─────────────────────────────── */
+.task-toolbar-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); margin-bottom: var(--sp-3); flex-wrap: wrap;
 }
-.task-subgroup { margin-left: 12px; margin-bottom: 12px; }
+.task-toolbar-right { display: flex; gap: var(--sp-2); align-items: center; }
+.task-select {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--r-sm);
+  padding: 6px 10px; font-size: 12px; cursor: pointer;
+}
+.task-select:focus { outline: none; border-color: var(--primary); }
+.task-quick-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
+.task-quick-row .task-select { flex: 1; }
+
+.task-group { margin-bottom: var(--sp-6); }
+.task-group-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-dim);
+  padding: var(--sp-2) 0; margin-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.task-subgroup { margin-bottom: var(--sp-3); }
 .task-subgroup summary {
-  cursor: pointer; font-size: 12px; color: var(--text-dim);
-  padding: 6px 0; user-select: none;
+  cursor: pointer; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-dim); padding: var(--sp-2) 0; user-select: none;
 }
 .task-subgroup summary::-webkit-details-marker { color: var(--primary); }
-.task-item {
-  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
-  margin-bottom: 8px;
+
+.task-card {
+  display: flex; align-items: center; gap: var(--sp-3);
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--r-card); padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-2);
+  transition: border-color 0.15s, transform 0.12s;
 }
-.task-item .checkbox {
-  width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: all 0.2s;
+.task-card:hover { border-color: var(--primary); transform: translateY(-1px); }
+.task-card.task-done { opacity: 0.6; }
+.task-card.prio-high  { border-left-color: var(--danger); }
+.task-card.prio-medium { border-left-color: var(--warning); }
+.task-card.prio-low   { border-left-color: var(--secondary); }
+.task-check-wrap {
+  cursor: pointer; flex-shrink: 0; padding: 2px;
+  border-radius: var(--r-sm);
 }
-.task-item .checkbox.done { background: var(--primary); border-color: var(--primary); }
-.task-item .checkbox.done::after { content: '\2713'; color: #fff; font-size: 13px; }
-.task-item .task-title { flex: 1; font-size: 14px; }
-.task-item .task-title.done { text-decoration: line-through; color: var(--text-dim); }
-.task-item .task-meta { font-size: 12px; color: var(--text-dim); }
+.task-check-wrap:hover .task-checkbox { border-color: var(--primary); }
+.task-checkbox {
+  width: 20px; height: 20px; border: 2px solid var(--border);
+  border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.task-checkbox.done {
+  background: var(--primary); border-color: var(--primary);
+}
+.task-checkbox.done::after { content: '\2713'; color: #fff; font-size: 13px; line-height: 1; }
+.task-card-body { flex: 1; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.task-card-title { font-size: 14px; color: var(--text); flex: 1; }
+.task-card-title.done { text-decoration: line-through; color: var(--text-dim); }
+.task-prio-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 2px 7px;
+  border-radius: var(--r-badge); flex-shrink: 0;
+}
+.prio-badge-high   { background: rgba(239,83,80,.15);  color: var(--danger); }
+.prio-badge-medium { background: rgba(245,158,11,.15); color: var(--warning); }
+.prio-badge-low    { background: rgba(77,182,172,.15); color: var(--secondary); }
 
 .badge {
   display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px;
@@ -400,9 +818,187 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 .ach-modal-desc { color: var(--text-dim); font-size: 13px; margin-top: 8px; }
 
 .proj-pct-text { font-size: 12px; color: var(--text-dim); margin-top: 4px; display: block; }
+.proj-ideas { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; }
+.proj-ideas-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); flex-basis: 100%; }
+.proj-idea-chip {
+  display: inline-block; padding: 3px 10px;
+  background: rgba(140,158,255,.10); border: 1px solid rgba(140,158,255,.25);
+  border-radius: var(--r-pill); font-size: 11px; color: var(--primary);
+  cursor: pointer; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.proj-idea-chip:hover {
+  background: rgba(140,158,255,.22); border-color: var(--primary);
+}
+.proj-unassigned-ideas { border: 1px dashed var(--border); }
 .task-subheader { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
 .qr-msg { color: #666; padding: 1rem; }
 .sugg-member-count { font-size: 12px; color: var(--text-dim); }
+.proj-desc-input { margin-top: var(--sp-2); }
+
+/* ═══════════════════════════════════════════════════
+   MOBILE / APK  —  max-width: 768px
+   Same HTML, layout adapts via CSS only. No JS changes.
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Shell: drop sidebar column, add bottom-nav row */
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 52px 1fr 56px;
+    grid-template-areas:
+      "topbar"
+      "main"
+      "sidebar";
+  }
+
+  /* Topbar: compact, hide center status pills */
+  .topbar { padding: 0 var(--sp-4); }
+  .topbar-status { display: none; }
+
+  /* Sidebar → bottom nav bar */
+  .sidebar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    top: auto;
+    height: 56px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 50;
+  }
+  .nav-list {
+    flex-direction: row;
+    gap: 0;
+    padding: 0;
+    justify-content: space-around;
+    align-items: stretch;
+    width: 100%;
+  }
+  .nav-divider { display: none; }
+
+  /* Nav items: icon on top, tiny label below */
+  .nav-item {
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 4px 4px;
+    border-left: none;
+    border-top: 2px solid transparent;
+    border-radius: 0;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    min-width: 44px;
+    font-size: 9px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .nav-item.active {
+    border-left-color: transparent;
+    border-top-color: var(--primary);
+  }
+  .nav-icon { width: auto; font-size: 18px; }
+  .nav-label { font-size: 9px; }
+  .nav-badge {
+    position: absolute;
+    top: 4px;
+    right: calc(50% - 18px);
+    min-width: 16px;
+    padding: 0 4px;
+  }
+  .nav-item { position: relative; }
+  .nav-soon { display: none; }
+
+  /* Main content: bottom padding to clear the nav bar */
+  .main-content { padding-bottom: 56px; }
+
+  /* Views: tighter padding */
+  .view { padding: var(--sp-4) var(--sp-3); }
+
+  /* Braindump view: single column */
+  #view-braindumps.active {
+    flex-direction: column;
+    padding: var(--sp-3);
+    gap: var(--sp-3);
+  }
+
+  /* Detail panel → bottom sheet */
+  .detail-panel {
+    position: fixed;
+    bottom: 56px; /* sit above bottom nav */
+    left: 0; right: 0;
+    width: 100%;
+    max-height: 68vh;
+    border-radius: var(--r-card) var(--r-card) 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    z-index: 100;
+    box-shadow: 0 -8px 32px rgba(0,0,0,.45);
+  }
+
+  /* Backdrop for bottom sheet */
+  .detail-panel:not([hidden])::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: -1;
+    bottom: 56px;
+  }
+
+  /* CTA → floating action button */
+  #bdCtaBtn, #taskCtaBtn {
+    position: fixed;
+    bottom: calc(56px + var(--sp-4));
+    right: var(--sp-4);
+    width: auto;
+    padding: 13px 20px;
+    box-shadow: 0 4px 20px rgba(140,158,255,.45);
+    z-index: 90;
+  }
+
+  /* Quick-create: full width overlay above FAB */
+  .bd-quick-create:not(.hidden) {
+    position: fixed;
+    bottom: calc(56px + 52px + var(--sp-2));
+    left: var(--sp-3);
+    right: var(--sp-3);
+    z-index: 91;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: var(--sp-3);
+    box-shadow: 0 4px 24px rgba(0,0,0,.4);
+  }
+
+  /* Bulk delete: hidden on mobile (no checkbox selection) */
+  #bdBulkDelete { display: none; }
+
+  /* Touch-safe interactive targets */
+  .filter-pill { min-height: 36px; padding: 8px 16px; }
+  .entry-card { padding: var(--sp-3); }
+  .entry-menu { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 36px; }
+
+  /* Overview grid: 2 columns on narrow, swap to 1 if very narrow */
+  .overview-grid { grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+
+  /* Dashboard: tighter spacing */
+  .dash-greeting h2 { font-size: 18px; }
+  .quick-actions { gap: var(--sp-3); }
+}
+
+@media (max-width: 380px) {
+  .overview-grid { grid-template-columns: 1fr; }
+  .topbar-brand { font-size: 12px; letter-spacing: 0.08em; }
+}
 </style>
 </head>
 <body>
@@ -460,77 +1056,234 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   </section>
 </div>
 
-<div class="header">
-  <h1><span>NEXUS</span> Dashboard</h1>
-  <div class="header-actions">
-    <span class="status-dot" id="statusDot" title="Nicht verbunden"></span>
-    <button class="btn btn-ghost btn-sm" id="themeToggle" data-action="theme-cycle" title="Theme wechseln (Hell / Dunkel / System)">🎨 System</button>
-    <button class="btn btn-ghost" data-action="settings-open">Einstellungen</button>
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="brand-dot">●</span>
+    <span>NEXUS</span>
   </div>
-</div>
+  <div class="topbar-status" id="topbarStatus">
+    <span class="status-pill offline" id="statusPill">
+      <span class="dot danger" id="statusDot"></span>
+      <span id="statusText">OFFLINE</span>
+    </span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost btn-sm" id="themeToggle" data-action="theme-cycle" title="Theme wechseln">🌙 Dunkel</button>
+    <button class="btn btn-ghost btn-sm" data-action="settings-open" title="Einstellungen">⚙</button>
+  </div>
+</header>
 
-<div class="tabs">
-  <button class="tab active" data-tab="braindumps">BrainDumps</button>
-  <button class="tab" data-tab="projects">Projekte</button>
-  <button class="tab" data-tab="tasks">Aufgaben</button>
-  <button class="tab" data-tab="achievements">Erfolge</button>
-</div>
+<aside class="sidebar">
+  <nav class="nav-list" role="navigation" aria-label="Hauptnavigation">
+    <button class="nav-item active" data-view="dashboard" aria-current="page">
+      <span class="nav-icon" aria-hidden="true">🏠</span>
+      <span class="nav-label">Dashboard</span>
+    </button>
+    <button class="nav-item" data-view="braindumps">
+      <span class="nav-icon" aria-hidden="true">🧠</span>
+      <span class="nav-label">Braindumps</span>
+      <span class="nav-badge hidden" id="navBadgeBraindumps" aria-label="Unsortierte Einträge"></span>
+    </button>
+    <button class="nav-item" data-view="tasks">
+      <span class="nav-icon" aria-hidden="true">✅</span>
+      <span class="nav-label">Aufgaben</span>
+    </button>
+    <button class="nav-item" data-view="projects">
+      <span class="nav-icon" aria-hidden="true">📁</span>
+      <span class="nav-label">Projekte</span>
+    </button>
 
+    <div class="nav-divider" role="separator"></div>
+
+    <button class="nav-item disabled" tabindex="-1" aria-disabled="true" title="Bald verfügbar — Kalender (FEAT-002)">
+      <span class="nav-icon" aria-hidden="true">🗓️</span>
+      <span class="nav-label">Kalender</span>
+      <span class="nav-soon">bald</span>
+    </button>
+    <button class="nav-item disabled" tabindex="-1" aria-disabled="true" title="Bald verfügbar — Globale Suche">
+      <span class="nav-icon" aria-hidden="true">🔍</span>
+      <span class="nav-label">Suche</span>
+      <span class="nav-soon">bald</span>
+    </button>
+    <button class="nav-item" data-view="achievements">
+      <span class="nav-icon" aria-hidden="true">🏆</span>
+      <span class="nav-label">Erfolge</span>
+    </button>
+
+    <div class="nav-divider" role="separator"></div>
+
+    <button class="nav-item" data-action="settings-open">
+      <span class="nav-icon" aria-hidden="true">⚙️</span>
+      <span class="nav-label">Einstellungen</span>
+    </button>
+  </nav>
+</aside>
+
+<main class="main-content">
 <div id="globalBanner" class="banner error hidden" role="alert"></div>
 
-<!-- BrainDumps Tab -->
-<div class="content tab-content" id="tab-braindumps">
-  <div class="toolbar">
-    <input type="text" id="bdSearch" placeholder="BrainDumps suchen…" data-input="bd-search">
-    <select id="bdCategory" data-change="bd-filter">
-      <option value="">Alle Kategorien</option>
-    </select>
-    <button class="btn btn-primary" data-action="bd-refresh">Aktualisieren</button>
-    <button class="btn btn-ghost btn-sm hidden" id="bdUnsortedBadge" data-action="bd-filter-unsorted">Unsortiert (0)</button>
-    <button class="btn btn-danger" id="bdBulkDelete" data-action="bd-bulk-delete" disabled>Ausgewählte löschen</button>
+<!-- Dashboard View -->
+<section class="view active" id="view-dashboard">
+  <div class="dash-greeting">
+    <h2>Guten Tag 👋</h2>
+    <p>Was liegt heute an?</p>
   </div>
-  <div id="bdTable"></div>
-</div>
 
-<!-- Projects Tab -->
-<div class="content tab-content hidden" id="tab-projects">
+  <div class="quick-actions">
+    <button class="quick-action" data-action="nav-braindumps" aria-label="Braindumps öffnen" title="Braindumps">🧠</button>
+    <button class="quick-action" data-action="task-new" aria-label="Neue Aufgabe erstellen" title="Neue Aufgabe">✏️</button>
+    <button class="quick-action" data-action="nav-projects" aria-label="Projekte öffnen" title="Projekte">📁</button>
+    <button class="quick-action disabled" aria-label="Suche (bald verfügbar)" title="Suche — bald verfügbar" aria-disabled="true">🔍</button>
+  </div>
+
+  <div class="alert-card" id="dashAlertCard" hidden data-action="dash-alert-click">
+    <span class="alert-icon" aria-hidden="true">⚠</span>
+    <div class="alert-body">
+      <strong id="dashAlertText">Braindumps unsortiert</strong>
+      <span class="alert-sub">Jetzt ansehen →</span>
+    </div>
+    <span class="alert-arrow" aria-hidden="true">›</span>
+  </div>
+
+  <div class="overview-grid">
+    <button class="overview-card" data-action="nav-braindumps" aria-label="Braindumps öffnen">
+      <span class="overview-count" id="dashCountBraindumps">—</span>
+      <span class="overview-icon" aria-hidden="true">🧠</span>
+      <span class="overview-label">Braindumps</span>
+    </button>
+    <button class="overview-card" data-action="nav-tasks" aria-label="Aufgaben öffnen">
+      <span class="overview-count" id="dashCountTasks">—</span>
+      <span class="overview-icon" aria-hidden="true">✅</span>
+      <span class="overview-label">Offen</span>
+    </button>
+    <button class="overview-card" data-action="nav-projects" aria-label="Projekte öffnen">
+      <span class="overview-count" id="dashCountProjects">—</span>
+      <span class="overview-icon" aria-hidden="true">📁</span>
+      <span class="overview-label">Projekte</span>
+    </button>
+    <button class="overview-card" data-action="nav-achievements" aria-label="Erfolge öffnen">
+      <span class="overview-count" id="dashCountAchievements">—</span>
+      <span class="overview-icon" aria-hidden="true">🏆</span>
+      <span class="overview-label">Erfolge</span>
+    </button>
+  </div>
+</section>
+
+<!-- Braindumps View -->
+<section class="view" id="view-braindumps">
+  <div class="view-main">
+    <div class="bd-toolbar-top">
+      <input type="text" id="bdSearch" class="bd-search" placeholder="Suchen…" data-input="bd-search" aria-label="Braindumps suchen">
+      <div class="bd-toolbar-actions">
+        <button class="btn btn-ghost btn-sm hidden" id="bdUnsortedBadge" data-action="bd-filter-unsorted">Unsortiert (0)</button>
+        <button class="btn btn-danger btn-sm" id="bdBulkDelete" data-action="bd-bulk-delete" disabled>Löschen</button>
+      </div>
+    </div>
+    <div class="filter-pills" id="bdFilterPills" role="tablist" aria-label="Kategorie-Filter">
+      <button class="filter-pill active" role="tab" data-filter="">Alle</button>
+    </div>
+    <div class="bd-quick-create hidden" id="bdQuickCreate">
+      <textarea id="bdQuickText" placeholder="Gedanken, Ideen, Tasks — einfach losschreiben…" rows="3" aria-label="Neuer Braindump"></textarea>
+      <div class="bd-quick-footer">
+        <button class="btn btn-ghost btn-sm" data-action="bd-quick-cancel">Abbrechen</button>
+        <button class="btn btn-primary" data-action="bd-quick-submit">Speichern</button>
+      </div>
+    </div>
+    <button class="btn btn-cta" data-action="bd-quick-open" id="bdCtaBtn">+ Braindump</button>
+    <div id="bdTable"></div>
+  </div>
+
+  <aside class="detail-panel" id="bdDetailPanel" hidden aria-label="Braindump Detail">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <span class="entry-badge" id="panelBdCategory">—</span>
+        <time class="panel-date" id="panelBdDate"></time>
+      </div>
+      <button class="panel-close" data-action="bd-detail-close" aria-label="Panel schließen">✕</button>
+    </div>
+    <div class="panel-content">
+      <div class="panel-text" id="panelBdText"></div>
+      <div class="panel-summary hidden" id="panelBdSummary"></div>
+      <div class="panel-tags" id="panelBdTags"></div>
+      <div class="panel-section links-section">
+        <h3>Verknüpft mit</h3>
+        <div id="panelBdLinks"></div>
+      </div>
+      <div class="panel-footer-actions">
+        <button class="btn btn-danger btn-sm" data-action="bd-detail-delete">Löschen</button>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- Projects View -->
+<section class="view" id="view-projects">
   <div class="toolbar">
-    <button class="btn btn-primary" data-action="proj-refresh">Aktualisieren</button>
+    <button class="btn btn-primary" data-action="proj-new">+ Neues Projekt</button>
+    <button class="btn btn-ghost btn-sm" data-action="proj-refresh">Aktualisieren</button>
+  </div>
+  <div class="bd-quick-create hidden" id="projQuickCreate">
+    <input type="text" id="projNewName" class="bd-search" placeholder="Projektname…" maxlength="120">
+    <textarea id="projNewDesc" class="proj-desc-input" placeholder="Beschreibung (optional)" rows="2"></textarea>
+    <div class="bd-quick-footer">
+      <button class="btn btn-ghost btn-sm" data-action="proj-quick-cancel">Abbrechen</button>
+      <button class="btn btn-primary" data-action="proj-quick-submit">Erstellen</button>
+    </div>
   </div>
   <div id="suggestionsBanner" class="banner suggestion hidden"></div>
   <div class="card-grid" id="projectCards"></div>
-</div>
+</section>
 
-<!-- Tasks Tab -->
-<div class="content tab-content hidden" id="tab-tasks">
-  <div class="toolbar">
-    <button class="btn btn-primary" data-action="task-new">+ Neue Aufgabe</button>
-    <button class="btn btn-primary" id="taskRefreshBtn" data-action="task-refresh">Aktualisieren</button>
-    <select id="taskFilterStatus" data-change="task-render">
-      <option value="">Alle Status</option>
-      <option value="open">Offen</option>
-      <option value="done">Erledigt</option>
-    </select>
-    <select id="taskFilterPriority" data-change="task-render">
-      <option value="">Alle Prioritäten</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
-    </select>
-    <select id="taskFilterProject" data-change="task-render">
-      <option value="">Alle Projekte</option>
-    </select>
+<!-- Tasks View -->
+<section class="view" id="view-tasks">
+  <div class="task-toolbar-top">
+    <div class="filter-pills" id="taskStatusPills" role="tablist">
+      <button class="filter-pill active" role="tab" data-filter="">Alle</button>
+      <button class="filter-pill" role="tab" data-filter="open">Offen</button>
+      <button class="filter-pill" role="tab" data-filter="done">Erledigt</button>
+    </div>
+    <div class="task-toolbar-right">
+      <select id="taskFilterPriority" class="task-select" data-change="task-render">
+        <option value="">Alle Prioritäten</option>
+        <option value="high">Hoch</option>
+        <option value="medium">Mittel</option>
+        <option value="low">Niedrig</option>
+      </select>
+      <select id="taskFilterProject" class="task-select" data-change="task-render">
+        <option value="">Alle Projekte</option>
+      </select>
+    </div>
   </div>
+  <div class="bd-quick-create hidden" id="taskQuickCreate">
+    <input type="text" id="newTaskTitle" class="bd-search" placeholder="Aufgabe…" maxlength="200">
+    <div class="task-quick-row">
+      <select id="newTaskPriority" class="task-select">
+        <option value="low">Niedrig</option>
+        <option value="medium" selected>Mittel</option>
+        <option value="high">Hoch</option>
+      </select>
+      <select id="newTaskProject" class="task-select">
+        <option value="">— kein Projekt —</option>
+      </select>
+    </div>
+    <div class="bd-quick-footer">
+      <button class="btn btn-ghost btn-sm" data-action="task-cancel">Abbrechen</button>
+      <button class="btn btn-primary" data-action="task-create">Erstellen</button>
+    </div>
+  </div>
+  <button class="btn btn-cta" data-action="task-new" id="taskCtaBtn">+ Aufgabe</button>
   <div id="taskList"></div>
-</div>
+</section>
 
-<!-- Achievements Tab -->
-<div class="content tab-content hidden" id="tab-achievements">
+<!-- Achievements View -->
+<section class="view" id="view-achievements">
   <div class="toolbar">
     <button class="btn btn-primary" data-action="ach-refresh">Aktualisieren</button>
   </div>
   <div class="card-grid" id="achievementGrid"></div>
-</div>
+</section>
+
+</main>
 
 <!-- Settings Modal -->
 <div class="modal-overlay hidden" id="settingsModal">
@@ -558,27 +1311,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 </div>
 
 <!-- New Task Modal -->
-<div class="modal-overlay hidden" id="newTaskModal">
-  <div class="modal">
-    <h2>Neue Aufgabe</h2>
-    <label for="newTaskTitle">Titel</label>
-    <input type="text" id="newTaskTitle" placeholder="Aufgabentitel">
-    <label for="newTaskProject">Projekt (optional)</label>
-    <select id="newTaskProject">
-      <option value="">— kein Projekt —</option>
-    </select>
-    <label for="newTaskPriority">Priorität</label>
-    <select id="newTaskPriority">
-      <option value="low">Niedrig</option>
-      <option value="medium" selected>Mittel</option>
-      <option value="high">Hoch</option>
-    </select>
-    <div class="actions">
-      <button class="btn btn-ghost" data-action="task-cancel">Abbrechen</button>
-      <button class="btn btn-primary" data-action="task-create">Erstellen</button>
-    </div>
-  </div>
-</div>
+<!-- newTaskModal removed M4 — inline quick-create in #view-tasks -->
 
 <!-- Achievement Detail Modal -->
 <div class="modal-overlay hidden" id="achievementModal">
@@ -593,24 +1326,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   </div>
 </div>
 
-<!-- BrainDump Detail Modal (Synaptic Mosaic Phase U) -->
-<div class="modal-overlay hidden" id="bdDetailModal">
-  <div class="modal modal-wide">
-    <h2>BrainDump</h2>
-    <div id="bdDetailMeta" class="bd-detail-meta"></div>
-    <div id="bdDetailText" class="bd-detail-text"></div>
-    <div id="bdDetailSummary" class="mt-12"></div>
-    <div id="bdDetailTags" class="mt-8"></div>
-    <div class="links-section">
-      <h3>Verknüpft mit</h3>
-      <div id="bdDetailLinks"></div>
-    </div>
-    <div class="actions">
-      <button class="btn btn-danger" data-action="bd-detail-delete">Löschen</button>
-      <button class="btn btn-primary" data-action="bd-detail-close">Schließen</button>
-    </div>
-  </div>
-</div>
+<!-- bdDetailModal removed in M3 — replaced by #bdDetailPanel inside #view-braindumps -->
 
 <script>
 // --- State ---
@@ -691,29 +1407,73 @@ async function api(path, opts = {}, control = {}) {
 }
 
 async function checkConnection() {
+  const dot  = document.getElementById('statusDot');
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
   try {
     await api('/health', {}, { silent: true });
-    document.getElementById('statusDot').classList.add('connected');
-    document.getElementById('statusDot').title = 'Verbunden mit ' + coreUrl;
+    if (dot)  { dot.className = 'dot success'; }
+    if (pill) { pill.className = 'status-pill connected'; }
+    if (text) { text.textContent = 'VERBUNDEN'; }
   } catch {
-    document.getElementById('statusDot').classList.remove('connected');
-    document.getElementById('statusDot').title = 'Nicht verbunden';
+    if (dot)  { dot.className = 'dot danger'; }
+    if (pill) { pill.className = 'status-pill offline'; }
+    if (text) { text.textContent = 'OFFLINE'; }
   }
 }
 
-// --- Tabs ---
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-    tab.classList.add('active');
-    document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
-    const name = tab.dataset.tab;
-    if (name === 'braindumps') refreshBraindumps();
-    else if (name === 'projects') refreshProjects();
-    else if (name === 'tasks') refreshTasks();
-    else if (name === 'achievements') refreshAchievements();
+// --- Navigation (Views module pattern — UI_SPEC.md Section 5) ---
+const Views = {
+  dashboard: {
+    init() { refreshDashboard(); },
+    destroy() {},
+  },
+  braindumps:   { init() { refreshBraindumps(); },   destroy() {} },
+  tasks: {
+    _listeners: [],
+    init() {
+      refreshTasks();
+      const pills = document.getElementById('taskStatusPills');
+      if (pills) {
+        const handler = (e) => {
+          const pill = e.target.closest('.filter-pill');
+          if (!pill) return;
+          pills.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+          pill.classList.add('active');
+          renderTasks();
+        };
+        pills.addEventListener('click', handler);
+        this._listeners.push([pills, 'click', handler]);
+      }
+    },
+    destroy() {
+      this._listeners.forEach(([el, type, fn]) => el.removeEventListener(type, fn));
+      this._listeners = [];
+    },
+  },
+  projects:     { init() { refreshProjects(); },      destroy() {} },
+  achievements: { init() { refreshAchievements(); },  destroy() {} },
+};
+
+let _activeView = null;
+
+function navigate(viewId) {
+  if (!Views[viewId]) return;
+  _activeView?.destroy();
+  document.querySelectorAll('.view').forEach(v =>
+    v.classList.toggle('active', v.id === `view-${viewId}`)
+  );
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => {
+    const isActive = n.dataset.view === viewId;
+    n.classList.toggle('active', isActive);
+    isActive ? n.setAttribute('aria-current', 'page') : n.removeAttribute('aria-current');
   });
+  Views[viewId].init();
+  _activeView = Views[viewId];
+}
+
+document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+  item.addEventListener('click', () => navigate(item.dataset.view));
 });
 
 // --- BrainDumps ---
@@ -724,6 +1484,11 @@ async function refreshBraindumps() {
     populateCategoryFilter();
     renderBraindumps(braindumps);
     refreshUnsortedBadge();
+    if (_pendingDetailId) {
+      const id = _pendingDetailId;
+      _pendingDetailId = null;
+      openBraindumpDetail(id);
+    }
   } catch (e) {
     document.getElementById('bdTable').innerHTML =
       '<div class="empty-state"><p>BrainDumps konnten nicht geladen werden: ' + e.message + '</p></div>';
@@ -732,41 +1497,61 @@ async function refreshBraindumps() {
 
 async function refreshUnsortedBadge() {
   const btn = document.getElementById('bdUnsortedBadge');
-  if (!btn) return;
+  const navBadge = document.getElementById('navBadgeBraindumps');
   try {
     const data = await api('/braindump/unsorted/count');
     const n = data.count || 0;
-    btn.textContent = `Unsortiert (${n})`;
-    btn.classList.toggle('hidden', n === 0);
+    if (btn) { btn.textContent = `Unsortiert (${n})`; btn.classList.toggle('hidden', n === 0); }
+    if (navBadge) { navBadge.textContent = n > 0 ? n : ''; navBadge.classList.toggle('hidden', n === 0); }
   } catch {
-    btn.classList.add('hidden');
+    if (btn) btn.classList.add('hidden');
+    if (navBadge) navBadge.classList.add('hidden');
   }
 }
 
 function filterUnsorted() {
-  const sel = document.getElementById('bdCategory');
-  if (!Array.from(sel.options).some(o => o.value === 'Unsorted')) {
-    const opt = document.createElement('option');
-    opt.value = 'Unsorted';
-    opt.textContent = 'Unsorted';
-    sel.appendChild(opt);
+  const container = document.getElementById('bdFilterPills');
+  if (!container) return;
+  container.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  let pill = container.querySelector('[data-filter="Unsorted"]');
+  if (!pill) {
+    pill = document.createElement('button');
+    pill.className = 'filter-pill';
+    pill.role = 'tab';
+    pill.dataset.filter = 'Unsorted';
+    pill.textContent = 'Unsortiert';
+    pill.addEventListener('click', () => {
+      container.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      filterBraindumps();
+    });
+    container.appendChild(pill);
   }
-  sel.value = 'Unsorted';
+  pill.classList.add('active');
   filterBraindumps();
 }
 
 function populateCategoryFilter() {
   const cats = [...new Set(braindumps.map(b => b.category).filter(Boolean))];
-  const sel = document.getElementById('bdCategory');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">Alle Kategorien</option>' +
-    cats.map(c => `<option value="${c}">${c}</option>`).join('');
-  sel.value = cur;
+  const container = document.getElementById('bdFilterPills');
+  if (!container) return;
+  const currentFilter = container.querySelector('.filter-pill.active')?.dataset.filter ?? '';
+  container.innerHTML =
+    `<button class="filter-pill${currentFilter === '' ? ' active' : ''}" role="tab" data-filter="">Alle</button>` +
+    cats.map(c => `<button class="filter-pill${currentFilter === c ? ' active' : ''}" role="tab" data-filter="${esc(c)}">${esc(c)}</button>`).join('');
+  container.querySelectorAll('.filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      container.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      filterBraindumps();
+    });
+  });
 }
 
 function filterBraindumps() {
-  const q = document.getElementById('bdSearch').value.toLowerCase();
-  const cat = document.getElementById('bdCategory').value;
+  const q = (document.getElementById('bdSearch')?.value || '').toLowerCase();
+  const activePill = document.querySelector('#bdFilterPills .filter-pill.active');
+  const cat = activePill?.dataset.filter || '';
   const filtered = braindumps.filter(b => {
     if (cat && b.category !== cat) return false;
     if (q && !(b.raw_text || '').toLowerCase().includes(q) && !(b.category || '').toLowerCase().includes(q)) return false;
@@ -776,29 +1561,37 @@ function filterBraindumps() {
 }
 
 function renderBraindumps(items) {
+  const container = document.getElementById('bdTable');
   if (!items.length) {
-    document.getElementById('bdTable').innerHTML = '<div class="empty-state"><p>Keine BrainDumps gefunden.</p></div>';
-    updateBulkButtonState();
+    container.innerHTML = '<div class="empty-state"><p>Keine Braindumps gefunden.</p></div>';
     return;
   }
-  const rows = items.map(b => `<tr class="bd-row-clickable" data-action="bd-row-open" data-bd-id="${esc(b.id)}">
-    <td class="bd-row-skip"><input type="checkbox" class="bd-select" data-id="${esc(b.id)}" data-change="bd-select-toggle"></td>
-    <td>${b.category ? '<span class="badge badge-category">' + esc(b.category) + '</span>' : '-'}</td>
-    <td>${esc((b.raw_text || '').substring(0, 120))}${(b.raw_text || '').length > 120 ? '...' : ''}</td>
-    <td>${b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
-    <td class="bd-row-skip"><button class="btn btn-sm btn-danger" data-action="bd-delete" data-bd-id="${esc(b.id)}">Löschen</button></td>
-  </tr>`).join('');
-  document.getElementById('bdTable').innerHTML = `<table>
-    <thead><tr><th class="col-w-40"></th><th>Kategorie</th><th>Inhalt</th><th>Datum</th><th class="col-w-90">Aktionen</th></tr></thead>
-    <tbody>${rows}</tbody></table>`;
-  updateBulkButtonState();
+  const cards = items.map(b => {
+    const dateStr = b.created_at
+      ? new Date(b.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+      : '';
+    const isoDate = b.created_at ? b.created_at.substring(0, 10) : '';
+    const preview = (b.raw_text || '').substring(0, 140) + ((b.raw_text || '').length > 140 ? '…' : '');
+    const badge = b.category
+      ? `<span class="entry-badge">${esc(b.category)}</span>`
+      : '<span class="entry-badge entry-badge-empty">—</span>';
+    return `<div class="entry-card" role="button" tabindex="0"
+        data-action="bd-card-open" data-bd-id="${esc(b.id)}"
+        aria-label="Braindump öffnen">
+      <div class="entry-header">
+        ${badge}
+        <time class="entry-date" datetime="${esc(isoDate)}">${esc(dateStr)}</time>
+        <button class="entry-menu" aria-label="Optionen" data-action="bd-card-menu" data-bd-id="${esc(b.id)}">⋮</button>
+      </div>
+      <p class="entry-body">${esc(preview)}</p>
+    </div>`;
+  }).join('');
+  container.innerHTML = `<div class="entry-card-list">${cards}</div>`;
 }
 
 function updateBulkButtonState() {
-  const count = document.querySelectorAll('.bd-select:checked').length;
   const btn = document.getElementById('bdBulkDelete');
-  btn.disabled = count === 0;
-  btn.textContent = count > 0 ? `Ausgewählte löschen (${count})` : 'Ausgewählte löschen';
+  if (btn) btn.disabled = true;
 }
 
 async function deleteBraindump(id) {
@@ -820,10 +1613,14 @@ async function deleteSelectedBraindumps() {
 }
 
 // --- Projects ---
+let _ideas = [];
+
 async function refreshProjects() {
   try {
-    projects = await api('/projects');
-    if (!Array.isArray(projects)) projects = projects.data || projects.items || [];
+    [projects, _ideas] = await Promise.all([
+      api('/projects').then(r => Array.isArray(r) ? r : (r.data || r.items || [])),
+      api('/braindump/ideas', {}, { silent: true }).then(r => Array.isArray(r) ? r : []).catch(() => []),
+    ]);
     renderProjects();
     populateProjectSelects();
     refreshSuggestionsBanner();
@@ -836,6 +1633,7 @@ async function refreshProjects() {
 function populateProjectSelects() {
   const filter = document.getElementById('taskFilterProject');
   const newTask = document.getElementById('newTaskProject');
+  if (!filter || !newTask) return;
   const curFilter = filter.value;
   const curNew = newTask.value;
   const opts = projects.map(p => `<option value="${esc(p.id)}">${esc(p.name || 'Untitled')}</option>`).join('');
@@ -845,27 +1643,92 @@ function populateProjectSelects() {
   newTask.value = curNew;
 }
 
+function renderIdeaChips(ideas) {
+  if (!ideas.length) return '';
+  return `<div class="proj-ideas">
+    <span class="proj-ideas-label">💡 Ideen</span>
+    ${ideas.map(i => {
+      const text = i.summary || (i.raw_text || '').substring(0, 80);
+      return `<button class="proj-idea-chip" data-action="idea-open" data-bd-id="${esc(i.id)}" title="${esc(i.raw_text || '')}">${esc(text)}</button>`;
+    }).join('')}
+  </div>`;
+}
+
 async function renderProjects() {
-  if (!projects.length) {
-    document.getElementById('projectCards').innerHTML = '<div class="empty-state"><p>Keine Projekte gefunden.</p></div>';
+  const container = document.getElementById('projectCards');
+  const ideasByProject = new Map();
+  const unassigned = [];
+  for (const idea of _ideas) {
+    if (idea.project_id) {
+      if (!ideasByProject.has(idea.project_id)) ideasByProject.set(idea.project_id, []);
+      ideasByProject.get(idea.project_id).push(idea);
+    } else {
+      unassigned.push(idea);
+    }
+  }
+
+  if (!projects.length && !unassigned.length) {
+    container.innerHTML = '<div class="empty-state"><p>Keine Projekte gefunden.</p></div>';
     return;
   }
+
   const cards = await Promise.all(projects.map(async p => {
     let pct = 0;
     try {
       const prog = await api(`/projects/${encodeURIComponent(p.id)}/progress`);
       pct = prog.progress_percent || prog.percent || prog.progress || 0;
     } catch {}
+    const projIdeas = ideasByProject.get(p.id) || [];
     return `<div class="card">
       <button class="btn btn-sm btn-danger card-delete" data-action="proj-delete" data-proj-id="${esc(p.id)}" title="Projekt löschen">×</button>
       <h3>${esc(p.name || p.title || 'Untitled')}</h3>
       <p>${esc(p.description || '')}</p>
       <div class="progress-bar"><div class="progress-fill" data-pct="${pct}"></div></div>
-      <span class="proj-pct-text">${Math.round(pct)}% complete</span>
+      <span class="proj-pct-text">${Math.round(pct)}% abgeschlossen</span>
+      ${renderIdeaChips(projIdeas)}
     </div>`;
   }));
-  document.getElementById('projectCards').innerHTML = cards.join('');
-  applyProgressWidths(document.getElementById('projectCards'));
+
+  let html = cards.join('');
+
+  if (unassigned.length) {
+    html += `<div class="card proj-unassigned-ideas">
+      <h3>💡 Ideen ohne Projekt</h3>
+      <p class="text-dim">${unassigned.length} Idee${unassigned.length === 1 ? '' : 'n'} noch nicht zugeordnet</p>
+      ${renderIdeaChips(unassigned)}
+    </div>`;
+  }
+
+  container.innerHTML = html;
+  applyProgressWidths(container);
+}
+
+function openNewProject() {
+  const box = document.getElementById('projQuickCreate');
+  if (!box) return;
+  box.classList.remove('hidden');
+  document.getElementById('projNewName')?.focus();
+}
+
+function closeNewProject() {
+  const box = document.getElementById('projQuickCreate');
+  if (!box) return;
+  box.classList.add('hidden');
+  const name = document.getElementById('projNewName');
+  const desc = document.getElementById('projNewDesc');
+  if (name) name.value = '';
+  if (desc) desc.value = '';
+}
+
+async function submitNewProject() {
+  const name = (document.getElementById('projNewName')?.value || '').trim();
+  const desc = (document.getElementById('projNewDesc')?.value || '').trim();
+  if (!name) { document.getElementById('projNewName')?.focus(); return; }
+  try {
+    await api('/projects', { method: 'POST', body: JSON.stringify({ name, description: desc, braindump_ids: [] }) });
+    closeNewProject();
+    refreshProjects();
+  } catch (e) { alert('Fehler: ' + e.message); }
 }
 
 async function deleteProject(id) {
@@ -902,9 +1765,9 @@ async function refreshTasks() {
 }
 
 function renderTasks() {
-  const statusFilter = document.getElementById('taskFilterStatus').value;
-  const prioFilter = document.getElementById('taskFilterPriority').value;
-  const projFilter = document.getElementById('taskFilterProject').value;
+  const statusFilter = document.querySelector('#taskStatusPills .filter-pill.active')?.dataset.filter ?? '';
+  const prioFilter = document.getElementById('taskFilterPriority')?.value ?? '';
+  const projFilter = document.getElementById('taskFilterProject')?.value ?? '';
 
   const isDone = t => t.status === 'done' || t.status === 'completed';
   const normStatus = t => isDone(t) ? 'done' : 'open';
@@ -973,12 +1836,19 @@ function renderTasks() {
 function renderTaskItem(t) {
   const done = t.status === 'done' || t.status === 'completed';
   const prio = t.priority || 'medium';
-  const prioClass = `badge-priority-${prio}`;
-  return `<div class="task-item">
-    <div class="checkbox ${done ? 'done' : ''}" data-action="task-toggle" data-task-id="${esc(t.id)}" data-task-done="${done}"></div>
-    <span class="task-title ${done ? 'done' : ''}">${esc(t.title || t.name || '')}</span>
-    <span class="badge ${prioClass}">${esc(prio)}</span>
-    <button class="btn btn-sm btn-danger" data-action="task-delete" data-task-id="${esc(t.id)}">Delete</button>
+  const prioLabels = { high: 'Hoch', medium: 'Mittel', low: 'Niedrig' };
+  return `<div class="task-card prio-${prio} ${done ? 'task-done' : ''}" role="listitem">
+    <div class="task-check-wrap"
+      data-action="task-toggle" data-task-id="${esc(t.id)}" data-task-done="${done}"
+      aria-label="${done ? 'Als offen markieren' : 'Als erledigt markieren'}" role="button" tabindex="0">
+      <div class="task-checkbox ${done ? 'done' : ''}"></div>
+    </div>
+    <div class="task-card-body">
+      <span class="task-card-title ${done ? 'done' : ''}">${esc(t.title || t.name || '')}</span>
+      <span class="task-prio-badge prio-badge-${prio}">${prioLabels[prio] || prio}</span>
+    </div>
+    <button class="entry-menu" aria-label="Löschen"
+      data-action="task-delete" data-task-id="${esc(t.id)}">⋮</button>
   </div>`;
 }
 
@@ -1002,9 +1872,23 @@ async function deleteTask(id) {
 
 function openNewTask() {
   populateProjectSelects();
-  document.getElementById('newTaskModal').classList.remove('hidden');
+  const box = document.getElementById('taskQuickCreate');
+  const btn = document.getElementById('taskCtaBtn');
+  if (!box) return;
+  box.classList.remove('hidden');
+  if (btn) btn.classList.add('hidden');
+  document.getElementById('newTaskTitle')?.focus();
 }
-function closeNewTask() { document.getElementById('newTaskModal').classList.add('hidden'); }
+
+function closeNewTask() {
+  const box = document.getElementById('taskQuickCreate');
+  const btn = document.getElementById('taskCtaBtn');
+  if (!box) return;
+  box.classList.add('hidden');
+  if (btn) btn.classList.remove('hidden');
+  const title = document.getElementById('newTaskTitle');
+  if (title) title.value = '';
+}
 
 async function createTask() {
   const title = document.getElementById('newTaskTitle').value.trim();
@@ -1145,11 +2029,59 @@ function esc(s) {
   return d.innerHTML;
 }
 
-// --- Dashboard Init (called after onboarding or if already onboarded) ---
+// --- Dashboard View ---
+async function refreshDashboard() {
+  checkConnection();
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+  // Load all counts in parallel
+  const [bds, ts, ps, as, unsorted] = await Promise.allSettled([
+    api('/braindump',                  {}, { silent: true }),
+    api('/tasks',                      {}, { silent: true }),
+    api('/projects',                   {}, { silent: true }),
+    api('/achievements',               {}, { silent: true }),
+    api('/braindump/unsorted/count',   {}, { silent: true }),
+  ]);
+
+  if (bds.status === 'fulfilled') {
+    const arr = Array.isArray(bds.value) ? bds.value : (bds.value?.data || []);
+    set('dashCountBraindumps', arr.length);
+  }
+  if (ts.status === 'fulfilled') {
+    const arr = Array.isArray(ts.value) ? ts.value : (ts.value?.data || []);
+    const open = arr.filter(t => t.status !== 'done' && t.status !== 'completed').length;
+    set('dashCountTasks', open);
+  }
+  if (ps.status === 'fulfilled') {
+    const arr = Array.isArray(ps.value) ? ps.value : (ps.value?.data || []);
+    set('dashCountProjects', arr.length);
+  }
+  if (as.status === 'fulfilled') {
+    const arr = Array.isArray(as.value) ? as.value : (as.value?.data || []);
+    const unlocked = arr.filter(a => !!a.unlocked_at).length;
+    set('dashCountAchievements', unlocked + '/' + arr.length);
+  }
+
+  // Alert card + nav badge
+  const n = unsorted.status === 'fulfilled' ? (unsorted.value?.count || 0) : 0;
+  const alertCard = document.getElementById('dashAlertCard');
+  const alertText = document.getElementById('dashAlertText');
+  const navBadge  = document.getElementById('navBadgeBraindumps');
+  if (alertCard) {
+    if (n > 0) {
+      if (alertText) alertText.textContent = `${n} Braindump${n === 1 ? '' : 's'} unsortiert`;
+      alertCard.removeAttribute('hidden');
+    } else {
+      alertCard.setAttribute('hidden', '');
+    }
+  }
+  if (navBadge) { navBadge.textContent = n > 0 ? n : ''; navBadge.classList.toggle('hidden', n === 0); }
+}
+
+// --- App Init (called after onboarding or if already onboarded) ---
 function initDashboard() {
   applyTheme(currentTheme);
-  checkConnection();
-  refreshBraindumps();
+  navigate('dashboard');
 }
 
 // --- Onboarding ---
@@ -1546,38 +2478,70 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 
 let currentBdDetailId = null;
+let _pendingDetailId = null;
 
-async function openBraindumpDetail(id, evt) {
-  if (evt && evt.target && evt.target.tagName === 'INPUT') return;
+async function openBraindumpDetail(id) {
   currentBdDetailId = id;
   const bd = braindumps.find(b => b.id === id);
   if (!bd) return;
-  document.getElementById('bdDetailMeta').textContent =
-    (bd.category ? bd.category + ' · ' : '') +
-    (bd.created_at ? new Date(bd.created_at).toLocaleString() : '');
-  document.getElementById('bdDetailText').textContent = bd.raw_text || '';
-  const summaryEl = document.getElementById('bdDetailSummary');
-  summaryEl.innerHTML = bd.summary
-    ? '<strong class="bd-detail-strong">Zusammenfassung:</strong> ' + esc(bd.summary)
-    : '';
-  const tagsEl = document.getElementById('bdDetailTags');
-  let tags = [];
-  try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
-  tagsEl.innerHTML = tags.length
-    ? tags.map(t => '<span class="badge badge-category mr-4">' + esc(t) + '</span>').join('')
-    : '';
-  const linksEl = document.getElementById('bdDetailLinks');
-  linksEl.innerHTML = '<span class="empty">Lade…</span>';
-  document.getElementById('bdDetailModal').classList.remove('hidden');
+
+  // Mark the selected card
+  document.querySelectorAll('.entry-card').forEach(c =>
+    c.classList.toggle('selected', c.dataset.bdId === id)
+  );
+
+  // Category badge
+  const catEl = document.getElementById('panelBdCategory');
+  if (catEl) catEl.textContent = bd.category || '—';
+
+  // Date
+  const dateEl = document.getElementById('panelBdDate');
+  if (dateEl) {
+    dateEl.textContent = bd.created_at
+      ? new Date(bd.created_at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
+      : '';
+    dateEl.setAttribute('datetime', (bd.created_at || '').substring(0, 10));
+  }
+
+  // Body text
+  const textEl = document.getElementById('panelBdText');
+  if (textEl) textEl.textContent = bd.raw_text || '';
+
+  // Summary
+  const summaryEl = document.getElementById('panelBdSummary');
+  if (summaryEl) {
+    if (bd.summary) {
+      summaryEl.textContent = bd.summary;
+      summaryEl.classList.remove('hidden');
+    } else {
+      summaryEl.classList.add('hidden');
+    }
+  }
+
+  // Tags
+  const tagsEl = document.getElementById('panelBdTags');
+  if (tagsEl) {
+    let tags = [];
+    try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
+    tagsEl.innerHTML = tags.map(t => `<span class="entry-badge">${esc(t)}</span>`).join('');
+  }
+
+  // Links placeholder
+  const linksEl = document.getElementById('panelBdLinks');
+  if (linksEl) linksEl.innerHTML = '<span class="text-dim">Lade…</span>';
+
+  // Open panel
+  const panel = document.getElementById('bdDetailPanel');
+  if (panel) panel.removeAttribute('hidden');
+
+  // Fetch links (race-guard: SM-U-001)
   try {
     const data = await api(`/braindump/${encodeURIComponent(id)}/links`, {}, { silent: true });
-    // SM-U-001: Race-Guard — User könnte bei rekursiver Wikilink-Navigation
-    // bereits zu einem anderen BrainDump gewechselt sein, dann verfällt der Render.
     if (currentBdDetailId !== id) return;
-    renderLinks(linksEl, data);
-  } catch (e) {
+    if (linksEl) renderLinks(linksEl, data);
+  } catch {
     if (currentBdDetailId !== id) return;
-    linksEl.innerHTML = '<span class="empty">Verknüpfungen konnten nicht geladen werden.</span>';
+    if (linksEl) linksEl.innerHTML = '<span class="text-dim">Verknüpfungen nicht verfügbar.</span>';
   }
 }
 
@@ -1619,15 +2583,16 @@ function wikiLabelFor(type, id) {
 function openLinkTarget(type, id) {
   if (type === 'project') {
     closeBraindumpDetail();
-    document.querySelector('.tab[data-tab="projects"]').click();
+    navigate('projects');
     return;
   }
-  // Re-Open BrainDump-Detail mit dem Target
   openBraindumpDetail(id);
 }
 
 function closeBraindumpDetail() {
-  document.getElementById('bdDetailModal').classList.add('hidden');
+  const panel = document.getElementById('bdDetailPanel');
+  if (panel) panel.setAttribute('hidden', '');
+  document.querySelectorAll('.entry-card.selected').forEach(c => c.classList.remove('selected'));
   currentBdDetailId = null;
 }
 
@@ -1706,20 +2671,64 @@ async function dismissSuggestion(id) {
 // ============================================================
 // Phase C — CSP-Compliant Event Delegation (Crystalline Crab)
 // ============================================================
+// --- Quick-Create (Braindump) ---
+function openQuickCreate() {
+  const box = document.getElementById('bdQuickCreate');
+  const btn = document.getElementById('bdCtaBtn');
+  if (!box) return;
+  box.classList.remove('hidden');
+  if (btn) btn.classList.add('hidden');
+  document.getElementById('bdQuickText')?.focus();
+}
+
+function closeQuickCreate() {
+  const box = document.getElementById('bdQuickCreate');
+  const btn = document.getElementById('bdCtaBtn');
+  if (!box) return;
+  box.classList.add('hidden');
+  if (btn) btn.classList.remove('hidden');
+  const ta = document.getElementById('bdQuickText');
+  if (ta) ta.value = '';
+}
+
+async function submitQuickBraindump() {
+  const ta = document.getElementById('bdQuickText');
+  const text = (ta?.value || '').trim();
+  if (!text) return;
+  try {
+    await api('/braindump', { method: 'POST', body: JSON.stringify({ raw_text: text }) });
+    closeQuickCreate();
+    refreshBraindumps();
+  } catch (e) { alert('Fehler: ' + e.message); }
+}
+
 // Tauri injects CSP hashes that nullify 'unsafe-inline'. All event handlers
 // must be programmatic. data-action / data-change / data-input attributes
 // drive a single delegated dispatcher per event type.
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (currentBdDetailId) { closeBraindumpDetail(); return; }
+    closeQuickCreate();
+    closeNewTask();
+  }
+});
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const action = el.dataset.action;
-  if (action === 'bd-row-open') {
-    if (e.target.closest('button, input, .bd-row-skip, [data-action]:not(.bd-row-clickable)')) return;
-    openBraindumpDetail(el.dataset.bdId, e);
+  if (action === 'bd-card-open') {
+    if (e.target.closest('button, [data-action="bd-card-menu"]')) return;
+    openBraindumpDetail(el.dataset.bdId);
     return;
   }
   switch (action) {
+    case 'nav-braindumps':   navigate('braindumps'); break;
+    case 'nav-tasks':        navigate('tasks'); break;
+    case 'nav-projects':     navigate('projects'); break;
+    case 'nav-achievements': navigate('achievements'); break;
+    case 'dash-alert-click': navigate('braindumps'); filterUnsorted(); break;
     case 'theme-cycle': cycleTheme(); break;
     case 'settings-open': openSettings(); break;
     case 'settings-close': closeSettings(); break;
@@ -1729,8 +2738,19 @@ document.addEventListener('click', (e) => {
     case 'bd-filter-unsorted': filterUnsorted(); break;
     case 'bd-bulk-delete': deleteSelectedBraindumps(); break;
     case 'bd-delete': e.stopPropagation(); deleteBraindump(el.dataset.bdId); break;
+    case 'bd-card-menu': e.stopPropagation(); deleteBraindump(el.dataset.bdId); break;
     case 'bd-detail-delete': deleteBraindumpFromDetail(); break;
     case 'bd-detail-close': closeBraindumpDetail(); break;
+    case 'bd-quick-open': openQuickCreate(); break;
+    case 'bd-quick-cancel': closeQuickCreate(); break;
+    case 'bd-quick-submit': submitQuickBraindump(); break;
+    case 'idea-open':
+      _pendingDetailId = el.dataset.bdId;
+      navigate('braindumps');
+      break;
+    case 'proj-new': openNewProject(); break;
+    case 'proj-quick-cancel': closeNewProject(); break;
+    case 'proj-quick-submit': submitNewProject(); break;
     case 'proj-refresh': refreshProjects(); break;
     case 'proj-delete': deleteProject(el.dataset.projId); break;
     case 'task-new': openNewTask(); break;
@@ -1807,7 +2827,7 @@ function applyProgressWidths(root) {
 </script>
 
 <footer class="app-footer">
-  Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.2
+  Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.3
 </footer>
 
 </div><!-- /.app-shell -->

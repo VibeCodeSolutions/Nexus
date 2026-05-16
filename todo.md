@@ -5,6 +5,190 @@
 
 ---
 
+## 🎨 Sprint "Nexus Nightvision" — UI-Komplettredesign (Priorisiert 2026-05-16)
+
+> **Design-Referenz:** Plantry (Plant Health Tracker) — true-dark, vivid accent, Status-Pills, Quick-Action-Kreise, 2×2-Grid-Overview, Pill-CTA, Entry-Cards mit Typ-Badge.
+> **Spec:** `docs/UI_SPEC.md` — Source of Truth für alle visuellen und strukturellen Entscheidungen. Jede Änderung an `index.html` muss gegen die Spec geprüft werden.
+> **Compliance-Agent:** läuft automatisch alle 3 Tage und meldet Abweichungen von der Spec.
+> **Prinzip:** Shell = fix. Features = Content-Area. Neue Section = 1 nav-item + 1 `<section>` + 1 `Views{}` Eintrag.
+
+### Milestone 1 — Shell & Design System (`index.html` Grundstruktur)
+
+- [ ] **NV-M1-A** — Sidebar-Navigation ersetzt horizontale Tabs
+  - Struktur: `<aside class="sidebar">` mit `.nav-item[data-view]`-Buttons (Braindumps, Aufgaben, Projekte | Kalender disabled, Erfolge | Settings)
+  - Topbar: Logo + Status-Pills + Theme-Toggle + Settings-Icon
+  - Shell-CSS: `display:grid; grid-template-columns: 220px 1fr`, Topbar 56px fixed
+  - DoD: Alle bestehenden 4 Views navigierbar via Sidebar; Tab-Leiste weg; Topbar zeigt Status-Dot und Theme-Toggle
+
+- [ ] **NV-M1-B** — Design-Token-Update
+  - `--bg` auf `#09090F` (true-dark), `--bg-card` auf `#111318`, `--border` auf `#1C2030`
+  - Neue Spacing-Tokens: `--sp-1` bis `--sp-8` (4/8/12/16/24/32px)
+  - Neue Radius-Tokens: `--r-pill`, `--r-card`, `--r-btn`, `--r-badge`, `--r-sm`
+  - DoD: Beide Themes (dark/light) visuell intakt; keine Broken-Layouts
+
+- [ ] **NV-M1-C** — JS-Architektur: `Views{}`-Modul-Pattern + `navigate()`
+  - Alle bestehenden View-Init-Funktionen in `Views.braindumps`, `Views.tasks`, `Views.projects`, `Views.achievements` verpacken
+  - Jedes Modul hat `init()` und `destroy()` (Event-Listener cleanup)
+  - Globale Variablen auf Allowlist reduzieren: `_activeView`, `_authToken`, `_serverUrl`, `_theme`
+  - DoD: `navigate('tasks')` → destroy braindumps, init tasks. Back-Navigation: kein Event-Listener-Leak
+
+- **Gate M1:** Alle 4 Views per Sidebar erreichbar. Dark + Light Theme. JS-Konsole ohne Fehler. Kein `style=`-Attribut im gesamten HTML.
+
+### Milestone 2 — Dashboard View (Home-Übersicht, neu)
+
+- [ ] **NV-M2-A** — Status-Pills in Topbar (dynamisch)
+  - `STATUS OK / FEHLER` (Verbindung), `N UNSORTIERT` (aus `/braindump/unsorted/count`), `N AUFGABEN` (offene Tasks)
+  - Pill-Komponente: `--r-pill`, kleiner Border, farbige Dot-Indikatoren
+  - DoD: Pills laden beim Start, refreshen nach Braindump-Submit
+
+- [ ] **NV-M2-B** — Quick-Action-Buttons (Zeile mit Kreisen)
+  - 3 Buttons: 🎙 Braindump, ✏️ Aufgabe, 🔍 Suche (vorerst disabled)
+  - Styling: 40×40px, rund, `--bg-surface`, Hover: `--primary-tint`
+  - DoD: Braindump-Button öffnet Braindump-View + fokussiert Input; Aufgabe öffnet Task-Modal
+
+- [ ] **NV-M2-C** — Alert-Card (Unsortiert-Banner)
+  - Erscheint wenn `unsorted_count > 0`, klicken → Braindump-View gefiltert auf Unsortiert
+  - Styling: Amber-Tint, Warndreick-Icon, Pfeil rechts
+  - DoD: 0 Unsortierte → Banner weg; N > 0 → Banner mit korrektem Count
+
+- [ ] **NV-M2-D** — 2×2 Overview-Grid (Plantry-Muster)
+  - 4 Cards: Braindumps (Gesamt-Count), Aufgaben (Offen), Projekte (Aktive), Erfolge (XP oder Badge-Count)
+  - Count-Badge oben rechts in Card, groß (28px), `--primary`
+  - Card-Label: UPPERCASE, 11px, `--text-dim`
+  - Klick navigiert zur jeweiligen View
+  - DoD: Counts korrekt aus API; Klick navigiert; Hover-Effekt
+
+- **Gate M2:** Dashboard ist neuer Default-Tab beim Start. Alle Counts laden korrekt. Alert-Banner reagiert auf Zustand. Quick-Actions funktionieren.
+
+### Milestone 3 — Braindump View (Redesign bestehend)
+
+- [ ] **NV-M3-A** — Toolbar: Filter-Pills + CTA-Button
+  - Filter-Pills: Alle / je Kategorie (dynamisch aus API) — `role="tablist"`, Pill-Styling
+  - CTA: `+ Braindump` als `btn-cta` (full-width, pill, `--primary`)
+  - DoD: Filter ändert angezeigte Liste; CTA öffnet Eingabe-Bereich
+
+- [ ] **NV-M3-B** — Entry-Cards (Plantry-Muster)
+  - Jede Row wird zu Card: `--r-card`, Entry-Badge (Kategorie, uppercase, `--primary-tint`), Datum rechts, ⋮-Menü
+  - Entry-Body: erste 120 Zeichen als Preview
+  - Hover: `border-color: var(--primary)`, leichte Erhöhung
+  - DoD: Alle Einträge als Cards; Badge zeigt korrekte Kategorie; "Unsortiert" Badge in `--warning` Farbe
+
+- [ ] **NV-M3-C** — Detail-Panel (Slide-in, kein Modal)
+  - Klick auf Card → `<aside class="detail-panel">` öffnet sich als zweite Spalte
+  - Inhalt: Volltext, Kategorie, Datum, verknüpfte Projekte (Wikilinks), "Tasks extrahieren"-Button (FEAT-001)
+  - DoD: Panel öffnet/schließt ohne Layout-Sprung; ESC schließt; kein Modal mehr
+
+- **Gate M3:** Braindump-View vollständig redesigned. Detail-Panel ersetzt Modal. Filter-Pills funktionieren. Entry-Cards mit Badges.
+
+### Milestone 4 — Aufgaben View (Redesign bestehend)
+
+- [ ] **NV-M4-A** — Filter-Pills: Alle / Heute / Pro Projekt
+- [ ] **NV-M4-B** — Task-Cards statt Tabellen-Rows
+  - Prioritäts-Badge (HOCH/MITTEL/NIEDRIG), Status-Checkbox groß, Projekt-Label, Fälligkeitsdatum
+  - Overdue: `--danger` Tint auf der Card
+- [ ] **NV-M4-C** — Inline-Erstellen (kein Modal, Eingabezeile oben)
+- **Gate M4:** Task-View ohne Tabellen. Cards mit Priority-Badges. Inline-Create.
+
+### Milestone 5 — Projekte View (Redesign bestehend)
+
+- [ ] **NV-M5-A** — Grid-Layout (2-spaltig) statt Liste
+- [ ] **NV-M5-B** — Projekt-Card: Name, Task-Progress-Bar, letzter Braindump-Link, %-Badge
+- [ ] **NV-M5-C** — Detail-Panel: Projekt-Tasks + verknüpfte Braindumps
+- **Gate M5:** Projekte als Grid-Cards. Detail-Panel zeigt Tasks + Links.
+
+### Milestone 6 — Polish, Reserved Slots, Erfolge View
+
+- [ ] **NV-M6-A** — Reserved Nav-Items: Kalender + Suche als disabled, Tooltip "Bald verfügbar"
+- [ ] **NV-M6-B** — Erfolge View: XP-Anzeige + Achievement-Cards (Plantry-Grid-Muster)
+- [ ] **NV-M6-C** — Responsive: Fenster < 900px → Sidebar kollabiert zu Icon-Only-Leiste
+- [ ] **NV-M6-D** — Animations: Entry-Card hover, Panel slide-in, Navigate fade (CSS transitions only, kein JS animate)
+- **Gate M6:** Alle 6 Milestones grün. Compliance-Agent-Scan: 0 Violations. Beide Themes. Fensterresize-Test.
+
+### Milestone-Übersicht
+
+| # | Name | Abhängigkeit | Schätzung |
+|---|---|---|---|
+| M1 | Shell + Design System | — | 1 Tag |
+| M2 | Dashboard View | M1 | 1 Tag |
+| M3 | Braindump View | M1 | 1–2 Tage |
+| M4 | Aufgaben View | M1 | 1 Tag |
+| M5 | Projekte View | M1 | 1 Tag |
+| M6 | Polish + Reserved Slots | M1–M5 | 0.5 Tage |
+
+**Gesamt: ~6–7 Tage**
+
+---
+
+## 🚀 Nächste Features (Priorisiert 2026-05-16, Admin)
+
+### FEAT-001 — KI-Aufgabensplitting aus Braindumps
+
+**Idee:** Ein Spracheintrag kann mehrere Themen enthalten. Aktuell wird der gesamte Text als ein Eintrag gespeichert und mit einer Kategorie versehen. Mit diesem Feature analysiert die KI den Braindump und extrahiert automatisch einzelne Action-Items als Tasks.
+
+**Aktueller Stand:** 1 Spracheingabe → 1 DB-Eintrag → 1 LLM-Call → 1 Kategorie. Kein Splitting, keine automatische Task-Erstellung.
+
+**Gewünschtes Verhalten:**
+- Nutzer spricht 1 Minute über 5 Themen → App erstellt 5 Tasks mit Titel, Kategorie und optionalem Fälligkeitsdatum
+- Der ursprüngliche Braindump-Text bleibt als Quelle erhalten
+- Splitting passiert im Hintergrund (analog zu `recategorize_unsorted`)
+
+**Umsetzungsplan:**
+- [ ] **FEAT-001-A** — Neuer LLM-Prompt `extract_action_items(text) -> Vec<ActionItem>` (Titel, Priorität, Fälligkeitsdatum optional, Kategorie)
+  - Datei: `core/src/llm/mod.rs` (neuer Trait-Default), alle Provider-Implementierungen
+  - DoD: Prompt extrahiert aus "Kauf Milch, ruf Kai an, Todo-App fixen bis Freitag" → 3 Tasks korrekt
+
+- [ ] **FEAT-001-B** — Neuer Endpoint `POST /braindump/{id}/extract-tasks`
+  - Datei: `core/src/handlers.rs`, `core/src/main.rs` (Route)
+  - Response: `{ "created": [task_id, ...], "count": N }`
+  - DoD: Call auf bestehenden Braindump → Tasks in DB, Antwort in <3s
+
+- [ ] **FEAT-001-C** — Optionaler Auto-Extract nach `POST /braindump` (Query-Param `?auto_extract=true` oder Settings-Toggle)
+  - Datei: `core/src/handlers.rs::create_braindump`
+  - DoD: Mobile App kann Auto-Extract aktivieren; Desktop-Settings-Modal hat Toggle
+
+- [ ] **FEAT-001-D** — UI: "Tasks extrahieren"-Button im Braindump-Detail (Desktop + Android)
+  - Dateien: `desktop/src/index.html` (Detail-Modal), `android/.../BrainDumpHistoryScreen.kt`
+  - DoD: Button sichtbar, Klick → Tasks erscheinen in Tasks-Tab ohne Reload
+
+**Aufwand:** ~3–5 Tage (Backend + beide UIs). Infrastruktur (Tasks-Tabelle, LLM-Anbindung, Background-Tasks) bereits vorhanden.
+
+---
+
+### FEAT-002 — Kalender-Integration
+
+**Idee:** NEXUS hat aktuell keine Kalender-Anbindung. Tasks mit Fälligkeitsdatum sollen optional in einen externen Kalender exportiert/synchronisiert werden können.
+
+**Aktueller Stand:** Kein einziger `calendar`/`gcal`/`ical`-Treffer im Repo. Vollständige Neuimplementierung nötig.
+
+**Gewünschter Scope (MVP):**
+- Google Calendar OAuth-Flow (ähnlich wie geplanter Claude-OAuth, E9)
+- Tasks mit `due_date` als Kalender-Events exportieren (kein Sync, nur Push)
+- iCal-Export als Alternative ohne OAuth (`.ics`-Datei download)
+
+**Umsetzungsplan:**
+- [ ] **FEAT-002-A** — `GET /braindump/export.ics` — iCal-Feed aller Braindumps mit Datum
+  - Datei: `core/src/handlers.rs`, Crate: `icalendar` (crates.io)
+  - DoD: URL in Kalender-App eingetragen → Events sichtbar, Bearer-geschützt
+
+- [ ] **FEAT-002-B** — `GET /tasks/export.ics` — iCal-Feed aller offenen Tasks mit `due_date`
+  - Datei: `core/src/handlers.rs`
+  - DoD: Tasks mit Fälligkeitsdatum erscheinen als Kalender-Events
+
+- [ ] **FEAT-002-C** — Google Calendar Push via OAuth
+  - Dateien: `core/src/llm/` (neues Modul `gcal.rs`), `core/src/keystore.rs` (OAuth-Tokens)
+  - Abhängigkeit: E9 (Claude OAuth Desktop) als Blaupause
+  - DoD: Settings-Screen → "Mit Google Kalender verbinden" → Tasks werden bei Erstellung gepusht
+
+- [ ] **FEAT-002-D** — UI: Kalender-Einstellungen (Desktop + Android)
+  - Dateien: `desktop/src/index.html` (Settings-Modal), `android/.../SettingsScreen.kt`
+  - DoD: iCal-URL kopierbar, GCal-Verbinden-Button, Sync-Status sichtbar
+
+**Aufwand:** FEAT-002-A+B (~1–2 Tage, einfacher iCal-Export), FEAT-002-C+D (~5–7 Tage mit GCal-OAuth).
+
+---
+
+---
+
 ## 🔴 Vor v0.1.0 GA (Blocker)
 
 - [x] **N-001-SIC** — Dashboard `/` Bearer-pflichtig machen

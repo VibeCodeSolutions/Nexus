@@ -95,6 +95,40 @@ pub async fn delete_project(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Err
     Ok(())
 }
 
+/// Gibt alle Braindumps mit category='Idea' zurück, inkl. ihrem verknüpften project_id (oder NULL).
+pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(BrainDumpEntry, Option<String>)>, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, \
+                b.tags_json, b.classification_status, b.nexus_inbox_id, \
+                bp.project_id \
+         FROM braindumps b \
+         LEFT JOIN braindump_projects bp ON b.id = bp.braindump_id \
+         WHERE LOWER(b.category) = 'idea' \
+         ORDER BY b.created_at DESC",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let result = rows.into_iter().map(|row| {
+        use sqlx::Row;
+        let entry = BrainDumpEntry {
+            id: row.get("id"),
+            created_at: row.get("created_at"),
+            raw_text: row.get("raw_text"),
+            transcript: row.get("transcript"),
+            category: row.get("category"),
+            summary: row.get("summary"),
+            tags_json: row.get("tags_json"),
+            classification_status: row.get("classification_status"),
+            nexus_inbox_id: row.get("nexus_inbox_id"),
+        };
+        let project_id: Option<String> = row.get("project_id");
+        (entry, project_id)
+    }).collect();
+
+    Ok(result)
+}
+
 pub async fn assign_braindump_to_project(pool: &SqlitePool, braindump_id: &str, project_id: &str) -> Result<(), sqlx::Error> {
     sqlx::query("INSERT OR IGNORE INTO braindump_projects (braindump_id, project_id) VALUES (?, ?)")
         .bind(braindump_id)
@@ -159,6 +193,30 @@ pub async fn find_task_by_external_id(
     .bind(nexus_external_id)
     .fetch_optional(pool)
     .await
+}
+
+/// Backfill: Für alle Braindumps mit category='Task' ohne zugehörigen Task einen anlegen.
+/// Läuft idempotent beim Start; erzeugt keine Duplikate dank nexus_external_id.
+pub async fn backfill_tasks_from_braindumps(pool: &SqlitePool) -> Result<usize, sqlx::Error> {
+    let orphans = sqlx::query_as::<_, crate::models::BrainDumpEntry>(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id \
+         FROM braindumps WHERE LOWER(category) = 'task'",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut created = 0usize;
+    for bd in orphans {
+        let ext_id = format!("bd:{}", bd.id);
+        let exists = find_task_by_external_id(pool, &ext_id).await?.is_some();
+        if exists { continue; }
+        let title = bd.summary
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| bd.raw_text.chars().take(120).collect());
+        let _ = create_task_with_external_id(pool, &title, None, Some("medium"), Some(&ext_id)).await;
+        created += 1;
+    }
+    Ok(created)
 }
 
 pub async fn list_tasks(pool: &SqlitePool, project_id_filter: Option<&str>, status_filter: Option<&str>) -> Result<Vec<Task>, sqlx::Error> {

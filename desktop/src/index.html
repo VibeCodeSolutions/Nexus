@@ -289,6 +289,92 @@ body {
 .bd-quick-create textarea:focus { border-color: var(--primary); outline: none; }
 .bd-quick-footer { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
 
+/* ── NV-3: Foto-Braindump-Sheet ─────────────────── */
+.bd-cta-group { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.bd-cta-group .btn-cta { margin-bottom: 0; }
+.btn-cta-photo { background: var(--bg-surface); color: var(--text); border: 1px solid var(--border); flex: 0 0 auto; min-width: 140px; }
+.btn-cta-photo:hover { background: var(--bg-card); border-color: var(--primary); transform: translateY(-1px); }
+
+.bd-photo-create {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.bd-photo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: var(--sp-4);
+  min-height: 280px;
+}
+@media (max-width: 720px) {
+  .bd-photo-grid { grid-template-columns: 1fr; }
+}
+.bd-photo-input { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.bd-photo-drop {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-height: 240px; padding: var(--sp-4);
+  background: var(--bg-surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  overflow: hidden;
+}
+.bd-photo-drop:hover, .bd-photo-drop:focus-visible { border-color: var(--primary); background: var(--primary-tint); outline: none; }
+.bd-photo-drop.drag-over { border-color: var(--primary); background: var(--primary-tint); }
+.bd-photo-drop.locked { cursor: default; }
+.bd-photo-drop-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-dim); text-align: center; }
+.bd-photo-drop-icon { font-size: 32px; line-height: 1; }
+.bd-photo-drop-label { font-size: 14px; color: var(--text); }
+.bd-photo-drop-hint { font-size: 12px; color: var(--text-dim); }
+.bd-photo-preview {
+  max-width: 100%; max-height: 320px; object-fit: contain;
+  border-radius: var(--r-sm);
+}
+.bd-photo-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  align-self: flex-start;
+  padding: 4px 10px; border-radius: var(--r-pill); font-size: 12px;
+  background: var(--bg-surface); color: var(--text-dim); border: 1px solid var(--border);
+}
+.bd-photo-status.streaming { background: var(--primary-tint); color: var(--primary); border-color: var(--primary); }
+.bd-photo-status.success { background: rgba(76,175,80,0.12); color: var(--success); border-color: rgba(76,175,80,0.35); }
+.bd-photo-status.error { background: rgba(244,67,54,0.12); color: var(--danger); border-color: rgba(244,67,54,0.35); }
+.bd-photo-output {
+  display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+}
+.bd-photo-output-header { font-size: 12px; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; }
+.bd-photo-ocr {
+  flex: 1; min-height: 160px; margin: 0;
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  font-size: 13px; line-height: 1.5; color: var(--text);
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: var(--sp-3);
+  white-space: pre-wrap; word-break: break-word;
+  overflow: auto; max-height: 320px;
+}
+.bd-photo-ocr:empty::before { content: "Warte auf Eingabe…"; color: var(--text-dim); font-style: italic; }
+.bd-photo-ocr-line { display: block; min-height: 1.5em; }
+.bd-photo-tags-header { font-size: 12px; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; }
+.bd-photo-tags-hint { color: var(--text-dim); text-transform: none; letter-spacing: 0; font-size: 11px; }
+.bd-photo-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.bd-photo-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: var(--r-pill); font-size: 12px;
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-dim);
+  cursor: pointer; transition: background 0.1s, border-color 0.1s, color 0.1s;
+  user-select: none;
+}
+.bd-photo-tag:hover { border-color: var(--primary); color: var(--text); }
+.bd-photo-tag.accepted { background: var(--primary); border-color: var(--primary); color: #fff; }
+.bd-photo-tag.accepted:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.bd-photo-tag.rejected { opacity: 0.4; text-decoration: line-through; }
+
 .entry-list { display: flex; flex-direction: column; gap: var(--sp-2); }
 .entry-card-list {
   display: flex; flex-direction: column;
@@ -1189,7 +1275,37 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
         <button class="btn btn-primary" data-action="bd-quick-submit">Speichern</button>
       </div>
     </div>
-    <button class="btn btn-cta" data-action="bd-quick-open" id="bdCtaBtn">+ Braindump</button>
+    <div class="bd-cta-group" id="bdCtaGroup">
+      <button class="btn btn-cta" data-action="bd-quick-open" id="bdCtaBtn">+ Braindump</button>
+      <button class="btn btn-cta btn-cta-photo" data-action="bd-photo-open" id="bdCtaPhotoBtn" aria-label="Foto-Braindump aufnehmen oder hochladen">📷 Foto</button>
+    </div>
+    <div class="bd-photo-create hidden" id="bdPhotoCreate" role="dialog" aria-modal="true" aria-label="Foto-Braindump">
+      <div class="bd-photo-grid">
+        <div class="bd-photo-input">
+          <label class="bd-photo-drop" id="bdPhotoDrop" tabindex="0" aria-label="Bild auswählen oder hineinziehen">
+            <input type="file" id="bdPhotoFile" accept="image/*" hidden>
+            <div class="bd-photo-drop-empty" id="bdPhotoDropEmpty">
+              <span class="bd-photo-drop-icon">📥</span>
+              <span class="bd-photo-drop-label">Bild hier ablegen oder klicken</span>
+              <span class="bd-photo-drop-hint">JPG / PNG / WebP, max. 10&nbsp;MB</span>
+            </div>
+            <img class="bd-photo-preview hidden" id="bdPhotoPreview" alt="Vorschau">
+          </label>
+          <div class="bd-photo-status" id="bdPhotoStatus" hidden></div>
+        </div>
+        <div class="bd-photo-output">
+          <div class="bd-photo-output-header">OCR-Stream</div>
+          <div class="bd-photo-ocr" id="bdPhotoOcr" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions"></div>
+          <div class="bd-photo-tags-header" id="bdPhotoTagsHeader" hidden>Tag-Vorschläge <span class="bd-photo-tags-hint">(klicken zum Übernehmen)</span></div>
+          <div class="bd-photo-tags" id="bdPhotoTags"></div>
+        </div>
+      </div>
+      <div class="bd-quick-footer">
+        <button class="btn btn-ghost btn-sm" data-action="bd-photo-cancel">Abbrechen</button>
+        <button class="btn btn-ghost btn-sm hidden" data-action="bd-photo-retry" id="bdPhotoRetryBtn">Erneut versuchen</button>
+        <button class="btn btn-primary hidden" data-action="bd-photo-open-detail" id="bdPhotoOpenDetailBtn">Eintrag öffnen</button>
+      </div>
+    </div>
     <div id="bdTable"></div>
   </div>
 
@@ -2471,6 +2587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   initOnboarding();
+  bindPhotoSheetEvents();
 });
 
 // ============================================================
@@ -2702,6 +2819,333 @@ async function submitQuickBraindump() {
   } catch (e) { alert('Fehler: ' + e.message); }
 }
 
+/* ── NV-3: Foto-Braindump ───────────────────────── */
+const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+const photoState = {
+  file: null,
+  abortController: null,
+  suggestedTags: [],
+  acceptedTags: new Set(),
+  braindumpId: null,
+};
+
+function openPhotoCreate() {
+  closeQuickCreate();
+  const sheet = document.getElementById('bdPhotoCreate');
+  const group = document.getElementById('bdCtaGroup');
+  if (!sheet) return;
+  resetPhotoSheet();
+  sheet.classList.remove('hidden');
+  if (group) group.classList.add('hidden');
+  const drop = document.getElementById('bdPhotoDrop');
+  if (drop) drop.focus();
+}
+
+function closePhotoCreate() {
+  const sheet = document.getElementById('bdPhotoCreate');
+  const group = document.getElementById('bdCtaGroup');
+  if (!sheet) return;
+  if (photoState.abortController) {
+    try { photoState.abortController.abort(); } catch (_) {}
+  }
+  resetPhotoSheet();
+  sheet.classList.add('hidden');
+  if (group) group.classList.remove('hidden');
+}
+
+function resetPhotoSheet() {
+  photoState.file = null;
+  photoState.abortController = null;
+  photoState.suggestedTags = [];
+  photoState.acceptedTags = new Set();
+  photoState.braindumpId = null;
+  const drop = document.getElementById('bdPhotoDrop');
+  const empty = document.getElementById('bdPhotoDropEmpty');
+  const preview = document.getElementById('bdPhotoPreview');
+  const fileInput = document.getElementById('bdPhotoFile');
+  const status = document.getElementById('bdPhotoStatus');
+  const ocr = document.getElementById('bdPhotoOcr');
+  const tagsHeader = document.getElementById('bdPhotoTagsHeader');
+  const tagsBox = document.getElementById('bdPhotoTags');
+  const retry = document.getElementById('bdPhotoRetryBtn');
+  const openDetail = document.getElementById('bdPhotoOpenDetailBtn');
+  if (drop) { drop.classList.remove('drag-over', 'locked'); }
+  if (empty) empty.classList.remove('hidden');
+  if (preview) {
+    if (preview.dataset.objUrl) {
+      try { URL.revokeObjectURL(preview.dataset.objUrl); } catch (_) {}
+      delete preview.dataset.objUrl;
+    }
+    preview.classList.add('hidden');
+    preview.removeAttribute('src');
+  }
+  if (fileInput) fileInput.value = '';
+  if (status) { status.hidden = true; status.textContent = ''; status.className = 'bd-photo-status'; }
+  if (ocr) ocr.textContent = '';
+  if (tagsHeader) tagsHeader.hidden = true;
+  if (tagsBox) tagsBox.innerHTML = '';
+  if (retry) retry.classList.add('hidden');
+  if (openDetail) openDetail.classList.add('hidden');
+}
+
+function setPhotoStatus(text, variant) {
+  const status = document.getElementById('bdPhotoStatus');
+  if (!status) return;
+  status.hidden = false;
+  status.textContent = text;
+  status.className = 'bd-photo-status' + (variant ? ' ' + variant : '');
+}
+
+function setPhotoFile(file) {
+  if (!file) return;
+  if (!/^image\//.test(file.type)) {
+    setPhotoStatus('Datei ist kein Bild.', 'error');
+    return;
+  }
+  if (file.size > PHOTO_MAX_BYTES) {
+    setPhotoStatus(`Bild zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB, max 10 MB).`, 'error');
+    return;
+  }
+  photoState.file = file;
+  const preview = document.getElementById('bdPhotoPreview');
+  const empty = document.getElementById('bdPhotoDropEmpty');
+  if (preview) {
+    if (preview.dataset.objUrl) {
+      try { URL.revokeObjectURL(preview.dataset.objUrl); } catch (_) {}
+    }
+    const url = URL.createObjectURL(file);
+    preview.dataset.objUrl = url;
+    preview.src = url;
+    preview.classList.remove('hidden');
+  }
+  if (empty) empty.classList.add('hidden');
+  setPhotoStatus('Bereit — Analyse läuft …', 'streaming');
+  submitPhotoBraindump();
+}
+
+async function submitPhotoBraindump() {
+  if (!photoState.file) return;
+  const ocr = document.getElementById('bdPhotoOcr');
+  const drop = document.getElementById('bdPhotoDrop');
+  const retry = document.getElementById('bdPhotoRetryBtn');
+  if (ocr) ocr.textContent = '';
+  if (drop) drop.classList.add('locked');
+  if (retry) retry.classList.add('hidden');
+  setPhotoStatus('Analysiere …', 'streaming');
+
+  const fd = new FormData();
+  fd.append('image', photoState.file, photoState.file.name || 'photo.jpg');
+
+  const controller = new AbortController();
+  photoState.abortController = controller;
+  const headers = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const failWith = (msg) => {
+    setPhotoStatus(msg, 'error');
+    if (retry) retry.classList.remove('hidden');
+    if (drop) drop.classList.remove('locked');
+  };
+
+  let res;
+  try {
+    res = await fetch(coreUrl + '/braindump/from_image', {
+      method: 'POST', body: fd, headers, signal: controller.signal,
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    failWith('Verbindung fehlgeschlagen: ' + e.message);
+    return;
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { const body = await res.text(); if (body) detail = body.slice(0, 200); } catch (_) {}
+    failWith(`Fehler ${res.status}: ${detail}`);
+    return;
+  }
+  try {
+    await consumeSseStream(res.body, (frame) => handlePhotoFrame(frame));
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    failWith('Stream-Fehler: ' + e.message);
+  } finally {
+    photoState.abortController = null;
+  }
+}
+
+async function consumeSseStream(stream, onFrame) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  // SSE-Frames sind durch leere Zeile (\n\n) getrennt. Frame-Format:
+  //   event: <name>\n
+  //   data: <line>\n
+  //   data: <line>\n
+  //   \n
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf('\n\n')) !== -1) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      const frame = parseSseFrame(raw);
+      if (frame) onFrame(frame);
+    }
+  }
+  if (buffer.trim()) {
+    const frame = parseSseFrame(buffer);
+    if (frame) onFrame(frame);
+  }
+}
+
+function parseSseFrame(raw) {
+  const lines = raw.split('\n');
+  let event = 'message';
+  const dataLines = [];
+  for (const line of lines) {
+    if (!line) continue;
+    if (line.startsWith(':')) continue;
+    const colon = line.indexOf(':');
+    if (colon === -1) continue;
+    const field = line.slice(0, colon);
+    let value = line.slice(colon + 1);
+    if (value.startsWith(' ')) value = value.slice(1);
+    if (field === 'event') event = value;
+    else if (field === 'data') dataLines.push(value);
+  }
+  if (!dataLines.length) return null;
+  const dataStr = dataLines.join('\n');
+  let data;
+  try { data = JSON.parse(dataStr); } catch (_) { data = dataStr; }
+  return { event, data };
+}
+
+function handlePhotoFrame(frame) {
+  const ocr = document.getElementById('bdPhotoOcr');
+  switch (frame.event) {
+    case 'line': {
+      if (!ocr) return;
+      const text = (frame.data && typeof frame.data === 'object') ? frame.data.text : String(frame.data);
+      const lineEl = document.createElement('div');
+      lineEl.className = 'bd-photo-ocr-line';
+      lineEl.textContent = text || '';
+      ocr.appendChild(lineEl);
+      ocr.scrollTop = ocr.scrollHeight;
+      break;
+    }
+    case 'tags': {
+      const list = (frame.data && Array.isArray(frame.data.tags)) ? frame.data.tags : [];
+      renderPhotoTags(list);
+      break;
+    }
+    case 'done': {
+      photoState.braindumpId = frame.data && frame.data.braindump_id;
+      setPhotoStatus('✓ Gespeichert', 'success');
+      const openDetail = document.getElementById('bdPhotoOpenDetailBtn');
+      if (openDetail && photoState.braindumpId) openDetail.classList.remove('hidden');
+      refreshBraindumps();
+      break;
+    }
+    case 'error': {
+      const msg = (frame.data && frame.data.message) || 'Unbekannter Fehler';
+      setPhotoStatus('✗ ' + msg, 'error');
+      const retry = document.getElementById('bdPhotoRetryBtn');
+      if (retry) retry.classList.remove('hidden');
+      break;
+    }
+  }
+}
+
+function renderPhotoTags(tags) {
+  const box = document.getElementById('bdPhotoTags');
+  const header = document.getElementById('bdPhotoTagsHeader');
+  if (!box) return;
+  photoState.suggestedTags = tags.slice();
+  box.innerHTML = '';
+  if (!tags.length) { if (header) header.hidden = true; return; }
+  if (header) header.hidden = false;
+  for (const tag of tags) {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'bd-photo-tag';
+    pill.dataset.action = 'bd-photo-tag-toggle';
+    pill.dataset.tag = tag;
+    pill.setAttribute('aria-pressed', 'false');
+    pill.textContent = tag;
+    box.appendChild(pill);
+  }
+}
+
+function togglePhotoTag(el) {
+  const tag = el.dataset.tag;
+  if (!tag) return;
+  if (el.classList.contains('accepted')) {
+    el.classList.remove('accepted');
+    el.classList.add('rejected');
+    el.setAttribute('aria-pressed', 'false');
+    photoState.acceptedTags.delete(tag);
+  } else if (el.classList.contains('rejected')) {
+    el.classList.remove('rejected');
+    el.setAttribute('aria-pressed', 'false');
+    photoState.acceptedTags.delete(tag);
+  } else {
+    el.classList.add('accepted');
+    el.setAttribute('aria-pressed', 'true');
+    photoState.acceptedTags.add(tag);
+  }
+  persistPhotoAcceptedTags();
+}
+
+async function persistPhotoAcceptedTags() {
+  // NV-3 trackt Accept/Reject nur clientseitig in photoState.acceptedTags.
+  // Backend-Endpoint (POST /braindump/:id/tags) folgt in NV-4 (Auto-Tag-UI).
+  // Bis dahin werden die vom Core bereits persistierten suggested_tags
+  // unverändert mit dem Eintrag gespeichert.
+}
+
+function openPhotoBraindumpDetail() {
+  if (!photoState.braindumpId) return;
+  const id = photoState.braindumpId;
+  closePhotoCreate();
+  openBraindumpDetail(id);
+}
+
+function bindPhotoSheetEvents() {
+  const drop = document.getElementById('bdPhotoDrop');
+  const fileInput = document.getElementById('bdPhotoFile');
+  if (drop) {
+    drop.addEventListener('click', () => {
+      if (drop.classList.contains('locked')) return;
+      fileInput && fileInput.click();
+    });
+    drop.addEventListener('keydown', (e) => {
+      if (drop.classList.contains('locked')) return;
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput && fileInput.click(); }
+    });
+    drop.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (drop.classList.contains('locked')) return;
+      drop.classList.add('drag-over');
+    });
+    drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('drag-over');
+      if (drop.classList.contains('locked')) return;
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) setPhotoFile(file);
+    });
+  }
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) setPhotoFile(file);
+    });
+  }
+}
+
 // Tauri injects CSP hashes that nullify 'unsafe-inline'. All event handlers
 // must be programmatic. data-action / data-change / data-input attributes
 // drive a single delegated dispatcher per event type.
@@ -2709,6 +3153,8 @@ async function submitQuickBraindump() {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (currentBdDetailId) { closeBraindumpDetail(); return; }
+    const photoSheet = document.getElementById('bdPhotoCreate');
+    if (photoSheet && !photoSheet.classList.contains('hidden')) { closePhotoCreate(); return; }
     closeQuickCreate();
     closeNewTask();
   }
@@ -2744,6 +3190,11 @@ document.addEventListener('click', (e) => {
     case 'bd-quick-open': openQuickCreate(); break;
     case 'bd-quick-cancel': closeQuickCreate(); break;
     case 'bd-quick-submit': submitQuickBraindump(); break;
+    case 'bd-photo-open': openPhotoCreate(); break;
+    case 'bd-photo-cancel': closePhotoCreate(); break;
+    case 'bd-photo-retry': submitPhotoBraindump(); break;
+    case 'bd-photo-tag-toggle': togglePhotoTag(el); break;
+    case 'bd-photo-open-detail': openPhotoBraindumpDetail(); break;
     case 'idea-open':
       _pendingDetailId = el.dataset.bdId;
       navigate('braindumps');

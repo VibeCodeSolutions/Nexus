@@ -246,6 +246,7 @@ class MainActivity : ComponentActivity() {
                             SparkScreen(
                                 speechManager = speechManager,
                                 apiClient = apiClient,
+                                connectionSettings = connectionSettings,
                                 isPaired = isPaired,
                                 isConnected = isConnected,
                                 hasPermission = hasAudioPermission,

@@ -21,3 +21,8 @@ data class SparkResponse(
 data class HealthResponse(
     val status: String
 )
+
+@Serializable
+data class UpdateSparkTagsRequest(
+    val tags: List<String>
+)

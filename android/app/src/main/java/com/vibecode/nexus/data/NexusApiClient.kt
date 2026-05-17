@@ -14,6 +14,7 @@ import com.vibecode.nexus.data.model.SetProviderRequest
 import com.vibecode.nexus.data.model.TaskCreateRequest
 import com.vibecode.nexus.data.model.TaskResponse
 import com.vibecode.nexus.data.model.TaskUpdateRequest
+import com.vibecode.nexus.data.model.UpdateSparkTagsRequest
 import com.vibecode.nexus.diagnostics.DiagReport
 import com.vibecode.nexus.diagnostics.DiagReportAck
 import io.ktor.client.HttpClient
@@ -113,6 +114,14 @@ class NexusApiClient(private val settings: ConnectionSettings) {
     suspend fun deleteSpark(id: String): Result<Unit> = authedRequest {
         client.delete("$baseUrl/spark/$id") {
             bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun updateSparkTags(id: String, tags: List<String>): Result<Unit> = authedRequest {
+        client.post("$baseUrl/spark/$id/tags") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token!!)
+            setBody(UpdateSparkTagsRequest(tags))
         }.body()
     }
 

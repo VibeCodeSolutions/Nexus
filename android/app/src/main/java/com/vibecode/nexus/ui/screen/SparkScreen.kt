@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.vibecode.nexus.data.ConnectionSettings
 import com.vibecode.nexus.data.NexusApiClient
 import com.vibecode.nexus.data.model.SparkResponse
 import com.vibecode.nexus.speech.RecognizerState
@@ -65,6 +67,7 @@ import kotlinx.coroutines.launch
 fun SparkScreen(
     speechManager: SpeechRecognizerManager,
     apiClient: NexusApiClient,
+    connectionSettings: ConnectionSettings,
     isPaired: Boolean,
     isConnected: Boolean?,
     hasPermission: Boolean,
@@ -79,6 +82,7 @@ fun SparkScreen(
     var editableText by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
     var lastResult by remember { mutableStateOf<SparkResponse?>(null) }
+    var showPhotoSheet by remember { mutableStateOf(false) }
 
     // Sync finalText into editable field
     LaunchedEffect(speechState.finalText) {
@@ -199,6 +203,27 @@ fun SparkScreen(
                             }
                         }
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            if (!isPaired) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Zuerst mit Core koppeln → Einstellungen")
+                                }
+                            } else {
+                                showPhotoSheet = true
+                            }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.CameraAlt,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("Foto-Spark")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -274,6 +299,15 @@ fun SparkScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    if (showPhotoSheet) {
+        SparkPhotoSheet(
+            settings = connectionSettings,
+            apiClient = apiClient,
+            onDismiss = { showPhotoSheet = false },
+            onSparkSaved = { /* List-Refresh läuft beim nächsten History-Open */ },
+        )
     }
 }
 

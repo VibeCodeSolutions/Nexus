@@ -1,5 +1,29 @@
 # QS Findings — NEXUS v0.1.0 Release
 
+## VC-013-VOL Settings-Toggle Auto-Extract — Pre-Commit — 2026-05-17
+**Status: ✅ FREIGABE** (0 Blocker / 0 Major / 1 Minor)
+
+Prüfung durchgeführt von: QS — VibeCoding
+WORKLOG-Ref: `~/.claude/projects/-home-kaik-Projekte-Apps-Nexus/worklogs/vc.md` qs-20260517-013 (AUFTRAG VC-013-VOL)
+
+### Was geprüft wurde
+- Desktop `desktop/src/index.html`: PREF_DEFAULTS + Toggle-Markup `#prefAutoExtract` + loadUserPrefs-Sync
+- Android `NexusApiClient.kt`: `getUserPrefs()` / `setUserPref()` Wrapper
+- Android `SettingsScreen.kt`: `SparksPrefsCard`-Composable mit Material3 Switch
+- Build: Desktop JS-Parse OK, Android `assembleDebug` 37/37 + `lintDebug` 0 errors, Core `cargo test` 85/0+1ign (Backend additiv unverändert)
+- Backend-E2E-Pfad: `handlers.rs:129 user_pref_bool("auto_extract_tasks_enabled")` triggert `tokio::spawn extract_action_items` (FEAT-001-C aktiv)
+
+### Findings
+
+#### VC-013-MIN-1 — 🟢 Minor — Path-Encoding-Drift Desktop↔Android
+- **Prüfgegenstand:** Desktop `savePref` nutzt `encodeURIComponent(key)` (index.html:2066), Android `setUserPref` raw String-Interpolation `"$baseUrl/api/user_prefs/$key"` (NexusApiClient.kt:270)
+- **Befund:** Für aktuellen Key `auto_extract_tasks_enabled` safe (Backend-Validator handlers.rs:215 nur a-z0-9_.). Generischer Wrapper sollte aber robust gegen Sonderzeichen sein.
+- **Korrekturvorschlag:** Ktor `URLBuilder.appendPathSegments(...)` oder `URLEncoder.encode(key, "UTF-8")` — Aufwand <5 Min.
+- **Status:** Backlog (kein Pre-Commit-Blocker)
+- **Korrektur-Zyklen:** 0/2
+
+---
+
 ## FEAT-001 KI-Aufgabensplitting — Post-Merge — 2026-05-17
 **Status: 🟡 AUFLAGEN-FREIGABE** (0 Blocker / 1 Major / 0 Minor)
 

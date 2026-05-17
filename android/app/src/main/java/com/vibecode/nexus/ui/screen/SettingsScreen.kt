@@ -45,6 +45,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -242,6 +243,14 @@ fun SettingsScreen(
                 )
             }
 
+            // Sparks — Auto-Extract Toggle (VC-013-VOL)
+            if (isPaired) {
+                SparksPrefsCard(
+                    apiClient = apiClient,
+                    snackbarHostState = snackbarHostState,
+                )
+            }
+
             // Self-Diagnostics card
             DiagnosticsCard(
                 report = effectiveDiag,
@@ -353,6 +362,75 @@ fun SettingsScreen(
                 ) {
                     Text("Wizard neustarten")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SparksPrefsCard(
+    apiClient: NexusApiClient,
+    snackbarHostState: SnackbarHostState,
+) {
+    val scope = rememberCoroutineScope()
+    var autoExtractEnabled by remember { mutableStateOf(false) }
+    var loaded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        apiClient.getUserPrefs().onSuccess { prefs ->
+            val raw = prefs["auto_extract_tasks_enabled"]
+            autoExtractEnabled = raw == "true" || raw == "1"
+            loaded = true
+        }.onFailure {
+            loaded = true
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Sparks", style = MaterialTheme.typography.titleMedium)
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Tasks automatisch extrahieren",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        "Neue Sparks werden im Hintergrund nach Action-Items durchsucht.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = autoExtractEnabled,
+                    enabled = loaded,
+                    onCheckedChange = { newValue ->
+                        autoExtractEnabled = newValue
+                        scope.launch {
+                            apiClient.setUserPref(
+                                "auto_extract_tasks_enabled",
+                                if (newValue) "true" else "false"
+                            ).onFailure { e ->
+                                autoExtractEnabled = !newValue
+                                snackbarHostState.showSnackbar(
+                                    "Konnte nicht gespeichert werden: ${e.message ?: "unbekannt"}"
+                                )
+                            }
+                        }
+                    }
+                )
             }
         }
     }

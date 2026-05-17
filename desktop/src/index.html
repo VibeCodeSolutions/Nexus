@@ -1405,6 +1405,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
       <input type="checkbox" id="prefAutoTags" data-pref="auto_tags_enabled" data-action="pref-toggle">
       <span>Tag-Vorschläge automatisch übernehmen</span>
     </label>
+
+    <h3 class="h3-llm">Sparks</h3>
+    <label class="pref-toggle">
+      <input type="checkbox" id="prefAutoExtract" data-pref="auto_extract_tasks_enabled" data-action="pref-toggle">
+      <span>Tasks automatisch aus neuen Sparks extrahieren</span>
+    </label>
+
     <label for="prefNotifFilter">Benachrichtigungen</label>
     <select id="prefNotifFilter" data-pref="notifications_filter" data-change="pref-select">
       <option value="all">Alle</option>
@@ -2024,6 +2031,7 @@ async function createTask() {
 const PREF_DEFAULTS = {
   camera_analysis_enabled: 'true',
   auto_tags_enabled: 'true',
+  auto_extract_tasks_enabled: 'false',
   notifications_filter: 'all',
 };
 const userPrefs = { ...PREF_DEFAULTS };
@@ -2047,6 +2055,7 @@ async function loadUserPrefs() {
   } catch (_) { /* Defaults bleiben */ }
   document.getElementById('prefCameraAnalysis').checked = userPrefs.camera_analysis_enabled === 'true';
   document.getElementById('prefAutoTags').checked = userPrefs.auto_tags_enabled === 'true';
+  document.getElementById('prefAutoExtract').checked = userPrefs.auto_extract_tasks_enabled === 'true';
   document.getElementById('prefNotifFilter').value = userPrefs.notifications_filter;
 }
 

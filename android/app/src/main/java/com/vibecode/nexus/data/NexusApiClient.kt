@@ -260,6 +260,21 @@ class NexusApiClient(private val settings: ConnectionSettings) {
         Unit
     }
 
+    suspend fun getUserPrefs(): Result<Map<String, String>> = authedRequest {
+        client.get("$baseUrl/api/user_prefs") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun setUserPref(key: String, value: String): Result<Unit> = authedRequest {
+        client.post("$baseUrl/api/user_prefs/$key") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token!!)
+            setBody(mapOf("value" to value))
+        }
+        Unit
+    }
+
     suspend fun listDiagReports(
         limit: Int = 5,
         source: String? = null,

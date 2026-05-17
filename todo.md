@@ -147,17 +147,13 @@ Weitere Kandidaten (aus CURRENT_STATE.md "Nächster Sprint offen"):
 - [⚠] **FEAT-001-C** — Auto-Extract via user_pref + tokio::spawn (Arc-Clone Pool+LLM, tracing::warn). Backend-Pfad ✅, **UI-Toggle fehlt Desktop+Android** → Folge-Sub-Sprint VC-013-VOL.
 - [x] **FEAT-001-D** — UI: "📋 Tasks extrahieren"-Button im Spark-Detail (Desktop + Android), Status-Area role=status aria-live=polite. ✅ qs-20260517-012.
 
-### VC-013-VOL — Settings-Toggle Auto-Extract (Folge-Auflage FEAT-001-C) — ⏳ offen
+### VC-013-VOL — Settings-Toggle Auto-Extract (Folge-Auflage FEAT-001-C) — ✅ **ERLEDIGT 2026-05-17** (qs-20260517-013)
 
-> Folge-Sub-Sprint aus FEAT-001-POST-MERGE-Gate. Aufwand ~20–30 Min.
+> Folge-Sub-Sprint aus FEAT-001-POST-MERGE-Gate. Tuvok-Freigabe 0/0/1 (Minor VC-013-MIN-1 Backlog).
 
-- [ ] **VC-013-VOL-A** — Desktop-Settings-Modal: Toggle "Auto-Extract Tasks aus Sparks" → setzt user_pref `auto_extract_tasks_enabled` (true/false)
-  - Datei: `desktop/src/index.html` (Settings-Modal)
-  - DoD: Toggle persistiert via `POST /api/user_prefs/auto_extract_tasks_enabled`, Initialwert beim Modal-Open laden
-
-- [ ] **VC-013-VOL-B** — Android-Settings-Screen: identischer Toggle
-  - Datei: `android/app/src/main/java/.../SettingsScreen.kt` + `NexusApiClient.kt` (falls API-Wrapper fehlt)
-  - DoD: Switch sichtbar, Persistenz E2E grün gegen Core
+- [x] **VC-013-VOL-A** — Desktop-Settings-Modal: Toggle unter neuer `<h3>Sparks</h3>`-Sektion, `data-pref="auto_extract_tasks_enabled"`, Default 'false' (opt-in). ✅
+- [x] **VC-013-VOL-B** — Android `SparksPrefsCard` mit Material3-Switch + `getUserPrefs`/`setUserPref`-API-Wrapper in `NexusApiClient`. ✅
+- [ ] **VC-013-MIN-1** (Backlog) — Path-Encoding-Wrapper Android `setUserPref` generisch robust machen (aktuell raw String-Interpolation; für `auto_extract_tasks_enabled` safe, für künftige generische Keys problematisch). Aufwand <5 Min.
 
 ---
 

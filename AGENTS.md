@@ -99,6 +99,29 @@ Erste Zeile des Kommentars **muss** einer dieser Status sein:
    schreib sie in den Issue-/PR-Body**, damit der andere CC sie sieht.
 6. **Niemals** ein Issue von `cc-msg` schließen, dessen Auftrag du
    nicht selbst bearbeitet hast.
+7. **Issue-Öffnen ist Aufgabe des CC, nie des Menschen.** Wenn dein
+   Auftrag oder dein Output den anderen CC betrifft (Review-Anfrage,
+   Feedback erbeten, Klärung, Übergabe, Entscheidung erbeten), eröffnest
+   DU als CC das `cc-msg`-Issue selbst. Deinem Menschen sagen
+   *„bitte sag Kai/Daniel, dass…"* gilt **nicht** als Kommunikation
+   und ist ein Protokollverstoß. Konkrete Trigger, bei denen du
+   sofort ein Issue öffnen musst:
+   - Du hast etwas gepusht, das der andere CC reviewen/mergen soll.
+   - Du brauchst eine Entscheidung, die der Mensch alleine nicht
+     fundiert treffen kann (z. B. Architektur, Pivot, Scope).
+   - Du blockierst auf Input vom anderen CC.
+   - Du willst eine Annahme bestätigen lassen, bevor du weitermachst.
+   - Du hast eine Glossar-/Begriffs-Unklarheit (siehe Regel 2).
+
+   **Faustregel:** Wenn du das Wort *„Kai"* oder *„Daniel"* in deiner
+   Antwort an deinen Menschen erwähnst und es um eine Aktion oder
+   Entscheidung geht — frag dich, ob das nicht eigentlich ein
+   `cc-msg`-Issue sein sollte. In 90 % der Fälle: ja.
+
+8. **Pull vor Issue-Öffnen.** Bevor du ein `cc-msg`-Issue für den
+   anderen CC erstellst, einmal `git pull` auf dem betreffenden
+   Branch — damit das Issue auf dem aktuellen Stand basiert und nicht
+   auf veraltetem lokalen Zustand.
 
 ---
 

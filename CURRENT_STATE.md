@@ -209,7 +209,7 @@ Auslöser: Admin-Dogfooding-Findings (Refresh grau, Mobile-Task-Sync, Diag-Stand
 
 ---
 
-## Release-Sprint v0.1.0 (siehe HANDOVER.md, STATUS_REPORT_2026-05-01.md)
+## Release-Sprint v0.1.0 (siehe `docs/archive/HANDOVER_2026-05-02.md`, `docs/archive/STATUS_REPORT_2026-05-01.md`)
 
 Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/RPM/AppImage (Linux), signierte APK.
 

@@ -54,7 +54,7 @@
 - Core-Build: `cd core && cargo build --release` EXIT=0
 - Desktop-Tauri: `cd desktop && cargo tauri build --bundles deb,rpm` EXIT=0 (AppImage gezielt ausgeschlossen wegen SM-F-3-Tooling — separat per `linuxdeploy` installierbar)
 - Android-Build: `cd android && ./gradlew assembleDebug` EXIT=0 (Phase F + Phase U Android via AS-CLI)
-- Cross-CLI-E2E (siehe `HANDOVER.md`): Phase-U-Android (`SparkHistoryScreen`-Bottom-Sheet + `ProjectsScreen`-Top-Banner + `NexusApiClient` 4 Funktionen + Link/Suggestion DTOs), X-6 APK-Build, X-8 Tuvok-Final-Live cross-CLI.
+- Cross-CLI-E2E (siehe `docs/archive/HANDOVER_2026-05-02.md`): Phase-U-Android (`SparkHistoryScreen`-Bottom-Sheet + `ProjectsScreen`-Top-Banner + `NexusApiClient` 4 Funktionen + Link/Suggestion DTOs), X-6 APK-Build, X-8 Tuvok-Final-Live cross-CLI.
 
 ---
 
@@ -116,4 +116,4 @@
 
 ## [0.1.0] — 2026-05-01 (vormittag, vorhergehende Sprints)
 
-Siehe `STATUS_REPORT_2026-05-01.md` und `HANDOVER.md` für Release-Sprint v0.1.0 GA-Sicherung (AUFTRAG #3 + #4).
+Siehe `docs/archive/STATUS_REPORT_2026-05-01.md` und `docs/archive/HANDOVER_2026-05-02.md` für Release-Sprint v0.1.0 GA-Sicherung (AUFTRAG #3 + #4).

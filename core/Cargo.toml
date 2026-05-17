@@ -37,6 +37,9 @@ gray_matter = "0.3"
 # brauchen nur JPEG- und PNG-Decoder; default-Features sind deaktiviert, um
 # unnötige Format-Bibliotheken (TIFF, AVIF, …) aus dem Build zu halten.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+# FEAT-002 Sprint A: iCal-Export-Endpoints für Sparks und Tasks.
+# Strongly-typed Builder für VCALENDAR/VEVENT, kein OAuth, keine Netzwerk-IO.
+icalendar = "0.17"
 
 
 [dev-dependencies]

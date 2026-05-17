@@ -353,6 +353,119 @@ pub async fn extract_tasks_from_spark(
     })))
 }
 
+// FEAT-002 Sprint A: iCal-Export-Endpoints. Liefert `text/calendar` mit allen
+// Sparks bzw. allen offenen Tasks mit Fälligkeitsdatum. Bearer-geschützt durch
+// den globalen `auth::require_token`-Layer in main.rs.
+//
+// Format-Konventionen:
+// - Sparks: VEVENT mit DTSTART aus `created_at` (SQLite-DateTime
+//   "YYYY-MM-DD HH:MM:SS", als UTC behandelt). SUMMARY = erste 60 Zeichen
+//   von transcript-vor-raw_text. DESCRIPTION = voller Text.
+// - Tasks: VEVENT mit DTSTART als DATE aus `due_date` (YYYY-MM-DD), nur
+//   Tasks mit `status != 'done'` UND `due_date IS NOT NULL`.
+//   VTODO wäre semantisch sauberer, aber Apple Calendar/GCal interpretieren
+//   VTODO inconsistent — VEVENT als 1-Tages-Event ist überall lesbar.
+// - UID-Schema: `nexus-spark-<id>@nexus` / `nexus-task-<id>@nexus`,
+//   stabil über Re-Fetches (kein Timestamp im UID).
+
+fn ics_response(body: String) -> impl axum::response::IntoResponse {
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/calendar; charset=utf-8")],
+        body,
+    )
+}
+
+fn spark_summary(text: &str) -> String {
+    let trimmed = text.trim();
+    if trimmed.chars().count() <= 60 {
+        trimmed.to_string()
+    } else {
+        let cut: String = trimmed.chars().take(57).collect();
+        format!("{cut}...")
+    }
+}
+
+fn build_sparks_calendar(entries: &[crate::models::SparkEntry]) -> String {
+    use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+    use icalendar::{Calendar, Component, Event, EventLike};
+
+    let mut cal = Calendar::new();
+    cal.name("Nexus Sparks");
+
+    for spark in entries {
+        let source_text = spark.transcript.as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(spark.raw_text.as_str());
+
+        // SQLite-DateTime ("YYYY-MM-DD HH:MM:SS"). Bei Parse-Fehler fällt der
+        // Eintrag NICHT raus — wir nehmen `Utc::now()` als Fallback, damit
+        // der Spark zumindest sichtbar bleibt (sonst wäre ein einziger
+        // korrupter Timestamp ein silent-skip).
+        let naive = NaiveDateTime::parse_from_str(&spark.created_at, "%Y-%m-%d %H:%M:%S")
+            .unwrap_or_else(|_| Utc::now().naive_utc());
+        let dt: DateTime<Utc> = Utc.from_utc_datetime(&naive);
+
+        let event = Event::new()
+            .uid(&format!("nexus-spark-{}@nexus", spark.id))
+            .summary(&spark_summary(source_text))
+            .description(source_text)
+            .starts(dt)
+            .ends(dt + chrono::Duration::minutes(30))
+            .done();
+        cal.push(event);
+    }
+    cal.to_string()
+}
+
+fn build_tasks_calendar(tasks: &[crate::models::Task]) -> String {
+    use chrono::NaiveDate;
+    use icalendar::{Calendar, Component, Event, EventLike};
+
+    let mut cal = Calendar::new();
+    cal.name("Nexus Tasks");
+
+    for task in tasks {
+        // Doppel-Filter (Repo-Layer macht das nicht): nur offene Tasks mit
+        // Fälligkeitsdatum.
+        if task.status == "done" {
+            continue;
+        }
+        let Some(due) = task.due_date.as_deref() else {
+            continue;
+        };
+        let Ok(date) = NaiveDate::parse_from_str(due, "%Y-%m-%d") else {
+            continue;
+        };
+
+        let event = Event::new()
+            .uid(&format!("nexus-task-{}@nexus", task.id))
+            .summary(&task.title)
+            .starts(date)
+            .done();
+        cal.push(event);
+    }
+    cal.to_string()
+}
+
+pub async fn export_sparks_ics(
+    State(state): State<AppState>,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    let entries = repo::list(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    Ok(ics_response(build_sparks_calendar(&entries)).into_response())
+}
+
+pub async fn export_tasks_ics(
+    State(state): State<AppState>,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    let tasks = repo::list_tasks(&state.pool, None, None)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    Ok(ics_response(build_tasks_calendar(&tasks)).into_response())
+}
+
 pub async fn suggest_projects(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -2477,5 +2590,76 @@ mod synaptic_phase_b_tests {
         let (created, skipped) = extract_tasks_for_spark_inner(&pool, &llm, "spark-empty", "t").await.unwrap();
         assert_eq!(created.len(), 1);
         assert_eq!(skipped, 1);
+    }
+
+    // FEAT-002 Sprint A — iCal-Export-Tests
+
+    #[tokio::test]
+    async fn test_spark_ics_export_empty_yields_valid_calendar() {
+        // Leere DB → das Calendar-Output darf trotzdem ein syntaktisch
+        // gültiges VCALENDAR sein (Header + END), nicht 404. Pflicht laut
+        // Brief-DoD und iCal-RFC 5545.
+        let entries: Vec<SparkEntry> = vec![];
+        let ics = super::build_sparks_calendar(&entries);
+        assert!(ics.starts_with("BEGIN:VCALENDAR"));
+        assert!(ics.contains("PRODID"));
+        assert!(ics.trim_end().ends_with("END:VCALENDAR"));
+        assert!(!ics.contains("BEGIN:VEVENT"));
+    }
+
+    #[tokio::test]
+    async fn test_sparks_ics_includes_event_with_stable_uid() {
+        let pool = setup_pool().await;
+        sqlx::query(
+            "INSERT INTO sparks (id, created_at, raw_text) VALUES (?, ?, ?)"
+        )
+            .bind("spark-A")
+            .bind("2026-05-17 12:30:00")
+            .bind("Brot kaufen und Termin verschieben")
+            .execute(&pool).await.unwrap();
+
+        let entries = repo::list(&pool).await.unwrap();
+        let ics = super::build_sparks_calendar(&entries);
+        assert!(ics.contains("UID:nexus-spark-spark-A@nexus"));
+        assert!(ics.contains("SUMMARY:Brot kaufen und Termin verschieben"));
+        // DTSTART muss aus created_at abgeleitet sein (Jahr+Monat reicht
+        // als Smoke — der icalendar-Crate-Encoder schreibt UTC).
+        assert!(ics.contains("DTSTART") && ics.contains("20260517"));
+    }
+
+    #[tokio::test]
+    async fn test_tasks_ics_filters_done_and_no_due_date() {
+        let pool = setup_pool().await;
+        // 3 Tasks: 1 done (raus), 1 ohne due_date (raus), 1 valid (rein)
+        sqlx::query(
+            "INSERT INTO tasks (id, title, priority, status, due_date) VALUES \
+             ('t-done', 'Erledigt', 'medium', 'done', '2026-05-20'), \
+             ('t-nodate', 'OhneDatum', 'medium', 'open', NULL), \
+             ('t-valid', 'Valider Task mit Fälligkeit', 'medium', 'open', '2026-05-25')"
+        ).execute(&pool).await.unwrap();
+
+        let tasks = repo::list_tasks(&pool, None, None).await.unwrap();
+        let ics = super::build_tasks_calendar(&tasks);
+
+        // Genau eine VEVENT-Sektion
+        let event_count = ics.matches("BEGIN:VEVENT").count();
+        assert_eq!(event_count, 1, "Expected exactly 1 VEVENT, got:\n{ics}");
+
+        // Der valide Task ist drin, die anderen nicht.
+        assert!(ics.contains("UID:nexus-task-t-valid@nexus"));
+        assert!(ics.contains("Valider Task mit Fälligkeit"));
+        assert!(!ics.contains("nexus-task-t-done@"));
+        assert!(!ics.contains("nexus-task-t-nodate@"));
+    }
+
+    #[test]
+    fn test_spark_summary_truncates_long_text() {
+        let short = super::spark_summary("kurz");
+        assert_eq!(short, "kurz");
+
+        let long_text = "a".repeat(80);
+        let s = super::spark_summary(&long_text);
+        assert!(s.ends_with("..."), "expected ellipsis, got {s}");
+        assert!(s.chars().count() <= 60);
     }
 }

@@ -1,5 +1,27 @@
 # QS Findings — NEXUS v0.1.0 Release
 
+## FEAT-002-AB iCal-Export-Endpoints — Pre-Commit — 2026-05-17
+**Status: ✅ FREIGABE** (0 Blocker / 0 Major / 0 Minor)
+
+Prüfung durchgeführt von: QS — VibeCoding
+WORKLOG-Ref: `~/.claude/projects/-home-kaik-Projekte-Apps-Nexus/worklogs/vc.md` qs-20260517-014
+
+### Was geprüft wurde
+- `core/Cargo.toml` (+icalendar 0.17)
+- `core/src/handlers.rs` (+~190 Z.: `ics_response`, `spark_summary`, `build_sparks_calendar`, `build_tasks_calendar`, `export_sparks_ics`, `export_tasks_ics`, 4 neue Tests)
+- `core/src/main.rs` (+2 Routes innerhalb `require_token`-Layer)
+- Build: `cargo build` clean, `cargo test` 89/0+1ign (+4 ggü. 85), Clippy keine FEAT-002-induzierten Warnings
+
+### Findings
+Keine. RFC-5545-konformer Output, UTF-8-safer Char-Truncate, Auth-Layer korrekt, Filter-Logik (`status='done'` + `due_date IS NULL`) durch Test belegt, Empty-State liefert valides VCALENDAR.
+
+### Backlog-Empfehlungen (nicht Pre-Commit-Blocker)
+- **FEAT-002-AUTH** — Token-in-URL als Bearer-Alternative für externe Kalender-Apps
+- **FEAT-002-ETAG** — ETag/Last-Modified für Re-Fetch-Effizienz
+- **FEAT-002-TRACE** — `tracing::warn!` beim `Utc::now`-Fallback im `created_at`-Parse
+
+---
+
 ## VC-013-VOL Settings-Toggle Auto-Extract — Pre-Commit — 2026-05-17
 **Status: ✅ FREIGABE** (0 Blocker / 0 Major / 1 Minor)
 

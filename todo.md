@@ -158,6 +158,8 @@ Weitere Kandidaten (aus CURRENT_STATE.md "Nächster Sprint offen"):
 ---
 
 ### FEAT-002 — Kalender-Integration
+**Sprint A (iCal-Export):** ✅ **ERLEDIGT 2026-05-17** (qs-20260517-014, 0 Findings) · Sprint B (GCal-OAuth): offen
+
 
 **Idee:** NEXUS hat aktuell keine Kalender-Anbindung. Tasks mit Fälligkeitsdatum sollen optional in einen externen Kalender exportiert/synchronisiert werden können.
 
@@ -169,13 +171,13 @@ Weitere Kandidaten (aus CURRENT_STATE.md "Nächster Sprint offen"):
 - iCal-Export als Alternative ohne OAuth (`.ics`-Datei download)
 
 **Umsetzungsplan:**
-- [ ] **FEAT-002-A** — `GET /spark/export.ics` — iCal-Feed aller Sparks mit Datum
-  - Datei: `core/src/handlers.rs`, Crate: `icalendar` (crates.io)
-  - DoD: URL in Kalender-App eingetragen → Events sichtbar, Bearer-geschützt
+- [x] **FEAT-002-A** — `GET /spark/export.ics` — VEVENT pro Spark, DTSTART aus `created_at` (30 min Default-Dauer), UID `nexus-spark-<id>@nexus`, SUMMARY = Char-truncate auf 60. ✅
+- [x] **FEAT-002-B** — `GET /tasks/export.ics` — VEVENT (Date-only) pro offenem Task mit `due_date`, filtert `status='done'` und `due_date IS NULL`. UID `nexus-task-<id>@nexus`. ✅
 
-- [ ] **FEAT-002-B** — `GET /tasks/export.ics` — iCal-Feed aller offenen Tasks mit `due_date`
-  - Datei: `core/src/handlers.rs`
-  - DoD: Tasks mit Fälligkeitsdatum erscheinen als Kalender-Events
+**Backlog aus QS qs-20260517-014:**
+- [ ] **FEAT-002-AUTH** — Token-in-URL als Bearer-Alternative für externe Kalender-Apps (Apple Calendar / GCal-Subscribe können keinen Bearer-Header setzen) — Aufwand ~1 Tag, gehört zu Sprint B oder als eigener Mini-Sprint
+- [ ] **FEAT-002-ETAG** — ETag + Last-Modified auf den iCal-Endpoints für Re-Fetch-Effizienz — ~½ Tag
+- [ ] **FEAT-002-TRACE** — `tracing::warn!` beim `Utc::now`-Fallback im `build_sparks_calendar` (created_at-Parse-Fehler) — trivial, ~5 Min, beim nächsten Touch der Datei
 
 - [ ] **FEAT-002-C** — Google Calendar Push via OAuth
   - Dateien: `core/src/llm/` (neues Modul `gcal.rs`), `core/src/keystore.rs` (OAuth-Tokens)

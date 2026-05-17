@@ -175,6 +175,8 @@ async fn main() {
                 .route("/spark/{id}", delete(handlers::delete_spark))
                 .route("/spark/{id}/tags", post(handlers::update_spark_tags))
                 .route("/spark/{id}/extract-tasks", post(handlers::extract_tasks_from_spark))
+                .route("/spark/export.ics", get(handlers::export_sparks_ics))
+                .route("/tasks/export.ics", get(handlers::export_tasks_ics))
                 .route("/spark/recategorize", post(handlers::recategorize_unsorted))
                 .route("/api/user_prefs", get(handlers::list_user_prefs))
                 .route("/api/user_prefs/{key}", post(handlers::set_user_pref))

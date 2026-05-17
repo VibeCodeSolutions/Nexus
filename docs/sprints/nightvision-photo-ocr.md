@@ -1,5 +1,6 @@
 # Sprint Nightvision — Foto-Spark-Pipeline
 
+**Status:** ✅ abgeschlossen (2026-05-17, NV-5 Post-Merge-QS qs-20260517-010 freigegeben)
 **Stand:** 2026-05-17
 **Auftrag:** Daniels Handoff (`docs/design-refs/nightvision-features/nexus/project/BUILD-SPEC.md`) als Feature-Spec umsetzen.
 **Audit:** ~80% bereits vorhanden. Echter Neubau ist Foto-Spark-Flow (Variante B). Rest sind Quick Wins (Volltextsuche, Settings-Toggles, Auto-Tag-UI).
@@ -160,3 +161,20 @@ NV-4 (Quick Wins) — unabhängig, kann jederzeit eingeschoben werden
 - **LLM-Provider-Vision-Quoten** — Groq Vision hat striktes Rate-Limiting; bei Tests dranbleiben. Mitigation: Fallback auf Tesseract.
 - **SSE durch Tauri-Webview** — sollte funktionieren (`EventSource` API ist Standard), aber im NV-3 früh smoke-testen, bevor UI fertig ist.
 - **Tesseract-System-Dependency** — User muss `tesseract` installiert haben für Fallback. Klar dokumentieren, beim Start optional warnen.
+
+## Abschluss-Bilanz
+
+| Sprint | Commit | QS-Ref | Status |
+|---|---|---|---|
+| NV-1 — Core Vision + Tesseract-Fallback | `2c41d97` | qs-20260517-001 | ✅ freigabe |
+| NV-2 — Streaming-Endpoint `POST /spark/from_image` | `3620558` | (Pre-Merge inkl. NV-1) | ✅ freigabe |
+| NV-3 — Desktop Foto-Braindump-Sheet | `3da7ee4` | qs-20260517-006 | ✅ auflagen-freigabe |
+| NV-4 — Volltextsuche + User-Prefs + Tag-Update | `523030b` | qs-20260517-007 | ✅ auflagen-freigabe |
+| Phase A — Sparks-Rename + Gamification-Removal | `1d80c9a` | qs-20260517-008 | ✅ auflagen-freigabe |
+| NV-5 — Android Foto-Spark (CameraX + SSE) | `2aa1542` | qs-20260517-009 → qs-20260517-010 | ✅ freigabe (post-merge) |
+
+**Pivot:** NV-5 war ursprünglich als Handoff-Doc für AS-CLI geplant — gepivotet auf Single-CLI-Implementierung (VISION.md, Memory `feedback_workflow_split`). Native Compose statt WebView.
+
+**Offene Hinweise (nicht-blockierend):**
+- Bottom-Nav-Badge mit Unsorted-Spark-Count (UI_SPEC §4.9, qs-20260517-002 Minor) — Backlog.
+- Smoke-Test auf physischem Pixel-Gerät steht aus (alle Builds nur über `assembleDebug` validiert).

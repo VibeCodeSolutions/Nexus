@@ -1274,13 +1274,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
             </div>
             <img class="bd-photo-preview hidden" id="bdPhotoPreview" alt="Vorschau">
           </label>
-          <div class="bd-photo-status" id="bdPhotoStatus" hidden></div>
+          <div class="bd-photo-status" id="bdPhotoStatus" role="status" aria-live="polite" hidden></div>
         </div>
         <div class="bd-photo-output">
           <div class="bd-photo-output-header">OCR-Stream</div>
           <div class="bd-photo-ocr" id="bdPhotoOcr" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions"></div>
           <div class="bd-photo-tags-header" id="bdPhotoTagsHeader" hidden>Tag-Vorschläge <span class="bd-photo-tags-hint">(klicken zum Übernehmen)</span></div>
-          <div class="bd-photo-tags" id="bdPhotoTags"></div>
+          <div class="bd-photo-tags" id="bdPhotoTags" aria-live="polite" aria-relevant="additions"></div>
         </div>
       </div>
       <div class="bd-quick-footer">
@@ -2839,7 +2839,32 @@ const photoState = {
   suggestedTags: [],
   acceptedTags: new Set(),
   sparkId: null,
+  previouslyFocused: null,
+  trapHandler: null,
 };
+
+function getPhotoSheetFocusables() {
+  const sheet = document.getElementById('bdPhotoCreate');
+  if (!sheet) return [];
+  const sel = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])';
+  return Array.from(sheet.querySelectorAll(sel))
+    .filter(el => !el.hidden && el.offsetParent !== null);
+}
+
+function photoSheetFocusTrap(e) {
+  if (e.key !== 'Tab') return;
+  const focusables = getPhotoSheetFocusables();
+  if (focusables.length === 0) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
 
 function openPhotoCreate() {
   closeQuickCreate();
@@ -2847,10 +2872,15 @@ function openPhotoCreate() {
   const group = document.getElementById('bdCtaGroup');
   if (!sheet) return;
   resetPhotoSheet();
+  photoState.previouslyFocused = document.activeElement;
   sheet.classList.remove('hidden');
   if (group) group.classList.add('hidden');
   const drop = document.getElementById('bdPhotoDrop');
   if (drop) drop.focus();
+  if (!photoState.trapHandler) {
+    photoState.trapHandler = photoSheetFocusTrap;
+    sheet.addEventListener('keydown', photoState.trapHandler);
+  }
 }
 
 function closePhotoCreate() {
@@ -2860,9 +2890,18 @@ function closePhotoCreate() {
   if (photoState.abortController) {
     try { photoState.abortController.abort(); } catch (_) {}
   }
+  if (photoState.trapHandler) {
+    sheet.removeEventListener('keydown', photoState.trapHandler);
+    photoState.trapHandler = null;
+  }
   resetPhotoSheet();
   sheet.classList.add('hidden');
   if (group) group.classList.remove('hidden');
+  const prev = photoState.previouslyFocused;
+  photoState.previouslyFocused = null;
+  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+    try { prev.focus(); } catch (_) {}
+  }
 }
 
 function resetPhotoSheet() {

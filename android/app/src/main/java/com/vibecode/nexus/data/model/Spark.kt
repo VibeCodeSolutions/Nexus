@@ -26,3 +26,8 @@ data class HealthResponse(
 data class UpdateSparkTagsRequest(
     val tags: List<String>
 )
+
+@Serializable
+data class UnsortedCountResponse(
+    val count: Long
+)

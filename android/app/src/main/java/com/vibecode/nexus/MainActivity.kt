@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -119,6 +121,7 @@ class MainActivity : ComponentActivity() {
                 // Periodic health check
                 var isConnected by remember { mutableStateOf<Boolean?>(null) }
                 var isPaired by remember { mutableStateOf(connectionSettings.isPaired) }
+                var unsortedCount by remember { mutableStateOf(0L) }
 
                 LaunchedEffect(isPaired) {
                     while (true) {
@@ -133,6 +136,16 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 LaunchedEffect(navBackStackEntry) {
                     isPaired = connectionSettings.isPaired
+                }
+
+                // Unsorted-Count poll (UI_SPEC §4.9: Nav-Badge für offene Sparks).
+                // Refresh bei jedem Routenwechsel + periodisch alle 60s.
+                LaunchedEffect(isPaired, navBackStackEntry) {
+                    while (isPaired) {
+                        apiClient.getUnsortedCount()
+                            .onSuccess { unsortedCount = it }
+                        delay(60_000)
+                    }
                 }
 
                 // Consume deep-link pairings
@@ -186,7 +199,19 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         },
-                                        icon = { Icon(item.icon, contentDescription = item.label) },
+                                        icon = {
+                                            if (item.route == "history" && unsortedCount > 0) {
+                                                BadgedBox(
+                                                    badge = {
+                                                        Badge { Text(unsortedCount.toString()) }
+                                                    }
+                                                ) {
+                                                    Icon(item.icon, contentDescription = item.label)
+                                                }
+                                            } else {
+                                                Icon(item.icon, contentDescription = item.label)
+                                            }
+                                        },
                                         label = { Text(item.label) }
                                     )
                                 }

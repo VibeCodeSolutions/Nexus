@@ -1,10 +1,12 @@
 # NEXUS — Current State
 
 **Stand:** 2026-05-17
-**Aktuelle Phase:** Sprint "Nightvision" abgeschlossen — UI-Redesign (Daniel, NV-M1..M4) + Foto-Spark-Pipeline (NV-1..NV-5) + Phase A (Sparks-Rename + Gamification-Removal). `v0.1.3` getaggt. Kein aktiver Sprint, nächster zu planen.
-**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `dcff6ec` (chore(qs) findings-gate NV-5-POST-MERGE — freigabe). main clean & sync mit origin.
+**Aktuelle Phase:** v0.1.3 released + 5 Post-Release-Commits (NV-Closure + FEAT-001 KI-Aufgabensplitting + VC-013-VOL Settings-Toggle + FEAT-002-A iCal-Export). Kein aktiver Sprint, nächster zu planen.
+**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `02ac2f4` (feat(feat-002-ab) iCal-Export). main clean & sync mit origin.
 
 **Sprint-Verlauf v0.1.3:** Obsidian-Briefkasten A–E ✅ · Happy Thompson A–C ✅ · Crystalline Crab Phase C ✅ · UI-Redesign Nightvision M1–M4 ✅ · Foto-Spark Pipeline NV-1..NV-5 ✅ · Phase A Sparks-Rename + Gamification-Removal ✅. Alle Sprints Tuvok-freigegeben (qs-20260509-001..004, qs-20260517-001..010).
+
+**Post-v0.1.3:** NV-Closure (3 Polish-Bookmarks) ✅ · FEAT-001 KI-Aufgabensplitting (4 Schichten) ✅ · VC-013-VOL Settings-Toggle (FEAT-001-C-Auflage) ✅ · FEAT-002-A iCal-Export Sparks+Tasks ✅. QS-Läufe qs-20260517-011..014 alle Freigabe.
 
 ---
 
@@ -36,8 +38,43 @@
 
 **Offene Bookmarks (nicht-blockierend, Folge-Sprints):**
 - Pixel-Smoke-Test auf physischem Gerät (alle Builds bisher nur `assembleDebug`-validiert).
-- Bottom-Nav-Badge mit Unsorted-Spark-Count (UI_SPEC §4.9, qs-20260517-002 Minor).
-- NV3-003 aria-modal+Focus, NV3-004 aria-live-Pattern (Minor, kosmetisch).
+- ~~Bottom-Nav-Badge mit Unsorted-Spark-Count~~ ✅ erledigt via NV-Closure (`5e60fa0`).
+- ~~NV3-003 aria-modal+Focus, NV3-004 aria-live-Pattern~~ ✅ erledigt via NV-Closure (`5e60fa0`).
+
+---
+
+## Post-v0.1.3 — Polish + Feature-Stack (2026-05-17, ✅ alle Tuvok-freigegeben)
+
+Stand-alone Mini-Sprints nach v0.1.3-Tag, kein neuer Release-Tag bisher.
+
+- ✅ **NV-Closure** (`5e60fa0`): Schließt drei offene Polish-Bookmarks aus Sprint Nightvision in einem Commit.
+  - Bottom-Nav-Badge (Android, UI_SPEC §4.9): `UnsortedCountResponse`-Model + `NexusApiClient.getUnsortedCount()` gegen `GET /spark/unsorted/count`, `BadgedBox` um Sparks-NavItem wenn `count > 0`, LaunchedEffect-Poll alle 60s + bei Routenwechsel.
+  - NV3-003 aria-modal + Focus-Trap (Desktop): `photoState` um `previouslyFocused` + `trapHandler`, `getPhotoSheetFocusables()` + `photoSheetFocusTrap()` für Tab-Cycle, `document.contains`-Guard beim Focus-Restore.
+  - NV3-004 aria-live (Desktop): `bdPhotoStatus` `role="status" aria-live="polite"`, `bdPhotoTags` `aria-live="polite" aria-relevant="additions"`.
+  - QS qs-20260517-011 ✅ freigabe (0 Findings).
+- ✅ **FEAT-001 — KI-Aufgabensplitting aus Sparks** (`65b4597`): Vier Schichten. Aus einem Spark werden mehrere Action-Items als individuelle Tasks extrahiert.
+  - **Schicht A LLM-Trait:** `ActionItem`-Struct (title/priority/due_date/category), `EXTRACT_ACTION_ITEMS_PROMPT` (deutsch), `extract_action_items()` Trait-Method mit Default-Impl + Pflicht-Override in `claude.rs`+`ollama.rs` (Prosa-Wrapper-Robustheit, empty-text early-return).
+  - **Schicht B Migration + Endpoint:** Migration `20260520_001_task_due_date.sql` (Tag+1-Versioning), Task-Model um `due_date` erweitert (4 FromRow-SELECTs angepasst), `create_task_full()` als voller Konstruktor + schlanke Wrapper, neuer Endpoint `POST /spark/{id}/extract-tasks` (idempotent via `nexus_external_id` Schema `spark-extract:<spark_id>:<idx>`, Skip bei leeren Titles).
+  - **Schicht C Auto-Extract:** `repo::user_pref_bool()`-Helper, `post_spark` spawnt `tokio::spawn` nach Insert wenn `auto_extract_tasks_enabled=true`, Fehler via `tracing::warn` (nicht propagiert).
+  - **Schicht D UI:** Desktop-Button „📋 Tasks extrahieren" + a11y-konsistenter Status-Area (`role="status" aria-live="polite"`); Android `SparkDetailSheet` OutlinedButton + `extractStatus per remember(entry.id)`, `ExtractTasksResponse`-Model + `extractTasksFromSpark()` API.
+  - Tests: 2 neue Unit-Tests (`test_extract_tasks_inner_creates_and_is_idempotent`, `test_extract_tasks_skips_empty_titles`), `MockLlm` um `action_items` erweitert.
+  - QS qs-20260517-012 → 0 Blocker / 1 Major (VC-013-VOL Settings-Toggle DoD-Riss) / 0 Minor → Code-Hauptpfad freigegeben, Auflage als Folge-Sub-Sprint.
+- ✅ **VC-013-VOL — Settings-Toggle Auto-Extract** (`17cd123`): Folge-Sub-Sprint zur FEAT-001-C-Auflage. User-Affordance für `auto_extract_tasks_enabled` jetzt in beiden Clients sichtbar.
+  - Desktop: neue `<h3>Sparks</h3>`-Sektion im Settings-Modal mit Toggle `#prefAutoExtract` (`data-pref="auto_extract_tasks_enabled"`, `data-action="pref-toggle"`), Default off (opt-in), Persistenz via bestehenden `savePref`-Pfad.
+  - Android: `NexusApiClient.getUserPrefs() / setUserPref()` konsistent zu setProvider-Pattern, `SparksPrefsCard` Composable mit Material3 Switch, Initial-Load via `LaunchedEffect(Unit)`, `Switch.enabled=loaded` Race-Schutz, optimistic update + Rollback bei Fehler mit Snackbar.
+  - QS qs-20260517-013 → 0/0/1 freigabe (Minor VC-013-MIN-1 Path-Encoding-Wrapper Android → Backlog).
+- ✅ **FEAT-002-A — iCal-Export-Endpoints** (`02ac2f4`): Sprint A der Kalender-Integration. Zwei neue Read-Only-Endpoints liefern RFC-5545-konformes VCALENDAR. Bearer-geschützt via `require_token`-Layer.
+  - `GET /spark/export.ics` — VEVENT pro Spark (`DTSTART` aus `created_at`, 30 min Default-Dauer, UID `nexus-spark-<id>@nexus`, SUMMARY = erste 60 char-truncated Zeichen via `chars().take(57)` UTF-8-safe, DESCRIPTION = voller `transcript`-vor-`raw_text`-Text).
+  - `GET /tasks/export.ics` — VEVENT (Date-only) pro offenem Task mit `due_date`; filtert `status='done'` und `due_date IS NULL` im Builder.
+  - Design-Entscheidungen dokumentiert in handlers.rs: VEVENT statt VTODO (Apple Calendar/GCal interpretieren VTODO inkonsistent), UID-Schema stabil über Re-Fetches, `Utc::now`-Fallback bei Parse-Fehler statt Skip.
+  - Tests: 4 neue Unit-Tests in `synaptic_phase_b_tests` (empty calendar, stable UID, filter, UTF-8 truncate). `cargo test 89/0+1ign`.
+  - QS qs-20260517-014 ✅ freigabe (0 Findings).
+
+**Backlog (FEAT-002 Sprint B/C oder Mini-Sprints):**
+- FEAT-002-AUTH: Token-in-URL als Bearer-Alternative für externe Kalender-Apps (Apple Calendar/GCal-Subscribe können keinen Bearer-Header setzen).
+- FEAT-002-ETAG: ETag/Last-Modified für Re-Fetch-Effizienz.
+- FEAT-002-TRACE: `tracing::warn` beim `Utc::now`-Fallback in `spark_ics_export`.
+- VC-013-MIN-1: Android Path-Encoding-Wrapper generisch robust machen.
 
 ---
 
@@ -329,11 +366,12 @@ nexus-core pair       # QR-Code für Android-Pairing
 
 ## Nächster Sprint (offen)
 
-Sprint-Slot frei nach v0.1.3 / Nightvision-Closure. Mögliche Kandidaten aus Backlog & Bookmarks:
+Sprint-Slot frei nach v0.1.3 + Post-Release-Feature-Stack. Mögliche Kandidaten aus Backlog & Bookmarks:
 
+- **FEAT-002-B/C — iCal-Härtung** — Token-in-URL (AUTH) + ETag/Last-Modified + Trace-Logging. Kleiner Sprint, schließt FEAT-002 vollständig ab.
 - **Vault-Implementierung** — `docs/VAULT-DESIGN.md` als 7-11-Tage-Spec liegt seit Joyful Jellyfish bereit; Links-Tabelle deckt schon ~80% des Edges-Schemas. ADHS-relevant.
-- **Pixel-Smoke + Bottom-Nav-Badge** — physischer E2E-Test der Nightvision-Android-App + offenes UI_SPEC §4.9-Detail.
-- **Provider-Coverage `extract_links`** — gemini/openai/mistral/groq/deepseek/openrouter/zai (aktuell nur Claude + Ollama).
+- **Pixel-Smoke** — physischer E2E-Test der Nightvision-Android-App (CameraX + SSE + Bottom-Nav-Badge live).
+- **Provider-Coverage `extract_links` + `extract_action_items`** — gemini/openai/mistral/groq/deepseek/openrouter/zai (aktuell nur Claude + Ollama für beide Traits).
 - **Fokus-Module** — FocusPact / HyperfokusWächter (Masterplan-Roadmap).
 - **Wellbeing** — ReizRunter / Abend-Ritual (Masterplan-Roadmap).
 - **Remote-Sync** — Tailscale-Integration (Masterplan-Roadmap).

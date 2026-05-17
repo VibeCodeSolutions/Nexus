@@ -1,12 +1,47 @@
 # NEXUS — Current State
 
-**Stand:** 2026-05-09
-**Aktuelle Phase:** Sprint "Obsidian-Briefkasten" — Phase A+B+C+D+E code-komplett. Win11-VM-Smoke (Admin) und `v0.1.3`-Tag-Bump stehen als Closure-Schritte aus. Parallel: Sprint "Happy Thompson" Code-Inhalte bereits seit 2026-05-04 fertig — beide Sprints zusammen als `v0.1.3`.
-**Phase-Status:** v0.1.0 GA-fähig, v0.1.2 released, **v0.1.3-Kandidat: Happy Thompson Code-Phasen + Obsidian-Briefkasten A–E komplett, Tuvok in allen 5 QS-Läufen (qs-20260509-001..004) freigabe; nur noch Win11-VM-Smoke + Tag-Bump.**
+**Stand:** 2026-05-17
+**Aktuelle Phase:** Sprint "Nightvision" abgeschlossen — UI-Redesign (Daniel, NV-M1..M4) + Foto-Spark-Pipeline (NV-1..NV-5) + Phase A (Sparks-Rename + Gamification-Removal). `v0.1.3` getaggt. Kein aktiver Sprint, nächster zu planen.
+**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `dcff6ec` (chore(qs) findings-gate NV-5-POST-MERGE — freigabe). main clean & sync mit origin.
+
+**Sprint-Verlauf v0.1.3:** Obsidian-Briefkasten A–E ✅ · Happy Thompson A–C ✅ · Crystalline Crab Phase C ✅ · UI-Redesign Nightvision M1–M4 ✅ · Foto-Spark Pipeline NV-1..NV-5 ✅ · Phase A Sparks-Rename + Gamification-Removal ✅. Alle Sprints Tuvok-freigegeben (qs-20260509-001..004, qs-20260517-001..010).
 
 ---
 
-## Sprint "Obsidian-Briefkasten" (2026-05-03 → laufend)
+## Sprint "Nightvision" — UI-Redesign + Foto-Spark-Pipeline (2026-05-16 → 2026-05-17, ✅ abgeschlossen)
+
+**Auslöser zweigeteilt:**
+- Daniels Plantry-inspirierter UI-Redesign-Drop (BUILD-SPEC + JSX-Mockups in `docs/design-refs/nightvision-features/`).
+- Foto-Spark-Pipeline als echtes Feature-Neubau-Stück (Variante B des Audits).
+
+**Spec-Ankerung:** `docs/UI_SPEC.md` als Single Source of Truth für visuelle/strukturelle Entscheidungen, `docs/sprints/nightvision-photo-ocr.md` für Pipeline-Sprint-Plan.
+
+### Teil 1 — UI-Redesign (Daniel, M1–M4)
+
+- ✅ **M1 Shell** (`5c3445f` Branch-Merge): Sidebar-Nav ersetzt horizontale Tabs, true-dark Design-Tokens (`#09090F`/`#111318`/`#1C2030`), `Views{}`-Modul-Pattern mit init/destroy, Globale-Variablen-Allowlist. Action-Dispatcher (kein inline-onclick mehr).
+- ✅ **M2 Dashboard** (im selben Branch): Greeting + Status-Pills (verbindung/unsortiert/aufgaben), Alert-Card für Unsorted-Sparks, 4 Quick-Action-Kreise, 2×2 Overview-Grid (Sparks/Tasks/Projekte/Achievements).
+- ✅ **M3 Entry-Cards** (im selben Branch): Filter-Pills oben in Sparks-Liste (Alle/Arbeit/Privat/Unsortiert), Card-Layout mit Badge+Date+⋮+Footer-Link.
+- ✅ **M4 Detail-Panel + Mobile-CSS** (im selben Branch): `<dialog>`-basiertes Detail-Panel, `@media (max-width: 768px)` für Desktop-Web. **Wichtig:** Mobile-CSS greift nur im Desktop-Webview; Android ist native Compose und muss separat portiert werden.
+- ✅ **Auto-Task-Erstellung Core** (im selben Branch): LLM kann Tasks aus Sparks generieren mit `nexus_external_id`-Backfill (idempotent).
+- ✅ **QS:** qs-20260517-001 (0 Blocker / 0 Major / 2 Minor) — Freigabe mit Hinweis. Erratum qs-20260517-001-E1 (Mobile-CSS-Fehleinschätzung korrigiert).
+
+### Teil 2 — Foto-Spark-Pipeline (NV-1..NV-5)
+
+- ✅ **NV-1 — Core Vision + Tesseract-Fallback** (`2c41d97`): `VisionProvider`-Trait, Groq-llama-3.2-vision-Impl + Tesseract-CLI-Fallback, Migration `20260517_001_spark_image.sql` (`source`/`image_path`-Spalten), `VisionConfig` + `spark_images_dir`, `image`-Crate-Resize auf max 1920 px. QS qs-20260517-003 ⚠️ Auflagen (3 Minor → NV-2-Folge).
+- ✅ **NV-2 — Streaming-Endpoint `POST /spark/from_image`** (`3620558`): Multipart-Handler, SSE-Frames (`line`/`tags`/`done`/`error`), `analyze_with_provider`-Trait-Injection-Refactor, `serve_spark_image`-Static-Route, `PipelineFrame`-Enum. QS qs-20260517-004 → qs-20260517-005 (alle 3 Major-Auflagen NV2-001/002/003 gefixt: Image-Cleanup in delete_spark, Route auf `/spark/from_image` singular, `DefaultBodyLimit::max(10 MB + 64 KiB)`).
+- ✅ **NV-3 — Desktop Foto-Braindump-Sheet** (`3da7ee4`): `<dialog>`-Sheet mit File-Picker + Drag&Drop, OCR-Result-Streaming via `EventSource`, Tag-Pills accept/reject, Spark-Refresh nach `done`. QS qs-20260517-006 (0 Blocker / 0 Major / 4 Minor) Auflagen-Freigabe — NV3-001 ObjectURL-Leak + NV3-002 aria-pressed empfohlen, gefixt vor Commit.
+- ✅ **NV-4 — Quick Wins** (`523030b`): Volltextsuche `?q=<term>` mit LIKE-Escape, Settings-Toggles (`camera_analysis_enabled`/`auto_tags_enabled`/`notifications_filter`) über `user_prefs`, Auto-Tag-UI im Spark-Detail (vorgeschlagen vs. übernommen). QS qs-20260517-007 (0 Blocker / 0 Major / 3 Minor) Auflagen-Freigabe — NV4-001 Migration-Datum-Drift +1 Tag (sqlx-Versioning-Lesson), NV4-002 setup_pool ohne user_prefs (Drift-Lesson 3. Anwendung), NV4-003 Such-Debounce ohne Request-Cancel.
+- ✅ **Phase A — Sparks-Rename + Gamification-Removal** (`1d80c9a`, BREAKING): Konzept-Refactor — "Braindumps" → "Sparks" projekt-weit (Core+Desktop+Android+Migration+Doku). Gamification (XP/Streaks/Achievements/Level) komplett entfernt — alle `/stats`, `/achievements`, `/xp/history`-Endpoints raus, DB-Tabellen `xp_events`/`achievements`/`user_stats` weg, Dashboard-Stats-Grid+Progress-Bar entfernt. QS qs-20260517-008 (0 Blocker / 1 Major / 1 Minor) Auflagen-Freigabe — PA-001 Android-Build vor Push verifiziert, PA-002 Desktop-Dev-Smoke ausstehend.
+- ✅ **NV-5 — Android Foto-Spark (CameraX + SSE)** (`2aa1542`): Native Compose-Implementierung (gepivotet von ursprünglich geplantem AS-CLI-Handoff auf Single-CLI per VISION.md). `SparkPhotoSseClient.kt` (OkHttp-Multipart-POST + manueller SSE-Parser + Flow-Cancel-Forwarding via `invokeOnCompletion`), `SparkPhotoSheet.kt` (ModalBottomSheet mit CameraX-PreviewView + ImageCapture + OCR-LazyColumn + FilterChip-Tags + Permission-Flow inkl. Permanent-Denial-Settings-Intent). CameraX 1.4.0 + CAMERA-Permission (Feature optional). QS Pre-Merge qs-20260517-009 (0/2/5), Post-Merge qs-20260517-010 (0/0/0) — alle NV5-001..007 re-verifiziert, assembleDebug + lintDebug grün.
+
+**Offene Bookmarks (nicht-blockierend, Folge-Sprints):**
+- Pixel-Smoke-Test auf physischem Gerät (alle Builds bisher nur `assembleDebug`-validiert).
+- Bottom-Nav-Badge mit Unsorted-Spark-Count (UI_SPEC §4.9, qs-20260517-002 Minor).
+- NV3-003 aria-modal+Focus, NV3-004 aria-live-Pattern (Minor, kosmetisch).
+
+---
+
+## Sprint "Obsidian-Briefkasten" (2026-05-03 → 2026-05-09, ✅ abgeschlossen)
 
 Auslöser: File-basierte LLM-Bridge zwischen Nexus und Obsidian-Vault. Statt synchroner LLM-Klassifikation schreibt Nexus Sparks in den Vault, ein Vault-seitiges Sortier-Skill (kepano/obsidian-skills) erzeugt Outbox-Files, Nexus konsumiert die zurück. Architektur-Entscheidungen vom Admin freigegeben: R1 Pending-Pattern · R2 DB-Migration mit DEFAULT 'done' · R3 File-Truth stateless.
 
@@ -16,7 +51,7 @@ Auslöser: File-basierte LLM-Bridge zwischen Nexus und Obsidian-Vault. Statt syn
 - ✅ **Phase C — Outbox-Importer** (uncommitted, bereit): Typisierter Frontmatter-Parser (`OutboxFrontmatter` + `NexusType`-Enum + `parse_outbox_typed`). Neue `obsidian/importer.rs` mit Scanner (md-only, ignoriert .tmp + _processed/), Dispatcher (Task→repo::create_task, Project→create_project mit body als description, Note→nur Status-Flip, Habit/Journal→Skipped wegen fehlendem DB-Schema), `flip_source_spark` (UPDATE sparks SET classification_status='done' + Category/Summary/Tags aus Outbox-Frontmatter, idempotent via `AND classification_status='pending'`-Klausel), Best-Effort Wikilink-Resolution (eindeutige Name-Matches), Atomic Archive nach `_processed/` mit `.dup-N`-Schutz vor Überschreibung. Neuer Endpoint `POST /api/obsidian/sync` (Bearer-pflichtig, 412 PRECONDITION_FAILED ohne Vault-Pfad). 60/60 Tests grün (18 neu für Phase C: 7 frontmatter, 11 importer), clippy clean. Tuvok-Iter-1 (qs-20260509-002) ✅ Freigabe — 0 Blocker / 0 Major / 7 Minor (alle Folge-Sprint-Bookmarks).
 - ✅ **Phase D — Wizard + Singleflight** (uncommitted, bereit): `run_onboard` in main.rs hat „Obsidian-Briefkasten" als Provider-Option mit Vault-Pfad-Input + Existenz-Check. `SetProviderRequest` bekommt optional `vault_path`-Feld; `onboard_set_provider` für „obsidian"-Pfad validiert (trim/empty + `Path::is_dir`) und persistiert via `keystore::set_vault_path`. `SetupStatus.vault_path` (skip_serializing_if Option::is_none) für Frontend-Anzeige. Frontend `desktop/src/index.html`: PROVIDERS-Liste um Obsidian-Eintrag erweitert, neuer 'obsidian'-Branch in `renderProviderDetail` (Text-Input + „Ordner wählen…"-Button via `data-action="pick-vault"` → `pickVaultFolder()` mit `window.__TAURI__.dialog.open` und Alert-Fallback). `saveProvider` erweitert um optional `vaultPath`-Param. **OB-C-MIN-5 mit-fixed**: `AppState.obsidian_sync_lock: Arc<tokio::sync::Mutex<()>>`; `obsidian_sync` nutzt `try_lock` → 409 CONFLICT bei laufendem Sync (kein Blocking, sofortiges User-Feedback). Tuvok-Iter-1 (qs-20260509-003) ✅ Freigabe ohne Findings — 0 Blocker / 0 Major / 0 Minor.
 - ✅ **Phase E — Schema-Migration + Robustheits-Bookmarks** (uncommitted, bereit): Migration `20260509_001_obsidian_external_ids.sql` mit `ALTER TABLE tasks/projects ADD COLUMN nexus_external_id` + partial `UNIQUE`-Index `WHERE nexus_external_id IS NOT NULL`. Repo: dünne `create_task`/`create_project`-Wrapper auf `*_with_external_id`-Variante; neue `find_*_by_external_id`-Optionals. Importer dispatch_task/project: vorab Lookup → Re-Use bei Treffer, sonst Insert mit external-id (OB-C-MIN-4). EXDEV-Fallback `move_or_copy_remove` mit `is_cross_device`-Detection (raw_os_error 18/17 ∪ ErrorKind::CrossesDevices, OB-C-MIN-2). Note ohne `nexus_source_inbox` → Skipped statt Imported (OB-C-MIN-7). Symlink-Vertrauensmodell als Doc-Kommentar in `scan_outbox` (OB-C-MIN-1). 65/65 Tests grün (5 neu für Phase E). Tuvok-Iter-1 (qs-20260509-004) ✅ Freigabe ohne Findings.
-- ⏳ **Phase F — Win11-VM-Smoke (Admin-Aufgabe)**: `docs/SMOKE_HAPPY_THOMPSON.md` Sektion 8a–8f durchklicken in Win11-VM. Bei grün → `bash scripts/bump-version.sh 0.1.3` → Tag → Push → Release.
+- ✅ **Phase F — Win11-VM-Smoke + v0.1.3-Tag** (Admin manuell + Doku-Sync, vor Nightvision-Sprint abgeschlossen): Tag `v0.1.3` gesetzt, Release-Pipeline grün.
 
 **Folge-Sprint-Bookmarks (offen, nicht in v0.1.3):**
 - OB-A-MIN-2 Migration-Roundtrip-Test (post-Migration-Schema-Verifikation)
@@ -27,7 +62,7 @@ Auslöser: File-basierte LLM-Bridge zwischen Nexus und Obsidian-Vault. Statt syn
 
 ---
 
-## Sprint "Happy Thompson" (2026-05-04, code-fertig — wartet auf Admin-Smoke)
+## Sprint "Happy Thompson" (2026-05-04 → 2026-05-09, ✅ abgeschlossen, Teil von v0.1.3)
 
 Auslöser: Polish-Restbestände aus Crystalline Crab (#5 LLM-Sort, #6 Android-Footer-Spacing, #8 Footer-Version, #10 LLM-Skip im Onboarding, #11 Pairing-NAT) plus Provider-Coverage-Lücke `extract_links` (Nutzer von 7/9 LLM-Providern bekamen null Auto-Wikilinks, weil Trait-Default `Ok(Vec::new())` zurückgab). Zusammen als `v0.1.3`-Bündel.
 
@@ -39,9 +74,9 @@ Auslöser: Polish-Restbestände aus Crystalline Crab (#5 LLM-Sort, #6 Android-Fo
 - ✅ **Phase A — Backend** (`6c137cb`): #5 LLM-Sort (`settings_models` deterministisch), #10 NoOp-Provider-Pfad (`create_provider`/`setup_status`/`onboard_set_provider`/`SetProviderRequest.api_key #[serde(default)]`), #11 `NEXUS_PAIR_HOST`-Env-Var-Override in `auth.rs`, Provider-Coverage `extract_links` für `openai_compatible` (deckt openai/mistral/groq/deepseek/openrouter), `gemini`, `zai` — alle nach Claude-Pattern mit `EXTRACT_LINKS_PROMPT` + JSON-Trim-Robustheit. cargo check + 28 Tests grün. Tuvok ✅ Pre-Commit-Diff-Review (0 Blocker / 0 Major / 3 Folge-Sprint-Minor: SH-A4 api_key-Validierung explizit, SH-A8 Z.ai system+user-Format, SH-A9 Mock-Tests).
 - ✅ **Phase B — Desktop** (`4e08a1d`): #8 Footer `index.html:1755` v0.1.0 → v0.1.2, #10 Skip-Button im Provider-Wizard mit `data-action="onboard-skip"` + `skipOnboardingProvider()`-Helper (ruft `saveProvider('noop', '')` → `screenDone`). Tauri cargo check grün. Mini-Self-Review.
 - ✅ **Phase C — Android** (`c844bd7`): #6 NexusFooter `navigationBarsPadding()` raus (Doppel-Inset mit NavigationBar im Scaffold-bottomBar) + vertical 6.dp → 2.dp; #8 strings.xml `app_footer` v0.1.0 → v0.1.2. `./gradlew assembleDebug` grün. Mini-Self-Review.
-- ⏳ **Phase D — Doku** (in Arbeit): `docs/SMOKE_HAPPY_THOMPSON.md` (NEU, 8 Test-Sektionen + CC-C-011-Coverage geschlossen + Provider-Coverage-Live-Test) + dieser CURRENT_STATE-Block + WORKLOG-Update.
-- ⏳ **Phase E — Build + Push + CI**: Push, `gh workflow run release.yml`, MSI + APK-Drop nach `/tmp/`, HTTP-Server für VM bereit.
-- ⏳ **Phase F — Admin-VM-Smoke abends**: Smoke-Checkliste durchklicken; bei grün → `bump-version.sh 0.1.3` → Tag-Push → Release.
+- ✅ **Phase D — Doku** (`docs/SMOKE_HAPPY_THOMPSON.md` + dieser CURRENT_STATE-Block + WORKLOG-Update).
+- ✅ **Phase E — Build + Push + CI**: Release-Pipeline grün.
+- ✅ **Phase F — Admin-VM-Smoke**: durchgeklickt, `v0.1.3`-Tag gesetzt, Release veröffentlicht.
 
 **Out of Scope (eigene Sprints):**
 - Finding #7 Dashboard-Trockenheit → eigener Design-Sprint mit Mockup-Diskussion
@@ -220,15 +255,9 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 ### Phase 10 — Tasks & Projekt-Management ✅
 ### Phase 11 — ProgressGlow ✅
 ### Phase 12 — Linux-Support ✅
-### Phase 13 — Gamification ✅
+### Phase 13 — Gamification ⚠️ REVERTED (2026-05-17 via Sprint Nightvision Phase A, Commit `1d80c9a`)
 
-**Neue Features Phase 13:**
-- XP-System: 10 XP/Spark, 25 XP/Task-Abschluss, 50 XP/Projekt, 15 XP Streak-Bonus
-- Level-System: Exponentiell (100 * level^1.5 XP pro Level)
-- Streaks: Tägliche Nutzung tracken, Streak-Bonus ab 2 Tagen
-- 14 Achievements: Meilenstein-Badges für Sparks, Tasks, Projekte, Streaks, Level, XP
-- Dashboard: Stats-Grid (Level/XP/Streak), XP-Fortschrittsbalken, Achievement-Anzeige
-- API-Responses: Spark/Task/Projekt-Erstellung liefern jetzt XP + freigeschaltete Achievements mit
+**Begründung Revert:** UX-Entscheidung — Gamification passte nicht zum ADHS-Personal-OS-Konzept (Dopamin-Falsch-Anreize statt echter Cortex-Entlastung). Entfernt: XP/Level/Streaks/Achievements komplett (DB-Tabellen `xp_events`/`achievements`/`user_stats` weg, API-Endpoints `/stats`/`/achievements`/`/xp/history` weg, Dashboard-Stats-Grid+XP-Bar weg, alle Spark/Task/Projekt-Responses ohne `xp`/`unlocked_achievements`-Felder). Migration `20260517_002_remove_gamification.sql` (Tag+1 wegen sqlx-Versioning-Drift, siehe Memory `project_sqlx_migration_versioning`).
 
 ---
 
@@ -240,27 +269,55 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 | Tauri Desktop (Linux x86-64) | `desktop/src-tauri/target/release/nexus-desktop` | 9.1 MB |
 | Android Debug APK | `android/app/build/outputs/apk/debug/app-debug.apk` | 61 MB |
 
-## API-Endpoints
+## API-Endpoints (Stand 2026-05-17, nach Phase A Gamification-Removal)
 
-| Method | Path | Auth | Beschreibung |
-|---|---|---|---|
-| GET | `/health` | Public | Health-Check |
-| GET | `/` | Public | Dashboard (HTML) mit Gamification |
-| POST | `/spark` | Bearer | Spark erstellen (+10 XP) |
-| GET | `/spark` | Bearer | Alle Sparks |
-| GET | `/spark/{id}` | Bearer | Einzelner Spark |
-| POST | `/projects/suggest` | Bearer | LLM-basierte Projekt-Vorschläge |
-| POST | `/projects` | Bearer | Projekt erstellen (+50 XP) |
-| GET | `/projects` | Bearer | Alle Projekte |
-| GET | `/projects/{id}/sparks` | Bearer | Sparks eines Projekts |
-| GET | `/projects/{id}/progress` | Bearer | Fortschritt (Tasks done/total) |
-| POST | `/tasks` | Bearer | Task erstellen |
-| GET | `/tasks` | Bearer | Tasks (Filter: project_id, status) |
-| PUT | `/tasks/{id}` | Bearer | Task updaten (done → +25 XP) |
-| DELETE | `/tasks/{id}` | Bearer | Task löschen |
-| GET | `/stats` | Bearer | User-Stats (XP, Level, Streak) |
-| GET | `/achievements` | Bearer | Alle Achievements |
-| GET | `/xp/history` | Bearer | XP-Events (limit=N) |
+**Public:**
+| Method | Path | Beschreibung |
+|---|---|---|
+| GET | `/health` | Health-Check |
+| GET | `/api/setup-status` | Onboarding-Status (Provider, Vault-Pfad) |
+| POST | `/api/onboard/set-provider` | Provider speichern + Vault-Pfad (Bearer-frei während Onboarding) |
+| POST | `/api/onboard/oauth` | OAuth-Token-Speicherung |
+| GET | `/api/pair/uri` | Pairing-QR-URI |
+| POST | `/api/pair/handshake` | Pairing-Handshake |
+
+**Sparks (Bearer):**
+| Method | Path | Beschreibung |
+|---|---|---|
+| GET | `/` | Dashboard (HTML) |
+| POST | `/spark` | Spark erstellen (Voice/Text) |
+| POST | `/spark/from_image` | Foto-Spark mit OCR + Tag-SSE-Stream (Multipart, 10 MB Limit) |
+| GET | `/spark` | Alle Sparks (Filter: `?q=<term>` Volltextsuche) |
+| GET | `/spark/{id}` | Einzelner Spark |
+| DELETE | `/spark/{id}` | Spark löschen (inkl. zugehöriges Foto-File) |
+| POST | `/spark/{id}/tags` | Spark-Tags überschreiben |
+| GET | `/spark/{id}/links` | Wikilinks zu/von Spark |
+| GET | `/spark/ideas` | Ideen-Subset |
+| GET | `/spark/unsorted/count` | Count für Bottom-Nav-Badge |
+| POST | `/spark/recategorize` | Manueller Recategorize-Trigger |
+
+**Projects & Tasks (Bearer):**
+| Method | Path | Beschreibung |
+|---|---|---|
+| POST | `/projects` · GET `/projects` · DELETE `/projects/{id}` | CRUD Projekte |
+| GET | `/projects/{id}/sparks` · `/progress` · `/links` | Projekt-Detail-Lookups |
+| POST | `/projects/suggest` | LLM-basierte Projekt-Vorschläge (on-demand) |
+| GET/POST/DELETE | `/projects/suggestions[/{id}/accept\|dismiss]` | Auto-Suggestion-Workflow |
+| POST/GET/PUT/DELETE | `/tasks[/{id}]` | CRUD Tasks |
+
+**Settings & Links & Obsidian (Bearer):**
+| Method | Path | Beschreibung |
+|---|---|---|
+| GET/POST | `/api/user_prefs[/{key}]` | User-Prefs (Camera/Auto-Tags/Notifications-Filter) |
+| GET/POST | `/api/settings/providers` · `/models` · `/provider` | LLM-Provider-Switch |
+| POST/DELETE | `/links[/{id}]` | Wikilink CRUD |
+| POST | `/api/obsidian/sync` | Outbox-Importer (412 ohne Vault-Pfad, 409 wenn Sync läuft) |
+| GET | `/api/images/{filename}` | Static-Image-Serve aus `spark_images_dir` |
+
+**Diagnostik (Bearer):**
+| Method | Path | Beschreibung |
+|---|---|---|
+| POST | `/api/diag/run` · `/report` · GET `/reports` | Self-Diagnostics |
 
 ## CLI-Commands
 
@@ -270,10 +327,15 @@ nexus-core set-key    # API-Key im Keychain speichern
 nexus-core pair       # QR-Code für Android-Pairing
 ```
 
-## Nächste Phasen (Post-Phase-13)
+## Nächster Sprint (offen)
 
-| Phase | Was |
-|---|---|
-| 14 | Fokus-Module — FocusPact, HyperfokusWächter |
-| 15 | Wellbeing — ReizRunter, Abend-Ritual |
-| 16 | Remote-Sync — Tailscale |
+Sprint-Slot frei nach v0.1.3 / Nightvision-Closure. Mögliche Kandidaten aus Backlog & Bookmarks:
+
+- **Vault-Implementierung** — `docs/VAULT-DESIGN.md` als 7-11-Tage-Spec liegt seit Joyful Jellyfish bereit; Links-Tabelle deckt schon ~80% des Edges-Schemas. ADHS-relevant.
+- **Pixel-Smoke + Bottom-Nav-Badge** — physischer E2E-Test der Nightvision-Android-App + offenes UI_SPEC §4.9-Detail.
+- **Provider-Coverage `extract_links`** — gemini/openai/mistral/groq/deepseek/openrouter/zai (aktuell nur Claude + Ollama).
+- **Fokus-Module** — FocusPact / HyperfokusWächter (Masterplan-Roadmap).
+- **Wellbeing** — ReizRunter / Abend-Ritual (Masterplan-Roadmap).
+- **Remote-Sync** — Tailscale-Integration (Masterplan-Roadmap).
+
+Sprint-Auswahl + H2-Planung steht aus.

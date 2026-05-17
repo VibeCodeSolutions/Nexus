@@ -1,11 +1,27 @@
-# NEXUS — Offene Punkte (Tuvok-QS, 2026-04-30)
+# NEXUS — Offene Punkte
 
-> Konsolidierte Aufgabenliste aus dem Vollreview. Volle Befund-Begründung in `review.md`.
-> Reihenfolge: Blocker → Major → Minor. Innerhalb der Stufe nach Aufwand sortiert (klein → groß).
+> **Stand:** 2026-05-17. Aktive Sprint-Historie + Endpoints + Phasen-Status: `CURRENT_STATE.md`.
+> Historische Inhalte (Tuvok-Vollreview vom 2026-04-30, alte Sprint-Bookmarks) sind weiter unten als Read-Only-Archiv erhalten.
 
 ---
 
-## 🎨 Sprint "Nexus Nightvision" — UI-Komplettredesign (Priorisiert 2026-05-16)
+## 🟢 Nächste Feature-Kandidaten (Stand 2026-05-17)
+
+> Sprint-Slot frei nach v0.1.3-Closure. Diese beiden Features waren am 2026-05-16 priorisiert worden; durch den Pivot auf Nightvision noch nicht angegangen. **FEAT-001 und FEAT-002 unten unverändert beibehalten** als Sprint-Kandidaten — siehe Sektion "Nächste Features".
+
+Weitere Kandidaten (aus CURRENT_STATE.md "Nächster Sprint offen"):
+- Vault-Implementierung (`docs/VAULT-DESIGN.md`, 7-11 Tage)
+- Pixel-Smoke + Bottom-Nav-Badge (UI_SPEC §4.9)
+- Provider-Coverage `extract_links` (7 LLM-Provider)
+- Fokus-Module / Wellbeing / Remote-Sync (Masterplan-Roadmap)
+
+---
+
+## 🎨 Sprint "Nexus Nightvision" — UI-Komplettredesign ✅ **ABGESCHLOSSEN 2026-05-17**
+
+> M1-M4 + Foto-Spark-Pipeline NV-1..NV-5 + Phase A Sparks-Rename/Gamification-Removal alle gemerged auf main. Tuvok-Refs: qs-20260517-001..010. v0.1.3 released. Details: `CURRENT_STATE.md` Sprint-Block "Nightvision".
+>
+> Milestone-Checklisten unten bleiben als historische Referenz erhalten.
 
 > **Design-Referenz:** Plantry (Plant Health Tracker) — true-dark, vivid accent, Status-Pills, Quick-Action-Kreise, 2×2-Grid-Overview, Pill-CTA, Entry-Cards mit Typ-Badge.
 > **Spec:** `docs/UI_SPEC.md` — Source of Truth für alle visuellen und strukturellen Entscheidungen. Jede Änderung an `index.html` muss gegen die Spec geprüft werden.
@@ -119,7 +135,7 @@
 
 ---
 
-## 🚀 Nächste Features (Priorisiert 2026-05-16, Admin)
+## 🚀 Nächste Features (Priorisiert 2026-05-16, Admin) — ⏳ offen, Sprint-Kandidaten
 
 ### FEAT-001 — KI-Aufgabensplitting aus Sparks
 
@@ -189,7 +205,7 @@
 
 ---
 
-## 🔴 Vor v0.1.0 GA (Blocker)
+## 🔴 Vor v0.1.0 GA (Blocker) — ✅ erledigt (historisch, v0.1.0 released 2026-05-01)
 
 - [x] **N-001-SIC** — Dashboard `/` Bearer-pflichtig machen
   - Datei: `core/src/auth.rs:180` (`is_public`), `core/src/main.rs:139` (Route)
@@ -199,7 +215,7 @@
 
 ---
 
-## 🟡 Vor v0.1.0 Public-Announcement (Major)
+## 🟡 Vor v0.1.0 Public-Announcement (Major) — ✅ überholt (historisch)
 
 - [x] **N-002-KOR** — XP-Farming durch Task-Toggle blockieren
   - Datei: `core/src/repo.rs::on_task_completed`
@@ -282,7 +298,7 @@
 
 ---
 
-## Routing-Vorschlag an Chakotay
+## Routing-Vorschlag an Chakotay (Snapshot 2026-04-30, historisch)
 
 | Finding | Empfohlene Abteilung | Spezialist |
 |---|---|---|

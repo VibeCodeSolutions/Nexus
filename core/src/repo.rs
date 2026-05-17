@@ -27,6 +27,82 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<BrainDumpEntry>, sqlx::Error>
         .await
 }
 
+/// Volltextsuche über `raw_text`, `transcript` und `summary`.
+/// Sucht case-insensitive per `LIKE`. Trimt `q`; leere Suche fällt auf [`list`] zurück.
+pub async fn list_search(
+    pool: &SqlitePool,
+    q: &str,
+) -> Result<Vec<BrainDumpEntry>, sqlx::Error> {
+    let needle = q.trim();
+    if needle.is_empty() {
+        return list(pool).await;
+    }
+    // Escape SQL-LIKE-Wildcards im User-Input.
+    let escaped = needle
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    let pattern = format!("%{escaped}%");
+    sqlx::query_as::<_, BrainDumpEntry>(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, \
+                classification_status, nexus_inbox_id, source, image_path \
+         FROM braindumps \
+         WHERE raw_text LIKE ?1 ESCAPE '\\' \
+            OR (transcript IS NOT NULL AND transcript LIKE ?1 ESCAPE '\\') \
+            OR (summary IS NOT NULL AND summary LIKE ?1 ESCAPE '\\') \
+         ORDER BY created_at DESC",
+    )
+    .bind(&pattern)
+    .fetch_all(pool)
+    .await
+}
+
+/// Upsert eines User-Prefs.
+pub async fn user_pref_set(
+    pool: &SqlitePool,
+    key: &str,
+    value: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO user_prefs (key, value) VALUES (?, ?) \
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
+    )
+    .bind(key)
+    .bind(value)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Listet alle gesetzten User-Prefs.
+pub async fn user_pref_list(
+    pool: &SqlitePool,
+) -> Result<Vec<(String, String)>, sqlx::Error> {
+    let rows: Vec<(String, String)> = sqlx::query_as("SELECT key, value FROM user_prefs")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows)
+}
+
+/// Ersetzt `tags_json` eines Braindumps mit der gegebenen Liste.
+/// Hält Tag-Order bei, dedupliziert nicht (Caller-Verantwortung).
+pub async fn update_braindump_tags(
+    pool: &SqlitePool,
+    id: &str,
+    tags: &[String],
+) -> Result<(), sqlx::Error> {
+    let tags_json = serde_json::to_string(tags).unwrap_or_else(|_| "[]".to_string());
+    let res = sqlx::query("UPDATE braindumps SET tags_json = ? WHERE id = ?")
+        .bind(&tags_json)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    if res.rows_affected() == 0 {
+        return Err(sqlx::Error::RowNotFound);
+    }
+    Ok(())
+}
+
 pub async fn create_project(pool: &SqlitePool, name: &str, description: &str) -> Result<Project, sqlx::Error> {
     create_project_with_external_id(pool, name, description, None).await
 }
@@ -655,5 +731,71 @@ mod tests {
 
         let done = list_tasks(&pool, None, Some("done")).await.unwrap();
         assert_eq!(done.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_search_filters_and_escapes() {
+        let pool = db::init_in_memory().await.unwrap();
+        insert(&pool, "Sprint Planning mit Mustafa").await.unwrap();
+        insert(&pool, "Einkaufen: Milch, Eier").await.unwrap();
+        insert(&pool, "100% sicher").await.unwrap();
+
+        let hits = list_search(&pool, "sprint").await.unwrap();
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].raw_text.contains("Sprint"));
+
+        let empty = list_search(&pool, "kein-match").await.unwrap();
+        assert!(empty.is_empty());
+
+        // Leerer Query → list() Fallback (3 Einträge).
+        let all = list_search(&pool, "  ").await.unwrap();
+        assert_eq!(all.len(), 3);
+
+        // SQL-LIKE-Wildcards im User-Input müssen escaped werden,
+        // sonst würde `%` jedes Zeichen matchen.
+        let escaped = list_search(&pool, "100%").await.unwrap();
+        assert_eq!(escaped.len(), 1);
+        assert!(escaped[0].raw_text.starts_with("100%"));
+    }
+
+    #[tokio::test]
+    async fn test_update_braindump_tags_replaces_and_404s() {
+        let pool = db::init_in_memory().await.unwrap();
+        let entry = insert(&pool, "Test").await.unwrap();
+
+        update_braindump_tags(&pool, &entry.id, &["a".into(), "b".into()])
+            .await
+            .unwrap();
+        let fetched = get_by_id(&pool, &entry.id).await.unwrap();
+        assert_eq!(fetched.tags_json, "[\"a\",\"b\"]");
+
+        update_braindump_tags(&pool, &entry.id, &[]).await.unwrap();
+        let cleared = get_by_id(&pool, &entry.id).await.unwrap();
+        assert_eq!(cleared.tags_json, "[]");
+
+        let err = update_braindump_tags(&pool, "no-such-id", &["x".into()]).await;
+        assert!(matches!(err, Err(sqlx::Error::RowNotFound)));
+    }
+
+    #[tokio::test]
+    async fn test_user_prefs_upsert_and_list() {
+        let pool = db::init_in_memory().await.unwrap();
+
+        user_pref_set(&pool, "camera_analysis_enabled", "true")
+            .await
+            .unwrap();
+        user_pref_set(&pool, "notifications_filter", "tasks_only")
+            .await
+            .unwrap();
+        // Upsert: gleicher Key überschreibt.
+        user_pref_set(&pool, "camera_analysis_enabled", "false")
+            .await
+            .unwrap();
+
+        let all = user_pref_list(&pool).await.unwrap();
+        assert_eq!(all.len(), 2);
+        let map: std::collections::HashMap<_, _> = all.into_iter().collect();
+        assert_eq!(map.get("camera_analysis_enabled").map(String::as_str), Some("false"));
+        assert_eq!(map.get("notifications_filter").map(String::as_str), Some("tasks_only"));
     }
 }

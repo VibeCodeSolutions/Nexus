@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS user_prefs (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

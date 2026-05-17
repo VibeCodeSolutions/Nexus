@@ -154,16 +154,87 @@ pub async fn list_ideas(
     Ok(Json(json!(items)))
 }
 
+#[derive(Deserialize)]
+pub struct BraindumpListQuery {
+    #[serde(default)]
+    pub q: Option<String>,
+}
+
 pub async fn list_braindumps(
     State(state): State<AppState>,
+    Query(params): Query<BraindumpListQuery>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let entries = repo::list(&state.pool)
-        .await
-        .map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
-        })?;
+    let entries = match params.q.as_deref() {
+        Some(needle) if !needle.trim().is_empty() => {
+            repo::list_search(&state.pool, needle).await
+        }
+        _ => repo::list(&state.pool).await,
+    }
+    .map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+    })?;
 
     Ok(Json(json!(entries)))
+}
+
+pub async fn list_user_prefs(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let rows = repo::user_pref_list(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let map: serde_json::Map<String, Value> = rows
+        .into_iter()
+        .map(|(k, v)| (k, Value::String(v)))
+        .collect();
+    Ok(Json(Value::Object(map)))
+}
+
+#[derive(Deserialize)]
+pub struct SetUserPrefRequest {
+    pub value: String,
+}
+
+pub async fn set_user_pref(
+    State(state): State<AppState>,
+    Path(key): Path<String>,
+    Json(body): Json<SetUserPrefRequest>,
+) -> Result<StatusCode, (StatusCode, Json<Value>)> {
+    if key.is_empty() || key.len() > 64 || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Ungültiger Pref-Key (a-z, 0-9, _, ., max 64)"})),
+        ));
+    }
+    repo::user_pref_set(&state.pool, &key, &body.value)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+pub struct UpdateBraindumpTagsRequest {
+    pub tags: Vec<String>,
+}
+
+pub async fn update_braindump_tags(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdateBraindumpTagsRequest>,
+) -> Result<StatusCode, (StatusCode, Json<Value>)> {
+    repo::update_braindump_tags(&state.pool, &id, &body.tags)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": format!("Braindump {id} nicht gefunden")})),
+            ),
+            other => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": other.to_string()})),
+            ),
+        })?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn get_braindump(
@@ -2186,6 +2257,13 @@ mod synaptic_phase_b_tests {
                 reason TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 status TEXT NOT NULL DEFAULT 'pending'
+            )",
+        ).execute(&pool).await.unwrap();
+        sqlx::query(
+            "CREATE TABLE user_prefs (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )",
         ).execute(&pool).await.unwrap();
         pool

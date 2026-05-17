@@ -375,6 +375,25 @@ body {
 .bd-photo-tag.accepted:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 .bd-photo-tag.rejected { opacity: 0.4; text-decoration: line-through; }
 
+/* ── NV-4: User-Prefs ───────────────────────────── */
+.pref-toggle {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) 0; cursor: pointer;
+}
+.pref-toggle input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
+.pref-toggle span { font-size: 14px; color: var(--text); }
+
+.bd-detail-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding-right: 4px;
+}
+.bd-detail-tag-remove {
+  background: transparent; border: none; color: var(--text-dim);
+  font-size: 14px; line-height: 1; padding: 0 2px; cursor: pointer;
+  border-radius: var(--r-pill);
+}
+.bd-detail-tag-remove:hover { color: var(--danger); }
+
 .entry-list { display: flex; flex-direction: column; gap: var(--sp-2); }
 .entry-card-list {
   display: flex; flex-direction: column;
@@ -1419,6 +1438,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <input type="password" id="settingApiKey" placeholder="">
     <button class="btn btn-ghost btn-sm mt-6" data-action="llm-save">LLM speichern</button>
 
+    <h3 class="h3-llm">Foto &amp; Tags</h3>
+    <label class="pref-toggle">
+      <input type="checkbox" id="prefCameraAnalysis" data-pref="camera_analysis_enabled" data-action="pref-toggle">
+      <span>Foto-Analyse aktiv (OCR + Tag-Vorschläge)</span>
+    </label>
+    <label class="pref-toggle">
+      <input type="checkbox" id="prefAutoTags" data-pref="auto_tags_enabled" data-action="pref-toggle">
+      <span>Tag-Vorschläge automatisch übernehmen</span>
+    </label>
+    <label for="prefNotifFilter">Benachrichtigungen</label>
+    <select id="prefNotifFilter" data-pref="notifications_filter" data-change="pref-select">
+      <option value="all">Alle</option>
+      <option value="tasks_only">Nur Aufgaben</option>
+      <option value="none">Keine</option>
+    </select>
+
     <div class="actions mt-16">
       <button class="btn btn-ghost" data-action="settings-close">Schließen</button>
       <button class="btn btn-primary" data-action="settings-save">Verbindung speichern</button>
@@ -1593,10 +1628,18 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item => {
 });
 
 // --- BrainDumps ---
+let _searchDebounceTimer = null;
+let _activeSearchQuery = '';
+let _refreshSeq = 0;
+
 async function refreshBraindumps() {
+  const q = _activeSearchQuery.trim();
+  const path = q ? `/braindump?q=${encodeURIComponent(q)}` : '/braindump';
+  const seq = ++_refreshSeq;
   try {
-    braindumps = await api('/braindump');
-    if (!Array.isArray(braindumps)) braindumps = braindumps.data || braindumps.items || [];
+    const result = await api(path);
+    if (seq !== _refreshSeq) return; // veraltete Antwort verwerfen
+    braindumps = Array.isArray(result) ? result : (result?.data || result?.items || []);
     populateCategoryFilter();
     renderBraindumps(braindumps);
     refreshUnsortedBadge();
@@ -1606,9 +1649,22 @@ async function refreshBraindumps() {
       openBraindumpDetail(id);
     }
   } catch (e) {
+    if (seq !== _refreshSeq) return;
     document.getElementById('bdTable').innerHTML =
       '<div class="empty-state"><p>BrainDumps konnten nicht geladen werden: ' + e.message + '</p></div>';
   }
+}
+
+function scheduleSearchRefresh() {
+  const input = document.getElementById('bdSearch');
+  const next = (input?.value || '').trim();
+  if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
+  _searchDebounceTimer = setTimeout(() => {
+    _searchDebounceTimer = null;
+    if (next === _activeSearchQuery) return;
+    _activeSearchQuery = next;
+    refreshBraindumps();
+  }, 250);
 }
 
 async function refreshUnsortedBadge() {
@@ -1665,12 +1721,13 @@ function populateCategoryFilter() {
 }
 
 function filterBraindumps() {
-  const q = (document.getElementById('bdSearch')?.value || '').toLowerCase();
+  // Text-Suche läuft serverseitig (refreshBraindumps mit ?q=). Hier nur Kategorie-Filter
+  // plus "Unsorted"-Sonderfall.
   const activePill = document.querySelector('#bdFilterPills .filter-pill.active');
   const cat = activePill?.dataset.filter || '';
   const filtered = braindumps.filter(b => {
+    if (cat === 'Unsorted') return !b.category || b.classification_status === 'unsorted';
     if (cat && b.category !== cat) return false;
-    if (q && !(b.raw_text || '').toLowerCase().includes(q) && !(b.category || '').toLowerCase().includes(q)) return false;
     return true;
   });
   renderBraindumps(filtered);
@@ -2070,11 +2127,43 @@ function openAchievement(id) {
 function closeAchievement() { document.getElementById('achievementModal').classList.add('hidden'); }
 
 // --- Settings ---
+const PREF_DEFAULTS = {
+  camera_analysis_enabled: 'true',
+  auto_tags_enabled: 'true',
+  notifications_filter: 'all',
+};
+const userPrefs = { ...PREF_DEFAULTS };
+
 async function openSettings() {
   document.getElementById('settingUrl').value = coreUrl;
   document.getElementById('settingToken').value = token;
   document.getElementById('settingsModal').classList.remove('hidden');
   loadLlmProviders();
+  loadUserPrefs();
+}
+
+async function loadUserPrefs() {
+  try {
+    const data = await api('/api/user_prefs', {}, { silent: true });
+    if (data && typeof data === 'object') {
+      for (const k of Object.keys(PREF_DEFAULTS)) {
+        if (typeof data[k] === 'string') userPrefs[k] = data[k];
+      }
+    }
+  } catch (_) { /* Defaults bleiben */ }
+  document.getElementById('prefCameraAnalysis').checked = userPrefs.camera_analysis_enabled === 'true';
+  document.getElementById('prefAutoTags').checked = userPrefs.auto_tags_enabled === 'true';
+  document.getElementById('prefNotifFilter').value = userPrefs.notifications_filter;
+}
+
+async function savePref(key, value) {
+  if (!(key in PREF_DEFAULTS)) return;
+  userPrefs[key] = value;
+  try {
+    await api(`/api/user_prefs/${encodeURIComponent(key)}`, {
+      method: 'POST', body: JSON.stringify({ value }),
+    });
+  } catch (e) { alert('Pref konnte nicht gespeichert werden: ' + e.message); }
 }
 function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
 function saveSettings() {
@@ -2597,6 +2686,46 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentBdDetailId = null;
 let _pendingDetailId = null;
 
+function renderDetailTags(bd) {
+  const tagsEl = document.getElementById('panelBdTags');
+  if (!tagsEl) return;
+  let tags = [];
+  try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
+  tagsEl.innerHTML = '';
+  if (!tags.length) return;
+  for (const tag of tags) {
+    const wrap = document.createElement('span');
+    wrap.className = 'entry-badge bd-detail-tag';
+    wrap.textContent = tag;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'bd-detail-tag-remove';
+    x.dataset.action = 'bd-detail-tag-remove';
+    x.dataset.tag = tag;
+    x.setAttribute('aria-label', `Tag entfernen: ${tag}`);
+    x.textContent = '×';
+    wrap.appendChild(x);
+    tagsEl.appendChild(wrap);
+  }
+}
+
+async function removeDetailTag(tag) {
+  if (!currentBdDetailId || !tag) return;
+  const bd = braindumps.find(b => b.id === currentBdDetailId);
+  if (!bd) return;
+  let tags = [];
+  try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
+  const next = tags.filter(t => t !== tag);
+  try {
+    await api(`/braindump/${encodeURIComponent(currentBdDetailId)}/tags`, {
+      method: 'POST', body: JSON.stringify({ tags: next }),
+    });
+    bd.tags_json = JSON.stringify(next);
+    renderDetailTags(bd);
+    renderBraindumps(braindumps);
+  } catch (e) { alert('Tag-Update fehlgeschlagen: ' + e.message); }
+}
+
 async function openBraindumpDetail(id) {
   currentBdDetailId = id;
   const bd = braindumps.find(b => b.id === id);
@@ -2635,13 +2764,10 @@ async function openBraindumpDetail(id) {
     }
   }
 
-  // Tags
-  const tagsEl = document.getElementById('panelBdTags');
-  if (tagsEl) {
-    let tags = [];
-    try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
-    tagsEl.innerHTML = tags.map(t => `<span class="entry-badge">${esc(t)}</span>`).join('');
-  }
+  // Tags (NV-4: removable). Eine eigene "vorgeschlagen vs. übernommen"-Distinction
+  // braucht eine Schema-Erweiterung (suggested_tags_json) — wird in Post-Phase-A
+  // separat angegangen. Hier reicht "Tag entfernen" via POST /braindump/:id/tags.
+  renderDetailTags(bd);
 
   // Links placeholder
   const linksEl = document.getElementById('panelBdLinks');
@@ -3195,6 +3321,7 @@ document.addEventListener('click', (e) => {
     case 'bd-photo-retry': submitPhotoBraindump(); break;
     case 'bd-photo-tag-toggle': togglePhotoTag(el); break;
     case 'bd-photo-open-detail': openPhotoBraindumpDetail(); break;
+    case 'bd-detail-tag-remove': e.stopPropagation(); removeDetailTag(el.dataset.tag); break;
     case 'idea-open':
       _pendingDetailId = el.dataset.bdId;
       navigate('braindumps');
@@ -3258,14 +3385,26 @@ document.addEventListener('change', (e) => {
     case 'bd-filter': filterBraindumps(); break;
     case 'bd-select-toggle': updateBulkButtonState(); break;
     case 'task-render': renderTasks(); break;
+    case 'pref-select': {
+      const key = el.dataset.pref;
+      if (key) savePref(key, el.value);
+      break;
+    }
   }
+});
+
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('input[type="checkbox"][data-action="pref-toggle"]');
+  if (!el) return;
+  const key = el.dataset.pref;
+  if (key) savePref(key, el.checked ? 'true' : 'false');
 });
 
 document.addEventListener('input', (e) => {
   const el = e.target.closest('[data-input]');
   if (!el) return;
   switch (el.dataset.input) {
-    case 'bd-search': filterBraindumps(); break;
+    case 'bd-search': scheduleSearchRefresh(); break;
   }
 });
 

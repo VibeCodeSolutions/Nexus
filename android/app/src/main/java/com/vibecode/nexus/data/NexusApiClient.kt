@@ -1,9 +1,9 @@
 package com.vibecode.nexus.data
 
 import com.vibecode.nexus.data.model.AcceptSuggestionResponse
-import com.vibecode.nexus.data.model.BrainDumpLinks
-import com.vibecode.nexus.data.model.BrainDumpRequest
-import com.vibecode.nexus.data.model.BrainDumpResponse
+import com.vibecode.nexus.data.model.SparkLinks
+import com.vibecode.nexus.data.model.SparkRequest
+import com.vibecode.nexus.data.model.SparkResponse
 import com.vibecode.nexus.data.model.HealthResponse
 import com.vibecode.nexus.data.model.ModelsResponse
 import com.vibecode.nexus.data.model.ProjectProgress
@@ -94,24 +94,24 @@ class NexusApiClient(private val settings: ConnectionSettings) {
         }
     }
 
-    // BrainDump
+    // Spark
 
-    suspend fun sendBrainDump(text: String): Result<BrainDumpResponse> = authedRequest {
-        client.post("$baseUrl/braindump") {
+    suspend fun sendSpark(text: String): Result<SparkResponse> = authedRequest {
+        client.post("$baseUrl/spark") {
             contentType(ContentType.Application.Json)
             bearerAuth(token!!)
-            setBody(BrainDumpRequest(text))
+            setBody(SparkRequest(text))
         }.body()
     }
 
-    suspend fun getBrainDumps(): Result<List<BrainDumpResponse>> = authedRequest {
-        client.get("$baseUrl/braindump") {
+    suspend fun getSparks(): Result<List<SparkResponse>> = authedRequest {
+        client.get("$baseUrl/spark") {
             bearerAuth(token!!)
         }.body()
     }
 
-    suspend fun deleteBrainDump(id: String): Result<Unit> = authedRequest {
-        client.delete("$baseUrl/braindump/$id") {
+    suspend fun deleteSpark(id: String): Result<Unit> = authedRequest {
+        client.delete("$baseUrl/spark/$id") {
             bearerAuth(token!!)
         }.body()
     }
@@ -166,16 +166,16 @@ class NexusApiClient(private val settings: ConnectionSettings) {
         }.body()
     }
 
-    suspend fun getProjectBrainDumps(projectId: String): Result<List<BrainDumpResponse>> = authedRequest {
-        client.get("$baseUrl/projects/$projectId/braindumps") {
+    suspend fun getProjectSparks(projectId: String): Result<List<SparkResponse>> = authedRequest {
+        client.get("$baseUrl/projects/$projectId/sparks") {
             bearerAuth(token!!)
         }.body()
     }
 
     // Synaptic Mosaic — Links + Project-Suggestions
 
-    suspend fun getBrainDumpLinks(braindumpId: String): Result<BrainDumpLinks> = authedRequest {
-        client.get("$baseUrl/braindump/$braindumpId/links") {
+    suspend fun getSparkLinks(sparkId: String): Result<SparkLinks> = authedRequest {
+        client.get("$baseUrl/spark/$sparkId/links") {
             bearerAuth(token!!)
         }.body()
     }

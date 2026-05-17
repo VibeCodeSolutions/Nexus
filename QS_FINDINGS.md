@@ -10,35 +10,35 @@ Sprint-Ref: `docs/sprints/nightvision-photo-ocr.md` (Sprint NV-2)
 ### Was geprüft wurde
 - `core/Cargo.toml` — axum-`multipart`-Feature, `tokio-stream`, `tokio fs`+`io-util`+`process`
 - `core/src/vision/mod.rs` — `analyze_with_provider`-Trait-Injection-Refactor (erfüllt NV1-001-Auflage)
-- `core/src/main.rs` — `AppState` um `vision_config`/`braindump_images_dir`/`default_provider_name`; zwei neue Routes
-- `core/src/handlers.rs` — `post_braindump_from_image`-Multipart-Handler, `serve_braindump_image`-Static-Route, `PipelineFrame`-Enum, `run_photo_braindump_pipeline`-Task
+- `core/src/main.rs` — `AppState` um `vision_config`/`spark_images_dir`/`default_provider_name`; zwei neue Routes
+- `core/src/handlers.rs` — `post_spark_from_image`-Multipart-Handler, `serve_spark_image`-Static-Route, `PipelineFrame`-Enum, `run_photo_spark_pipeline`-Task
 - Tests: `cargo test -p nexus-core` 82 passed / 1 ignored / 0 failed (+9 vs NV-1: 4 Mock-Pipeline-vision, 2 safe-filename, 2 Pipeline-End-to-End, 1 Frame-Serialisierung)
 - NV-1-Auflagen-Tracking
 
 ### Findings
 
 #### NV2-001-KOR — ✅ Erledigt (Re-Check qs-20260517-005)
-> `repo::delete_braindump` Z.287-319 liest image_path vor DB-DELETE, löscht Datei best-effort via `tokio::fs::remove_file`, `tracing::warn` bei Fehler. SM-PR-005-Links-Cleanup-Reihenfolge erhalten.
+> `repo::delete_spark` Z.287-319 liest image_path vor DB-DELETE, löscht Datei best-effort via `tokio::fs::remove_file`, `tracing::warn` bei Fehler. SM-PR-005-Links-Cleanup-Reihenfolge erhalten.
 
-#### NV2-001-KOR (ursprünglich) — 🟡 Major — `delete_braindump` löscht Foto-File nicht (Disk-Leak)
+#### NV2-001-KOR (ursprünglich) — 🟡 Major — `delete_spark` löscht Foto-File nicht (Disk-Leak)
 - **Prüfgegenstand:** `core/src/repo.rs:287-288` und `core/src/handlers.rs:189`
-- **Befund:** `delete_braindump` führt `DELETE FROM braindumps WHERE id = ?` aus, ohne vorher `image_path` zu lesen und die zugehörige JPEG aus `braindump_images_dir` zu löschen. Bei jedem Löschen eines Foto-Braindumps verwaist eine Datei im Filesystem — über die Zeit füllt sich das Verzeichnis ohne Bezug zu DB-Einträgen.
-- **Korrekturvorschlag:** Vor dem DELETE per `repo::get_by_id` (oder direkt im Repo) das `image_path` lesen; nach erfolgreichem DB-DELETE die Datei via `tokio::fs::remove_file` löschen (Best-Effort, Fehler als WARN loggen — kein Rollback). Konsequente Sub-Routine-Kapselung in `repo::delete_braindump`, damit auch Background-Cleanup (Obsidian-Sync etc.) den Pfad mitnutzt.
+- **Befund:** `delete_spark` führt `DELETE FROM sparks WHERE id = ?` aus, ohne vorher `image_path` zu lesen und die zugehörige JPEG aus `spark_images_dir` zu löschen. Bei jedem Löschen eines Foto-Sparks verwaist eine Datei im Filesystem — über die Zeit füllt sich das Verzeichnis ohne Bezug zu DB-Einträgen.
+- **Korrekturvorschlag:** Vor dem DELETE per `repo::get_by_id` (oder direkt im Repo) das `image_path` lesen; nach erfolgreichem DB-DELETE die Datei via `tokio::fs::remove_file` löschen (Best-Effort, Fehler als WARN loggen — kein Rollback). Konsequente Sub-Routine-Kapselung in `repo::delete_spark`, damit auch Background-Cleanup (Obsidian-Sync etc.) den Pfad mitnutzt.
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
 
 #### NV2-002-KON — ✅ Erledigt (Re-Check qs-20260517-005)
-> Route umbenannt auf `/braindump/from_image` (Singular). Sprintplan-Wortlaut in 3 Stellen mitgeführt. Doc-Kommentar in `handlers.rs::post_braindump_from_image` (Z.1191) hängt mit altem Plural-Pfad noch hinterher — Lead-Direktarbeit, kein Re-QS.
+> Route umbenannt auf `/spark/from_image` (Singular). Sprintplan-Wortlaut in 3 Stellen mitgeführt. Doc-Kommentar in `handlers.rs::post_spark_from_image` (Z.1191) hängt mit altem Plural-Pfad noch hinterher — Lead-Direktarbeit, kein Re-QS.
 
 #### NV2-002-KON (ursprünglich) — 🟡 Major — Route-Path-Pluralisierung-Drift
-- **Prüfgegenstand:** `core/src/main.rs:213` (`/braindumps/from_image`) vs `core/src/main.rs:171-177, 205` (`/braindump`, `/braindump/{id}`, `/braindump/ideas`, `/braindump/recategorize`, `/braindump/unsorted/count`, `/braindump/{id}/links`)
-- **Befund:** Alle sieben bestehenden Top-Level-Braindump-Routes nutzen Singular `/braindump/...`. Die neue NV-2-Route nutzt Plural `/braindumps/from_image`. Sprintplan schreibt zwar `/braindumps/from_image` vor — Konvention-Check-Lesson „Vorbild gewinnt" bei API-Pfaden ist hier dennoch eindeutig: Top-Level-Resource ist im Repo Singular. (`/projects/{id}/braindumps` Plural ist legitime Sub-Resource-Liste, kein Gegenbeispiel.)
-- **Korrekturvorschlag:** Route auf `/braindump/from_image` umbenennen. Bonus: Sprintplan-Wortlaut in `docs/sprints/nightvision-photo-ocr.md` mitziehen, damit NV-3 + NV-5 (Android-Handoff) den korrigierten Pfad verwenden — Konvention bleibt Single-Source.
+- **Prüfgegenstand:** `core/src/main.rs:213` (`/sparks/from_image`) vs `core/src/main.rs:171-177, 205` (`/spark`, `/spark/{id}`, `/spark/ideas`, `/spark/recategorize`, `/spark/unsorted/count`, `/spark/{id}/links`)
+- **Befund:** Alle sieben bestehenden Top-Level-Spark-Routes nutzen Singular `/spark/...`. Die neue NV-2-Route nutzt Plural `/sparks/from_image`. Sprintplan schreibt zwar `/sparks/from_image` vor — Konvention-Check-Lesson „Vorbild gewinnt" bei API-Pfaden ist hier dennoch eindeutig: Top-Level-Resource ist im Repo Singular. (`/projects/{id}/sparks` Plural ist legitime Sub-Resource-Liste, kein Gegenbeispiel.)
+- **Korrekturvorschlag:** Route auf `/spark/from_image` umbenennen. Bonus: Sprintplan-Wortlaut in `docs/sprints/nightvision-photo-ocr.md` mitziehen, damit NV-3 + NV-5 (Android-Handoff) den korrigierten Pfad verwenden — Konvention bleibt Single-Source.
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
 
 #### NV2-003-SIC — ✅ Erledigt (Re-Check qs-20260517-005)
-> Per-Route `axum::extract::DefaultBodyLimit::max(NV_IMAGE_MAX_BYTES + 64 KiB)`-Layer auf `/braindump/from_image`. `NV_IMAGE_MAX_BYTES` jetzt `pub` für Single-Source. 3-MB-Body-Test optional als Folgepflege (kein Re-Block).
+> Per-Route `axum::extract::DefaultBodyLimit::max(NV_IMAGE_MAX_BYTES + 64 KiB)`-Layer auf `/spark/from_image`. `NV_IMAGE_MAX_BYTES` jetzt `pub` für Single-Source. 3-MB-Body-Test optional als Folgepflege (kein Re-Block).
 
 #### NV2-003-SIC (ursprünglich) — 🟡 Major — `DefaultBodyLimit` für Multipart-Upload nicht angehoben
 - **Prüfgegenstand:** `core/src/handlers.rs:NV_IMAGE_MAX_BYTES` (10 MB) vs axum-0.8-Default-Body-Limit (2 MB)
@@ -48,7 +48,7 @@ Sprint-Ref: `docs/sprints/nightvision-photo-ocr.md` (Sprint NV-2)
 - **Korrektur-Zyklen:** 0/2
 
 ### Erledigte Auflagen aus NV-1
-- ✅ **NV1-001-VOL** Mock-Provider-Pipeline-Test: erfüllt durch `analyze_with_provider`-Refactor + 4 Mock-Pipeline-Tests in `vision/mod.rs::tests` + 2 End-to-End-Pipeline-Tests in `handlers.rs::nv_photo_braindump_tests`.
+- ✅ **NV1-001-VOL** Mock-Provider-Pipeline-Test: erfüllt durch `analyze_with_provider`-Refactor + 4 Mock-Pipeline-Tests in `vision/mod.rs::tests` + 2 End-to-End-Pipeline-Tests in `handlers.rs::nv_photo_spark_tests`.
 - ✅ **NV1-003-COD** `unused_assignments`-allow: behoben — `vision_err` wird nur noch im Fallback-Zweig erzeugt, `#![allow(unused_assignments)]` entfernt.
 - ⏳ **NV1-002-COD** `clean_json`-Duplikat: bleibt offen, war Backlog ohne Re-QS-Pflicht. Kein neues Finding.
 
@@ -61,7 +61,7 @@ Sprint-Ref: `docs/sprints/nightvision-photo-ocr.md` (Sprint NV-2)
 
 ---
 
-## Sprint Nightvision NV-1 — Foto-Braindump-Pipeline (Core-Foundation) — 2026-05-17
+## Sprint Nightvision NV-1 — Foto-Spark-Pipeline (Core-Foundation) — 2026-05-17
 **Status: ⚠️ FREIGABE MIT AUFLAGEN** (0 Blocker / 0 Major / 3 Minor)
 
 Prüfung durchgeführt von: QS — VibeCoding
@@ -69,14 +69,14 @@ WORKLOG-Ref: `~/.claude/projects/-home-kaik-Projekte-Apps-Nexus/worklogs/vc.md` 
 Sprint-Ref: `docs/sprints/nightvision-photo-ocr.md` (Sprint NV-1)
 
 ### Was geprüft wurde
-- Migration `migrations/20260517_001_braindump_image.sql` (ALTER ADD COLUMN `source`, `image_path`)
-- `core/src/models.rs` — `BrainDumpEntry` + `braindump_source` Modul
+- Migration `migrations/20260517_001_spark_image.sql` (ALTER ADD COLUMN `source`, `image_path`)
+- `core/src/models.rs` — `SparkEntry` + `spark_source` Modul
 - `core/src/repo.rs` + `core/src/handlers.rs` — alle 8 FromRow-konsumierenden SELECTs erweitert (Lesson `migration-fallen` — Optional-External-ID via nullable Spalte)
-- `core/src/config.rs` — `VisionConfig` + `braindump_images_dir` + env-bool-Helper
+- `core/src/config.rs` — `VisionConfig` + `spark_images_dir` + env-bool-Helper
 - `core/src/vision/{mod.rs,resize.rs,groq.rs,tesseract.rs}` — neues Modul
 - `core/Cargo.toml` — `image`-Crate + tokio `process`+`io-util` Features
 - `cargo test -p nexus-core` — 73 passed / 1 ignored (Tesseract-Binary) / 0 failed
-- Konvention-Check: Pfad (`~/.nexus/braindump_images/`) und ENV-Naming (`NEXUS_VISION_*`) konsistent zu bestehendem Pattern
+- Konvention-Check: Pfad (`~/.nexus/spark_images/`) und ENV-Naming (`NEXUS_VISION_*`) konsistent zu bestehendem Pattern
 
 ### Findings
 
@@ -131,7 +131,7 @@ WORKLOG-Ref: AUFTRAG #23
 - `handlers.rs:1352-1364` Test-Setup-CREATE-TABLE wurde um `classification_status TEXT NOT NULL DEFAULT 'done'` + `nexus_inbox_id TEXT` (NULLable) ergänzt → identisch mit Migration-Resultat. Tests laufen ohne Migration-Layer (in-memory CREATE TABLE direkt) — Pattern war pre-existing, durch das Schema-Match keine Regression.
 - Indizes fehlen im Test-Setup. Kein Finding: Indizes sind reine Performance-Optimierung, Tests prüfen Korrektheit, nicht Query-Plan.
 
-**OB-A3. serde-Kompatibilität bei BrainDumpEntry** — PASS
+**OB-A3. serde-Kompatibilität bei SparkEntry** — PASS
 - `classification_status: String` mit `#[serde(default = "default_classification_status")]` → Deserialisierung von Pre-Migration-JSON-Payloads ohne dieses Feld liefert `"done"` (semantisch korrekt, da bestehende Rows synchron klassifiziert wurden).
 - `nexus_inbox_id: Option<String>` mit `#[serde(default)]` → fehlend = None (Option-Default). Korrekt.
 
@@ -437,7 +437,7 @@ Handler-Code + Routing + Auth-Guard sind korrekt und laufzeit-verifiziert. **Abe
 - Browser-Test ohne Tauri: setup-status kann geladen werden (public), pair/uri schlägt mit leerem Token fehl (erwartet).
 
 **E7. initDashboard()-Kapselung** — PASS
-- Definiert Z.848–851, ruft `checkConnection(); refreshBraindumps();`.
+- Definiert Z.848–851, ruft `checkConnection(); refreshSparks();`.
 - Wird aufgerufen aus:
   - Onboarding-Skip-Pfad (Z.904)
   - Finish-Button-Click (Z.1088)
@@ -748,7 +748,7 @@ Prüfung durchgeführt von: Tuvok (QS VibeCoding) — kalt, ohne Vor-Session-Kon
 - **Prüfgegenstand:** Eigene `NexusApiClient`-Instanz in `PairScreen.completePairing`
 - **Spezialist:** Android-Layer
 - **Befund:** `PairScreen.kt:50-53` erzeugt eine neue `NexusApiClient(connectionSettings)`-Instanz, ruft `pairHandshake()` und schließt sie sofort wieder. MainActivity hält bereits einen Singleton-Client (Z.82). Da `NexusApiClient.baseUrl`/`token` Property-Getter sind, die direkt aus `settings` lesen (`get() = settings.coreUrl`), liest auch der Singleton stets frische Werte — eine separate Instanz ist nicht nötig. Side-Effect: zweiter OkHttp-Pool-Allocate, marginaler Overhead. Inkonsistenz zur sonstigen Architektur.
-- **Korrekturvorschlag:** Singleton als `apiClient: NexusApiClient` durch das Composable durchreichen (analog zu `BrainDumpScreen`/`TasksScreen` in MainActivity). Code wird gleichzeitig kürzer.
+- **Korrekturvorschlag:** Singleton als `apiClient: NexusApiClient` durch das Composable durchreichen (analog zu `SparkScreen`/`TasksScreen` in MainActivity). Code wird gleichzeitig kürzer.
 - **Status:** offen (Backlog)
 - **Korrektur-Zyklen:** 0/2
 
@@ -1172,7 +1172,7 @@ Geprüft: `core/src/config.rs`, `core/src/db.rs`, `core/src/main.rs`, `core/src/
 - **Kategorie:** Vollständigkeit
 - **Prüfgegenstand:** `core/src/db.rs::migrate_legacy_cwd_db`
 - **Erstellt von:** QS — VibeCoding
-- **Befund:** Eine Datenmigrations-Funktion mit `rename`/`copy` von User-Daten ist eingeführt — und hat keine Unit-Tests. Live-Migration heute auf einem System ist verifiziert (28 BrainDumps + 225 XP), aber das deckt nur den Happy-Path ab. Vier Verzweigungen sind ungetestet: (a) target-existiert-no-op, (b) legacy-fehlt-no-op, (c) parent-create_dir_all-fail, (d) rename-fail-mit-copy-fallback. Bei Bugfix in 6 Monaten könnte ein Refactor stille Regression einführen, weil die Funktion sicher aussieht aber kein Sicherheitsnetz hat.
+- **Befund:** Eine Datenmigrations-Funktion mit `rename`/`copy` von User-Daten ist eingeführt — und hat keine Unit-Tests. Live-Migration heute auf einem System ist verifiziert (28 Sparks + 225 XP), aber das deckt nur den Happy-Path ab. Vier Verzweigungen sind ungetestet: (a) target-existiert-no-op, (b) legacy-fehlt-no-op, (c) parent-create_dir_all-fail, (d) rename-fail-mit-copy-fallback. Bei Bugfix in 6 Monaten könnte ein Refactor stille Regression einführen, weil die Funktion sicher aussieht aber kein Sicherheitsnetz hat.
 - **Korrekturvorschlag:** `#[cfg(test)] mod migration_tests` mit `tempfile`-Crate. Vier Cases via `tempdir`-Setup: target-exists, legacy-missing, fresh-rename, cross-mount-fallback (letzteres simulierbar via OS-Mount-Trick oder skip mit Comment).
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
@@ -1192,7 +1192,7 @@ Geprüft: `core/src/config.rs`, `core/src/db.rs`, `core/src/main.rs`, `core/src/
 - **Kategorie:** Code-Qualität
 - **Prüfgegenstand:** `core/src/db.rs::migrate_legacy_cwd_db`
 - **Erstellt von:** QS — VibeCoding
-- **Befund:** Die Funktion migriert nur `./nexus.db`. Bei Cleanup-Audit heute wurden 6 verstreute `nexus.db`-Files im Repo gefunden (CWD-relative Bug-Spuren). Die Migration kümmert sich nur um eine Quelle. Andere stranded Files (z.B. `desktop/src-tauri/nexus.db` mit den heutigen 3 BrainDumps) bleiben liegen.
+- **Befund:** Die Funktion migriert nur `./nexus.db`. Bei Cleanup-Audit heute wurden 6 verstreute `nexus.db`-Files im Repo gefunden (CWD-relative Bug-Spuren). Die Migration kümmert sich nur um eine Quelle. Andere stranded Files (z.B. `desktop/src-tauri/nexus.db` mit den heutigen 3 Sparks) bleiben liegen.
 - **Korrekturvorschlag:** Ein Hinweis-Log nach der Migration, z.B. auf `tracing::info!`-Ebene: „Falls weitere `nexus.db`-Dateien aus alten Builds existieren (typisch in `desktop/src-tauri/`), diese manuell sichten und löschen." Auf Production-Linux-Installationen unrelevant (User hat keine zwei CWDs), aber im Dev-Repo nützlich. Backlog.
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
@@ -1204,7 +1204,7 @@ Geprüft: `core/src/config.rs`, `core/src/db.rs`, `core/src/main.rs`, `core/src/
 - **Permissions Unix 0o600**: nach connect, analog zu `keys.json` und `.nexus_token`. Konsistent mit bestehenden Patterns.
 - **`migrate_legacy_cwd_db`-Logik** (Code-Read, ungetestet — siehe N-022): early-return-Reihenfolge target.exists / legacy.exists korrekt; rename-vor-copy ist atomic; Fehlerbehandlung mit warn statt panic ist defensiv.
 - **`init_in_memory`** Test-Helper: `#[cfg(test)]`-gated, klare Trennung zu Production-init_pool.
-- **Live-Migration**: 28 BrainDumps + 225 XP auf echtem System rüber, source-File entfernt, Permissions 0o600 — keine Daten verloren.
+- **Live-Migration**: 28 Sparks + 225 XP auf echtem System rüber, source-File entfernt, Permissions 0o600 — keine Daten verloren.
 - **Plattform-Check**: Phase-0-Windows-Portability-Status aus HANDOVER konsistent eingehalten (`dirs::home_dir`, `#[cfg(unix)]` für Permissions).
 - **Cargo**: `clippy --all-targets -- -D warnings` clean, `test --release` 5/5 grün inkl. Idempotenz-Test über neuen Test-Helper.
 
@@ -1345,7 +1345,7 @@ Geprüft: JJ-A1 (`desktop/src/index.html` — Banner + Refresh-Style + api-Integ
 ### Was geprüft und OK befunden wurde
 
 - **JJ-A1 Banner-Pattern**: globaler DOM-Slot, CSS-Variants (.error/.hidden), zwei Helper-Funktionen, klar wiederverwendbar.
-- **JJ-A1 Refresh-Style**: `.btn-ghost` → `.btn-primary` ist konsistent mit allen anderen Refresh-Buttons im Dashboard (Braindumps/Projects/Achievements).
+- **JJ-A1 Refresh-Style**: `.btn-ghost` → `.btn-primary` ist konsistent mit allen anderen Refresh-Buttons im Dashboard (Sparks/Projects/Achievements).
 - **JJ-A1 Loading-State**: `taskRefreshBtn.disabled = true` + Text "Lade…" + finally-Block für Reset — defensiv geschrieben (auch bei Exception zurückgesetzt).
 - **JJ-A2 applyAck**: pure function, internal scope, data-class.copy idiomatisch, separat testbar.
 - **JJ-A2 Test-Setup**: junit 4.13.2 als testImplementation, Test-Verzeichnis korrekt unter `src/test/java/`, 3 Tests decken Happy-Path/Immutability/Overwrite.
@@ -1466,7 +1466,7 @@ Beobachtungen ohne Findings-Status:
 | PC-A-MAN-1 | Settings öffnen → AppearanceCard sichtbar mit 3-Segment-Switcher; Hell wählen → sofortiger Recompose, Indigo-Akzent, weißer Background | Admin auf Pixel |
 | PC-A-MAN-2 | App schließen + neu öffnen → Theme-Wahl persistiert | Admin auf Pixel |
 | PC-A-MAN-3 | System-Theme wechseln, App auf "System" → folgt automatisch | Admin auf Pixel |
-| PC-A-MAN-4 | Footer-Strip "Powered by VibeCode Solutions · NEXUS v0.1.0" über NavigationBar auf allen 7 Routes (welcome, pair, braindump, history, tasks, projects, settings) sichtbar | Admin auf Pixel |
+| PC-A-MAN-4 | Footer-Strip "Powered by VibeCode Solutions · NEXUS v0.1.0" über NavigationBar auf allen 7 Routes (welcome, pair, spark, history, tasks, projects, settings) sichtbar | Admin auf Pixel |
 | PC-A-MAN-5 | `cd android && ./gradlew assembleDebug` grün, kein neuer Lint-Fail | Final-Gate |
 
 ### Verdikt
@@ -1551,7 +1551,7 @@ Iteration 1 → grün. Keine Findings, keine Korrektur-Zyklen über alle drei Ph
 - **PC-A-MAN-1 (AppearanceCard + Recompose)**: Settings → "Hell" tap → sofortiger Recompose, weißer Background, Indigo-Akzent ✅
 - **PC-A-MAN-2 (Persistenz)**: `am force-stop` + `am start` → Hell-Theme bleibt erhalten ✅
 - **PC-A-MAN-3 (System-Theme-Reaktion)**: nicht direkt getestet, durch ColorScheme-Wechsel beim Manuell-Switch implizit verifiziert (System-Mode lief vorher, OS war Dark, App war Dark)
-- **PC-A-MAN-4 (Footer auf 7 Routes)**: BrainDump + Settings live geprüft, beide zeigen Footer korrekt nach Fix
+- **PC-A-MAN-4 (Footer auf 7 Routes)**: Spark + Settings live geprüft, beide zeigen Footer korrekt nach Fix
 - **PC-A-MAN-5 (gradle assembleDebug)**: 2× grün (initial + nach Fix)
 - **Connection**: Pixel ↔ Core (`192.168.178.70:7777`) ping 21ms, `/health` 200, `/api/setup-status` paired+ollama_reachable
 
@@ -1574,7 +1574,7 @@ Iteration 2 → grün, 1 Major in 1 Korrektur-Zyklus behoben.
 
 Bevor ich den Plan beurteile, habe ich an den genannten Code-Touchpoints stichprobenartig den IST-Stand geprüft:
 
-- **Migrations-Konvention:** `core/migrations/` enthält `20260412_001_braindump.sql`, `20260413_001_projects.sql`, `20260414_001_tasks.sql`, `20260415_001_gamification.sql`, `20260428_001_diag_reports.sql`. Format: `YYYYMMDD_NNN_name.sql`. **Plan-Vorschlag `006_links.sql` ist falsch** und würde von sqlx-migrate ggf. nicht in der erwarteten Reihenfolge ausgeführt.
+- **Migrations-Konvention:** `core/migrations/` enthält `20260412_001_spark.sql`, `20260413_001_projects.sql`, `20260414_001_tasks.sql`, `20260415_001_gamification.sql`, `20260428_001_diag_reports.sql`. Format: `YYYYMMDD_NNN_name.sql`. **Plan-Vorschlag `006_links.sql` ist falsch** und würde von sqlx-migrate ggf. nicht in der erwarteten Reihenfolge ausgeführt.
 - **`openSettings()`/`closeSettings()`:** existieren in `desktop/src/index.html` Z. 987-993. Static funktionsfähig. DSK-3-Bug liegt nicht in fehlender Funktion, sondern in (a) altem Bundle, (b) Crash davor, oder (c) Modal-CSS-Issue. Plan-Anweisung "debuggen" ist zu offen.
 - **LLM-Trait `LlmProvider`:** definiert in `core/src/llm/mod.rs` mit `categorize_and_summarize` + `suggest_projects`. **`suggest_projects` existiert bereits** und ist in 6 Provider-Files implementiert (claude, gemini, ollama, openai_compatible, zai, plus DummyProvider mit Default). Phase-B-F1 Auto-Trigger kann auf existierende Funktion aufbauen — Plan macht das nicht explizit.
 - **6 Provider-Files** (`claude.rs`, `gemini.rs`, `ollama.rs`, `openai_compatible.rs`, `zai.rs`, `mod.rs`) — neue Trait-Methode `extract_links` würde 6× implementiert werden müssen, außer Default-Impl im Trait.
@@ -1600,17 +1600,17 @@ Bevor ich den Plan beurteile, habe ich an den genannten Code-Touchpoints stichpr
 - **Befund:** Plan F-DSK-1 sagt nur "debuggen". Funktion existiert (Z. 987). Wahrscheinlichste Ursachen: (1) User hat altes Tauri-Bundle ohne PC-Updates, (2) JS-Crash blockiert Click-Handler, (3) Modal-z-index hinter app-shell.
 - **Korrekturvorschlag:** Plan F-DSK-1 mit Debug-Reihenfolge ergänzen: erst `tauri build --debug` neu, dann Bundle-Reinstall, dann Webview-DevTools-Console öffnen (rechtsklick im Tauri-Window → Inspect), bei JS-Error Stacktrace lesen.
 
-#### SM-PR-004 — Race-Condition extract_links bei schnellen BrainDumps
+#### SM-PR-004 — Race-Condition extract_links bei schnellen Sparks
 - **Schweregrad:** 🟡 Major
 - **Kategorie:** Korrektheit
-- **Befund:** Plan B-5 startet `extract_links` direkt nach POST /braindump als async-Task. Bei 3 schnellen BrainDumps in Folge laufen 3 LLM-Calls parallel — keiner sieht die anderen 2 als Kontext, race-bedingte unvollständige Verknüpfung.
+- **Befund:** Plan B-5 startet `extract_links` direkt nach POST /spark als async-Task. Bei 3 schnellen Sparks in Folge laufen 3 LLM-Calls parallel — keiner sieht die anderen 2 als Kontext, race-bedingte unvollständige Verknüpfung.
 - **Korrekturvorschlag:** Statt POST-Hook: `extract_links` läuft **im Background-Recategorize-Task** (sequentiell, alle 5min). Das vereinfacht den POST-Pfad, vermeidet Race und entkoppelt LLM-Latenz vom User-Roundtrip. Wenn Sofort-Verknüpfung erwünscht: explizit dokumentieren als "Best-Effort" und `Mutex<Vec<LinkSuggestion>>` als Cache nutzen.
 
 #### SM-PR-005 — Polymorphe Links ohne FK → Orphan-Records bei Delete
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Konsistenz (Daten)
-- **Befund:** Plan-Schema `links(source_type, source_id, target_type, target_id, ...)` hat keine FK (polymorph nicht möglich auf einer Tabelle). Wenn ein BrainDump gelöscht wird (existiert via `DELETE /braindump/{id}` heute? — bitte prüfen), bleiben Link-Records mit dangling source_id liegen.
-- **Korrekturvorschlag:** Plan-Phase B explizit ergänzen: bei `delete_braindump` und `delete_project` werden zugehörige Links per Application-Logic mitgelöscht (`DELETE FROM links WHERE source_type='braindump' AND source_id=$1 OR target_type='braindump' AND target_id=$1`). Optional: Background-Cleanup-Task für orphans, falls Delete-Pfad via DB-Direktzugriff genutzt wird.
+- **Befund:** Plan-Schema `links(source_type, source_id, target_type, target_id, ...)` hat keine FK (polymorph nicht möglich auf einer Tabelle). Wenn ein Spark gelöscht wird (existiert via `DELETE /spark/{id}` heute? — bitte prüfen), bleiben Link-Records mit dangling source_id liegen.
+- **Korrekturvorschlag:** Plan-Phase B explizit ergänzen: bei `delete_spark` und `delete_project` werden zugehörige Links per Application-Logic mitgelöscht (`DELETE FROM links WHERE source_type='spark' AND source_id=$1 OR target_type='spark' AND target_id=$1`). Optional: Background-Cleanup-Task für orphans, falls Delete-Pfad via DB-Direktzugriff genutzt wird.
 
 #### SM-PR-006 — Lokalisierungs-Strategie Backend
 - **Schweregrad:** 🟢 Minor
@@ -1651,7 +1651,7 @@ Bevor ich den Plan beurteile, habe ich an den genannten Code-Touchpoints stichpr
 #### SM-PR-012 — Lokalisierungs-Liste F-Phase fehlt explizit
 - **Schweregrad:** 🟡 Major
 - **Kategorie:** Vollständigkeit
-- **Befund:** Plan listet Stichproben (`BrainDumps`, `Refresh`, ...) aber gibt keine vollständige Liste. Implementer könnte Strings übersehen — z.B. Achievement-Namen, Wizard-Texte, Snackbar-Messages, error-Bodies, Diagnose-Texte.
+- **Befund:** Plan listet Stichproben (`Sparks`, `Refresh`, ...) aber gibt keine vollständige Liste. Implementer könnte Strings übersehen — z.B. Achievement-Namen, Wizard-Texte, Snackbar-Messages, error-Bodies, Diagnose-Texte.
 - **Korrekturvorschlag:** Plan-Phase F-DSK-2/F-AND-2 explizit als ersten Schritt: `grep -nE '"[A-Z][a-z]+ [a-z]+|>[A-Z][a-z]+'` über `desktop/src/index.html` und `android/app/src/main/java/com/vibecode/nexus/ui/**/*.kt` → vollständige Stringliste in `docs/i18n-strings-de.md` als Working-Doc, dann übersetzen, dann ersetzen. Verifikation per Re-Grep auf englische Patterns nach Übersetzung.
 
 ### Was am Plan OK ist
@@ -1694,7 +1694,7 @@ Nach Plan-Patch durch Hauptsession: Re-Review (Diff-Fokus auf SM-PR-001/002/004/
 |---|---|---|
 | SM-PR-001 | Migration-Naming `20260501_001_links.sql` (Z. 65) + `20260501_002_project_suggestions.sql` (Z. 75) — konsistent mit existing `YYYYMMDD_NNN_name.sql` | ✅ |
 | SM-PR-002 | Erläuterungs-Block (Z. 61) + B-4 (Z. 69) explizit "Default-Impl im Trait `Ok(Vec::new())`, Override opt-in in claude.rs+ollama.rs Pflicht, andere optional" | ✅ |
-| SM-PR-004 | Erläuterungs-Block (Z. 63) + Phase B-5 gestrichen, B-6/6a/6b Background-Task (sequenziell, env-konfigurierbar `NEXUS_LINK_CONFIDENCE_MIN`/`NEXUS_AUTO_PROJECT_*`) + Tuvok-Gate-B "POST-Response unverändert dünn" + Final-Live-Test "Echo-BrainDump → Response unverändert dünn (kein suggested_links)" | ✅ |
+| SM-PR-004 | Erläuterungs-Block (Z. 63) + Phase B-5 gestrichen, B-6/6a/6b Background-Task (sequenziell, env-konfigurierbar `NEXUS_LINK_CONFIDENCE_MIN`/`NEXUS_AUTO_PROJECT_*`) + Tuvok-Gate-B "POST-Response unverändert dünn" + Final-Live-Test "Echo-Spark → Response unverändert dünn (kein suggested_links)" | ✅ |
 | SM-PR-010 | Tuvok-Gate F Desktop-Strategie (Z. 56): `cargo tauri build` + Bundle-Frontend-grep für JS-Fixes (`cycleTheme`/`app-footer`/`openSettings`) + Re-Grep für englische UI-Strings + Visual-Test als Admin-Auflage gelabelt | ✅ |
 | SM-PR-012 | Erläuterungs-Block (Z. 45) + F-0 als erste Aktion (Z. 47) + F-AND-2 verweist auf `docs/i18n-strings-de.md` als Single-Source (Z. 52) | ✅ |
 
@@ -1760,7 +1760,7 @@ Iteration 2 → grün. Loop-Vermeidung greift: keine neuen Findings, alte erledi
 
 - APK reinstalliert auf Pixel (RFCX20J1PEX) ✅
 - App-Start clean, kein Crash, Footer "Powered by VibeCode Solutions · NEXUS v0.1.0" weiter sichtbar ✅
-- Bottom-Nav zeigt deutsch: BrainDump / Verlauf / Aufgaben / Projekte / Einstellungen ✅
+- Bottom-Nav zeigt deutsch: Spark / Verlauf / Aufgaben / Projekte / Einstellungen ✅
 - **Aufgaben-Tab geöffnet (Live-Test):** Top-Header zeigt **"Tasks"** in Indigo (englisch trotz deutschem Bottom-Nav-Label) — bestätigt Re-Grep-Befund ❌
 - **Status- und Priority-Marker in Task-Liste:** "open" / "done" / "medium" / "low" / "high" werden als Roh-Strings angezeigt — `task.status` und `task.priority` Z. 329/334 in TasksScreen.kt direkt gerendert, kein Mapping. ❌
 
@@ -1769,7 +1769,7 @@ Iteration 2 → grün. Loop-Vermeidung greift: keine neuen Findings, alte erledi
 #### SM-F-1 — Desktop "All Categories" trotz Übersetzung weiterhin englisch
 - **Schweregrad:** 🟡 Major
 - **Kategorie:** Vollständigkeit
-- **Befund:** `desktop/src/index.html` Z. 678 baut die Category-Dropdown dynamisch: `sel.innerHTML = '<option value="">All Categories</option>' + …`. Implementer hat den HTML-Source-Default Z. 428 zwar auf "Alle Kategorien" übersetzt, aber dieser JS-Path überschreibt das beim ersten `loadBraindumps()`-Call. Live-User sieht "All Categories".
+- **Befund:** `desktop/src/index.html` Z. 678 baut die Category-Dropdown dynamisch: `sel.innerHTML = '<option value="">All Categories</option>' + …`. Implementer hat den HTML-Source-Default Z. 428 zwar auf "Alle Kategorien" übersetzt, aber dieser JS-Path überschreibt das beim ersten `loadSparks()`-Call. Live-User sieht "All Categories".
 - **Korrektur:** `'<option value="">All Categories</option>'` → `'<option value="">Alle Kategorien</option>'`.
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
@@ -1802,7 +1802,7 @@ Iteration 2 → grün. Loop-Vermeidung greift: keine neuen Findings, alte erledi
 ### Was geprüft und OK befunden wurde
 
 - ✅ Footer "Powered by VibeCode Solutions · NEXUS v0.1.0" sichtbar live (PC-LIVE-1-Fix hält über Sprint-Grenze).
-- ✅ Bottom-Nav-Labels deutsch (BrainDump / Verlauf / Aufgaben / Projekte / Einstellungen) live verifiziert.
+- ✅ Bottom-Nav-Labels deutsch (Spark / Verlauf / Aufgaben / Projekte / Einstellungen) live verifiziert.
 - ✅ SettingsScreen scrollbar — Code-Diff sauber (`Modifier.verticalScroll(rememberScrollState())` korrekt eingebaut Z. 153 etwa).
 - ✅ Theme-Engine intakt (NEXUS-Titel in Indigo, App nicht abgestürzt).
 - ✅ Core `cargo check` grün, gradle `assembleDebug` grün.
@@ -1902,7 +1902,7 @@ GEÄNDERT:
 - `core/src/llm/claude.rs` (+39 LoC) — `extract_links` Override
 - `core/src/llm/ollama.rs` (+26 LoC) — `extract_links` Override mit `extract_json_array`-Helper
 - `core/src/main.rs` (+67 LoC) — 7 Routes hinter `require_token`, Background-Task-Erweiterung
-- `core/src/repo.rs` (+7 LoC) — `links::delete_for_node`-Cascade in `delete_project`+`delete_braindump`
+- `core/src/repo.rs` (+7 LoC) — `links::delete_for_node`-Cascade in `delete_project`+`delete_spark`
 
 ### Build-Verifikation
 
@@ -1914,18 +1914,18 @@ GEÄNDERT:
 
 ### Findings
 
-#### SM-B-001-COD — `extract_links_for_recent` re-queriert BrainDumps mit 0 LLM-Treffern endlos
+#### SM-B-001-COD — `extract_links_for_recent` re-queriert Sparks mit 0 LLM-Treffern endlos
 - **Schweregrad:** 🟡 Major
 - **Kategorie:** Code-Qualität / Performance / Wartbarkeit
-- **Befund:** Der Filter in `handlers.rs::extract_links_for_recent` lädt Kandidaten via `WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.source_type='braindump' AND l.source_id=b.id AND l.created_by='llm')`. Wenn der LLM-Provider für einen BrainDump 0 Suggestions zurückliefert (kein Match, oder alle unter `NEXUS_LINK_CONFIDENCE_MIN`), wird **kein** Link mit `source_id=bd.id, created_by='llm'` geschrieben. Ergo bleibt der BrainDump im NEXT-Cycle (5 min später) wieder Kandidat → weiterer LLM-Call → wieder 0 Treffer → endlos. Bei Claude-API mit ~$0.003/Call und Default-Limit 10 BrainDumps/Cycle × 12 Cycles/h fallen **echte Kosten** für inhaltlich-isolierte BrainDumps an, ohne dass je ein Fortschritt entsteht.
-- **Korrekturvorschlag:** Sentinel-Marker einführen: nach jedem `extract_links`-Aufruf (auch bei `Ok(suggestions)` mit `suggestions.is_empty()` ODER nach Confidence-Filter mit 0 Hits) einen "Marker-Link" auf den BrainDump selbst schreiben (`source_type='braindump', source_id=bd.id, target_type='braindump', target_id=bd.id, relation='noop-marker', created_by='llm', confidence=0.0`). Filter passt automatisch — der NOT-EXISTS-Check greift beim nächsten Cycle. Alternativ separate Tabelle `link_extraction_log(source_id, attempted_at)` mit Cooldown-Filter (sauberer, aber Migration nötig — als Bookmark fürs Vault-Sprint vorzusehen). Quick-Fix-Empfehlung: Sentinel.
+- **Befund:** Der Filter in `handlers.rs::extract_links_for_recent` lädt Kandidaten via `WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.source_type='spark' AND l.source_id=b.id AND l.created_by='llm')`. Wenn der LLM-Provider für einen Spark 0 Suggestions zurückliefert (kein Match, oder alle unter `NEXUS_LINK_CONFIDENCE_MIN`), wird **kein** Link mit `source_id=bd.id, created_by='llm'` geschrieben. Ergo bleibt der Spark im NEXT-Cycle (5 min später) wieder Kandidat → weiterer LLM-Call → wieder 0 Treffer → endlos. Bei Claude-API mit ~$0.003/Call und Default-Limit 10 Sparks/Cycle × 12 Cycles/h fallen **echte Kosten** für inhaltlich-isolierte Sparks an, ohne dass je ein Fortschritt entsteht.
+- **Korrekturvorschlag:** Sentinel-Marker einführen: nach jedem `extract_links`-Aufruf (auch bei `Ok(suggestions)` mit `suggestions.is_empty()` ODER nach Confidence-Filter mit 0 Hits) einen "Marker-Link" auf den Spark selbst schreiben (`source_type='spark', source_id=bd.id, target_type='spark', target_id=bd.id, relation='noop-marker', created_by='llm', confidence=0.0`). Filter passt automatisch — der NOT-EXISTS-Check greift beim nächsten Cycle. Alternativ separate Tabelle `link_extraction_log(source_id, attempted_at)` mit Cooldown-Filter (sauberer, aber Migration nötig — als Bookmark fürs Vault-Sprint vorzusehen). Quick-Fix-Empfehlung: Sentinel.
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
 
 #### SM-B-002-SIC — `LinkInput.created_by` ist client-controllable bei POST /links
 - **Schweregrad:** 🟡 Major
 - **Kategorie:** Sicherheit / Konsistenz
-- **Befund:** `links.rs::LinkInput.created_by` deserialisiert vom Client mit Default `"user"`, aber **wird vom Server nicht überschrieben** in `handlers.rs::create_link`. Ein User kann per `curl -d '{"source_type":"braindump","source_id":"X",...,"created_by":"llm"}'` einen Link mit `created_by="llm"` erzeugen. **Funktionsverhalten-Konsequenz**: das Filter-Predicate `WHERE l.created_by='llm'` in `extract_links_for_recent` (siehe SM-B-001) überspringt diesen BrainDump fortan permanent — Background-Task wird durch User-Aktion stillgelegt. Single-User-System mit Bearer-Auth, also kein klassischer Privilege-Drift, aber Audit-Trail sagt "vom LLM erzeugt" obwohl manuell. SM-PR-Auflage SM-PR-002 hat `created_by` als Indikator etabliert — die Endpoint-Semantik widerspricht.
+- **Befund:** `links.rs::LinkInput.created_by` deserialisiert vom Client mit Default `"user"`, aber **wird vom Server nicht überschrieben** in `handlers.rs::create_link`. Ein User kann per `curl -d '{"source_type":"spark","source_id":"X",...,"created_by":"llm"}'` einen Link mit `created_by="llm"` erzeugen. **Funktionsverhalten-Konsequenz**: das Filter-Predicate `WHERE l.created_by='llm'` in `extract_links_for_recent` (siehe SM-B-001) überspringt diesen Spark fortan permanent — Background-Task wird durch User-Aktion stillgelegt. Single-User-System mit Bearer-Auth, also kein klassischer Privilege-Drift, aber Audit-Trail sagt "vom LLM erzeugt" obwohl manuell. SM-PR-Auflage SM-PR-002 hat `created_by` als Indikator etabliert — die Endpoint-Semantik widerspricht.
 - **Korrekturvorschlag:** In `handlers.rs::create_link` nach Validierung explizit `let mut input = input; input.created_by = "user".to_string();` setzen, **bevor** `links::insert` aufgerufen wird. Damit ist `created_by="llm"` ausschließlich vom Background-Task setzbar. Test: einen Inline-Test in `handlers.rs` der einen direkten POST mit `created_by="llm"` simuliert und prüft dass die DB-Reihe `created_by="user"` enthält. Optional zusätzlich: validate_node_type-style `validate_created_by(&str)` für künftige Werte ('user' | 'llm').
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
@@ -1939,7 +1939,7 @@ GEÄNDERT:
   - `suggest_auto_projects` mit fixed-prompt-fixture: 2 Tests → ❌ **fehlen komplett**.
   Beide ungetesteten Funktionen sind nicht-trivial: env-konfigurierbare Confidence-Schwellen, Filter-Branching (auto-create vs. suggestion vs. drop), JSON-Parsing-Branches, sequential-Loops mit `let _ =`-Geschluck. Regression-Risiko bei Confidence-Schwellen-Refactors hoch — ein einfacher `>` statt `>=` ist nicht ohne Test detektierbar.
 - **Korrekturvorschlag:** Mindest-Coverage:
-  1. **`extract_links_for_recent` × 3**: (a) Mock-LLM liefert 2 Suggestions mit Confidence 0.9/0.6, `NEXUS_LINK_CONFIDENCE_MIN=0.7` → genau 1 Link in DB, `links_created=1`. (b) Mock-LLM liefert `Err(...)` → `failed=1`, kein Link in DB. (c) Pool ohne BrainDumps → `processed=0`, kein DB-Schreibversuch. Mock-Provider lässt sich via `struct MockLlm { suggestions: Vec<LinkSuggestion> }` + `LlmProvider`-Impl bauen — `categorize_and_summarize`/`suggest_projects` Default-`unimplemented!()` wenn nicht aufgerufen.
+  1. **`extract_links_for_recent` × 3**: (a) Mock-LLM liefert 2 Suggestions mit Confidence 0.9/0.6, `NEXUS_LINK_CONFIDENCE_MIN=0.7` → genau 1 Link in DB, `links_created=1`. (b) Mock-LLM liefert `Err(...)` → `failed=1`, kein Link in DB. (c) Pool ohne Sparks → `processed=0`, kein DB-Schreibversuch. Mock-Provider lässt sich via `struct MockLlm { suggestions: Vec<LinkSuggestion> }` + `LlmProvider`-Impl bauen — `categorize_and_summarize`/`suggest_projects` Default-`unimplemented!()` wenn nicht aufgerufen.
   2. **`suggest_auto_projects` × 2**: (a) Mock-LLM liefert 1 Proposal mit confidence=0.85 → `projects`-Reihe + 3 `assigned`-Reihen + `auto_created=1`. (b) Mock-LLM liefert 1 Proposal mit confidence=0.65 → `project_suggestions`-Reihe + `suggestions_added=1`, **keine** Project-Reihe.
   Tests können als Inline-Module in `handlers.rs` (analog zu `recategorize_tests` Z. 944) oder neu unter `core/tests/auto_project_test.rs`. Pfad-Detail Tuvok offen — wichtig ist der Code-Abdeckungs-Inhalt.
 - **Status:** offen
@@ -1959,7 +1959,7 @@ GEÄNDERT:
 #### SM-B-005-KOR — Race-Window in `repo::delete_project` zwischen TX-Commit und Link-Cleanup
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Korrektheit
-- **Befund:** `repo.rs` Z. 63 läuft `tx.commit()` zuerst, dann `links::delete_for_node(pool, "project", id)`. In dem Fenster zwischen den zwei Operationen (Single-User-System, aber Background-Task läuft parallel + Ktor-Client kann `GET /projects/{id}/links` rufen) ist das Project bereits gelöscht, Links existieren noch. Antwort wäre eine Linkliste zu einem nicht-existenten Project. Daten benignen Charakter (Frontend würde Detail-View nicht öffnen weil Project fehlt), aber Inkonsistenz. `delete_braindump` hat dieselbe Charakteristik (kein TX überhaupt).
+- **Befund:** `repo.rs` Z. 63 läuft `tx.commit()` zuerst, dann `links::delete_for_node(pool, "project", id)`. In dem Fenster zwischen den zwei Operationen (Single-User-System, aber Background-Task läuft parallel + Ktor-Client kann `GET /projects/{id}/links` rufen) ist das Project bereits gelöscht, Links existieren noch. Antwort wäre eine Linkliste zu einem nicht-existenten Project. Daten benignen Charakter (Frontend würde Detail-View nicht öffnen weil Project fehlt), aber Inkonsistenz. `delete_spark` hat dieselbe Charakteristik (kein TX überhaupt).
 - **Korrekturvorschlag:** Option A — Cleanup VOR `tx.commit()` einbauen, im selben TX. Aktuell schwierig weil `delete_for_node` `&SqlitePool` erwartet, nicht `&mut Transaction`. Refactoring: `delete_for_node_in_tx(tx: &mut Transaction)` als parallele Funktion in `links.rs`. Option B — Background-Cleanup-Task für Orphans (existiert noch nicht). Option C — als bekannten Edge-Case dokumentieren und im docs/LINKS.md erwähnen, akzeptieren. Empfehlung: **Option C** für Iter-1 (echtes Risiko gering, Refactoring scope-creepig), Bookmark für Vault-Sprint.
 - **Status:** offen, akzeptabel als Bookmark
 - **Korrektur-Zyklen:** 0/2
@@ -1967,17 +1967,17 @@ GEÄNDERT:
 #### SM-B-006-KOR — `accept_project_suggestion` Counter-Drift bei silent assign-Failures
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Korrektheit
-- **Befund:** `handlers.rs::accept_project_suggestion` ruft in einer for-Schleife `let _ = repo::assign_braindump_to_project(...)` und antwortet mit `linked_braindumps: bd_ids.len()`. Wenn ein einziger `assign`-Call fehlschlägt (BrainDump-ID existiert nicht mehr, oder DB-Constraint), wird der Fehler geschluckt, der Counter ist trotzdem `bd_ids.len()`. Frontend zeigt "5 Notizen verknüpft" obwohl nur 3 echte assigns durchliefen.
+- **Befund:** `handlers.rs::accept_project_suggestion` ruft in einer for-Schleife `let _ = repo::assign_spark_to_project(...)` und antwortet mit `linked_sparks: bd_ids.len()`. Wenn ein einziger `assign`-Call fehlschlägt (Spark-ID existiert nicht mehr, oder DB-Constraint), wird der Fehler geschluckt, der Counter ist trotzdem `bd_ids.len()`. Frontend zeigt "5 Notizen verknüpft" obwohl nur 3 echte assigns durchliefen.
 - **Korrekturvorschlag:** Erfolgs-Counter explizit zählen:
   ```rust
   let mut linked = 0;
   for bd_id in &bd_ids {
-      if repo::assign_braindump_to_project(&state.pool, bd_id, &project.id).await.is_ok() {
+      if repo::assign_spark_to_project(&state.pool, bd_id, &project.id).await.is_ok() {
           linked += 1;
       }
   }
   ```
-  Response-Field `linked_braindumps: linked`. Optional: bei `linked < bd_ids.len()` ein `partial: true`-Flag mitschicken.
+  Response-Field `linked_sparks: linked`. Optional: bei `linked < bd_ids.len()` ein `partial: true`-Flag mitschicken.
 - **Status:** offen
 - **Korrektur-Zyklen:** 0/2
 
@@ -1985,7 +1985,7 @@ GEÄNDERT:
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Korrektheit / Vollständigkeit
 - **Befund:** Zwei kleine Aspekte in `handlers.rs::suggest_auto_projects`:
-  1. Bei Auto-Create-Pfad analog SM-B-006: `let _ = repo::assign_braindump_to_project(...)` schluckt Failures, `auto_created=1` zählt nur die erfolgreich erstellte Project-Reihe, nicht ob alle Member-Assigns durchliefen.
+  1. Bei Auto-Create-Pfad analog SM-B-006: `let _ = repo::assign_spark_to_project(...)` schluckt Failures, `auto_created=1` zählt nur die erfolgreich erstellte Project-Reihe, nicht ob alle Member-Assigns durchliefen.
   2. Proposals mit Confidence < `suggest_min` (default 0.5) werden silent gedropt — kein Counter, keine `tracing::debug!`-Spur. Bei Debugging "warum wird gar kein Vorschlag erzeugt?" hilft kein Logging.
 - **Korrekturvorschlag:** (1) wie SM-B-006 (Erfolgs-Counter). (2) `tracing::debug!("auto-project: dropped proposal '{}' confidence={:.2} below {:.2}", proposal.name, proposal.confidence, suggest_min);` für Confidence-Drops. Optional `dropped` zu `AutoProjectStats` hinzufügen — passt zum Pattern in `LinkExtractStats`.
 - **Status:** offen
@@ -1993,7 +1993,7 @@ GEÄNDERT:
 
 ### Was geprüft und OK befunden wurde
 
-- ✅ **Plan-Compliance Phase B-Mehrheit:** Migration-Schema (id+source/target/relation/confidence/reason/created_at/created_by), 2 Indizes ✅; Repo-Funktionen `links::insert/list_for_source/list_for_target/delete_by_id/delete_for_node` alle vorhanden ✅; Cascade-Hooks in `delete_braindump`+`delete_project` ✅ (mit dem Race-Caveat aus SM-B-005); 7 Routes statt 4 (Plan unterspezifiziert — get_*_links, accept, dismiss, list_suggestions zusätzlich, sinnvoll); Default-Impl `extract_links` im Trait mit `Ok(Vec::new())` ✅ (SM-PR-002 erfüllt); claude.rs+ollama.rs Override-Pflicht ✅; Background-Task-Erweiterung sequenziell, gleicher Cancel-Token, env-konfigurierbar ✅ (SM-PR-004 erfüllt).
+- ✅ **Plan-Compliance Phase B-Mehrheit:** Migration-Schema (id+source/target/relation/confidence/reason/created_at/created_by), 2 Indizes ✅; Repo-Funktionen `links::insert/list_for_source/list_for_target/delete_by_id/delete_for_node` alle vorhanden ✅; Cascade-Hooks in `delete_spark`+`delete_project` ✅ (mit dem Race-Caveat aus SM-B-005); 7 Routes statt 4 (Plan unterspezifiziert — get_*_links, accept, dismiss, list_suggestions zusätzlich, sinnvoll); Default-Impl `extract_links` im Trait mit `Ok(Vec::new())` ✅ (SM-PR-002 erfüllt); claude.rs+ollama.rs Override-Pflicht ✅; Background-Task-Erweiterung sequenziell, gleicher Cancel-Token, env-konfigurierbar ✅ (SM-PR-004 erfüllt).
 - ✅ **Cycle-Reihenfolge in `main.rs`:** `cycle.wrapping_add(1)` läuft VOR `is_multiple_of(auto_project_every)`. Initial `cycle=0`, nach Increment `cycle=1`, dann `1 % 6 != 0` → erste Auto-Projekt-Trigger nach Cycle 6, nicht 0. **Korrekt** — verhindert dass beim Server-Start sofort ein LLM-Call rausgeht bevor stabile Datenlage da ist.
 - ✅ **LLM-Provider-Coverage SM-PR-002:** 7 weitere Provider (gemini, openai, mistral, groq, deepseek, openrouter, zai) erben Default-Impl `Ok(Vec::new())`. User auf einem dieser Provider sieht keine LLM-Links — das ist per Plan-Design OK, kein Forced-6-fach-Implement-Anti-Pattern. Bookmark für künftigen Provider-Coverage-Sprint, kein Iter-1-Finding.
 - ✅ **Deutsch-Strings im Backend (SM-PR-006):** Alle User-facing error-Bodies in den 7 neuen Endpoints deutsch ("source_type/target_type muss …", "suggestion nicht gefunden", "Suggestion ist nicht mehr pending"). `tracing::warn!`-Strings englisch (Operations-Sprache, per Plan).
@@ -2040,7 +2040,7 @@ GEÄNDERT:
 | **SM-B-001-COD** Sentinel | `handlers.rs::extract_links_for_recent` Z. 1146 `wrote_any`-Flag, Z. 1166-1180 Sentinel-Insert (Selbst-Link `relation="noop-marker"`, `confidence=0.0`, `created_by="llm"`) bei `Ok(...)` mit 0 Treffern. Bei `Err(...)` KEIN Sentinel — Retry-fähig. Test-Beleg: `extract_links_writes_sentinel_on_empty_result` (Sentinel da nach Cycle 1, `processed=0` in Cycle 2) + `extract_links_handles_llm_error_without_sentinel` (Err-Pfad, kein Marker). | ✅ erledigt |
 | **SM-B-002-SIC** Server-Override | `handlers.rs::create_link` Z. 980-981 `let mut input = input; input.created_by = "user".to_string();` vor `links::insert`. Kommentar erklärt Semantik. Test-Beleg: `create_link_overrides_created_by_to_user` (Client sendet `"llm"`, DB-Reihe `"user"`). | ✅ erledigt |
 | **SM-B-003-VOL** Mock-LLM + 5 Tests | Neuer `mod synaptic_phase_b_tests` Z. ~1310-1568. `MockLlm`-Struct mit `LlmProvider`-Impl, `categorize_and_summarize` als `unimplemented!()` (Test-only). 6 Tests gesamt (Plan-Soll 5+1 SM-B-002): 3× `extract_links_for_recent` (Confidence-Filter / Sentinel / Err-Pfad), 2× `suggest_auto_projects` (Auto-Create / Suggestion-Persist), 1× `create_link` (SM-B-002). | ✅ erledigt |
-| **SM-B-006-KOR** accept-Counter | `handlers.rs::accept_project_suggestion` Z. 1052-1066 `linked`-Counter, Response enthält `linked_braindumps` (echt geschrieben), `requested_braindumps` (Soll), `partial`-Flag bei Diskrepanz. | ✅ erledigt |
+| **SM-B-006-KOR** accept-Counter | `handlers.rs::accept_project_suggestion` Z. 1052-1066 `linked`-Counter, Response enthält `linked_sparks` (echt geschrieben), `requested_sparks` (Soll), `partial`-Flag bei Diskrepanz. | ✅ erledigt |
 | **SM-B-007-KOR** suggest-Counter + Drop-Logging | `handlers.rs::suggest_auto_projects` Z. 1238-1265 `members_linked`-Counter im Auto-Create-Pfad, `tracing::debug!`-Trace + `stats.dropped += 1` für Confidence<min-Drops. `AutoProjectStats` um `members_linked` und `dropped` ergänzt. | ✅ erledigt |
 | **SM-B-004-COD** Migration-Rename | **Verworfen — Plan-Bug.** `sqlx::migrate!` parst die Migration-Version aus dem **ersten Underscore-Token**. Bei Rename `20260501_001_links.sql` + `20260501_002_project_suggestions.sql` würden beide Files dieselbe Version `20260501` bekommen → `UNIQUE constraint failed: _sqlx_migrations.version`. Original-Naming `20260502_001_project_suggestions.sql` ist deshalb das einzig Korrekte. Sprint-Plan-Forderung war ein Plan-Bug, kein Code-Bug. Tuvok-Iter-1-Finding zurückgenommen. | 🔄 invalide |
 | **SM-B-005-KOR** Race-Window | Per Chakotay-Routing-Entscheidung kein Code-Patch in Iter-2. Wandert in Phase X als Edge-Case-Block in `docs/LINKS.md`. | ⏳ Phase-X-Bookmark |
@@ -2048,7 +2048,7 @@ GEÄNDERT:
 ### Bonus-Discovery durch Iter-2-Tests
 
 **SM-B-008-KOR — `transcript`-Spalte in 3 Phase-B-SELECTs vergessen** (Iter-1-Lücke, gefixt im Iter-2-Block):
-- **Befund:** `extract_links_for_recent` (candidates Z. ~1100, recent_bds Z. ~1121) und `suggest_auto_projects` (entries Z. ~1216) nutzten ein SELECT ohne `transcript`-Spalte. `BrainDumpEntry`-`FromRow` erwartet alle Felder → `ColumnNotFound("transcript")` zur Laufzeit, aber zur Compile-Zeit unsichtbar (sqlx-query-Strings sind nicht von Compile-Time-Macros erfasst). In Iter-1 war das nicht sichtbar weil `cargo test` global nicht gelaufen wurde — nur `cargo test links` (5 Tests, andere Code-Pfade). Mit den Iter-2-Mock-Tests sind die Code-Pfade durchgelaufen, der Bug fiel sofort auf.
+- **Befund:** `extract_links_for_recent` (candidates Z. ~1100, recent_bds Z. ~1121) und `suggest_auto_projects` (entries Z. ~1216) nutzten ein SELECT ohne `transcript`-Spalte. `SparkEntry`-`FromRow` erwartet alle Felder → `ColumnNotFound("transcript")` zur Laufzeit, aber zur Compile-Zeit unsichtbar (sqlx-query-Strings sind nicht von Compile-Time-Macros erfasst). In Iter-1 war das nicht sichtbar weil `cargo test` global nicht gelaufen wurde — nur `cargo test links` (5 Tests, andere Code-Pfade). Mit den Iter-2-Mock-Tests sind die Code-Pfade durchgelaufen, der Bug fiel sofort auf.
 - **Korrektur:** Alle drei SELECTs erweitert um `transcript` in der Original-Spalten-Reihenfolge `id, created_at, raw_text, transcript, category, summary, tags_json` (analog zu `recategorize_unsorted_inner` Z. 555).
 - **Status:** ✅ erledigt im selben Iter-2-Block
 
@@ -2064,8 +2064,8 @@ GEÄNDERT:
 
 ### Was geprüft und OK befunden wurde
 
-- ✅ **Sentinel-Semantik korrekt:** Sentinel auch wenn `Ok(suggestions)` mit Items aber alle unter Confidence-Min — verhindert Cost-Loop für BrainDumps mit nur schwachen Treffern. Bei `Err(...)` KEIN Sentinel — temporäre LLM-Ausfälle dürfen retryen, was der gewollte Backoff-Pfad in `main.rs` ist.
-- ✅ **Sentinel-Insert geschluckt mit `let _`:** Wenn der Sentinel-Insert selbst failed (DB-Pressure o.ä.), läuft der BrainDump im nächsten Cycle wieder durch — selbe Resilienz wie bei regulären Link-Inserts.
+- ✅ **Sentinel-Semantik korrekt:** Sentinel auch wenn `Ok(suggestions)` mit Items aber alle unter Confidence-Min — verhindert Cost-Loop für Sparks mit nur schwachen Treffern. Bei `Err(...)` KEIN Sentinel — temporäre LLM-Ausfälle dürfen retryen, was der gewollte Backoff-Pfad in `main.rs` ist.
+- ✅ **Sentinel-Insert geschluckt mit `let _`:** Wenn der Sentinel-Insert selbst failed (DB-Pressure o.ä.), läuft der Spark im nächsten Cycle wieder durch — selbe Resilienz wie bei regulären Link-Inserts.
 - ✅ **Test-Schema-Pflege:** `setup_pool` in `synaptic_phase_b_tests` spiegelt das Schema händisch (5 CREATE-Statements). Bei künftigen Schema-Änderungen muss der Test mitgezogen werden — als Wartungs-Bookmark vermerkt, nicht als Finding (Pattern ist konsistent mit `links::tests::setup_pool`).
 - ✅ **`MockLlm`-Design:** `unimplemented!()` für `categorize_and_summarize` panict explizit wenn der Mock falsch genutzt wird — saubere Test-Hygiene.
 - ✅ **`partial`-Flag in accept-Response:** Frontend (Phase U) wird das ggf. konsumieren wollen — als Phase-U-Bookmark vermerkt, kein Iter-2-Finding.
@@ -2093,7 +2093,7 @@ Iter-2-Diff-Fokus hat alle 3 Major + 2 Counter-Drift-Minors aus Iter-1 sauber ad
 ## Synaptic Mosaic — Phase U (Desktop) — Iteration 1
 
 **Datum:** 2026-05-02 vormittags
-**Prüfgegenstand:** Phase U Desktop (BrainDump-Detail-Modal mit Verknüpfungen-Block + Suggestions-Banner) vor Commit
+**Prüfgegenstand:** Phase U Desktop (Spark-Detail-Modal mit Verknüpfungen-Block + Suggestions-Banner) vor Commit
 **Erstellt von:** Hauptsession — VibeCoding (Sprint Synaptic Mosaic Auto-Pilot)
 **Auftrag:** AUFTRAG #13 vc.md
 **Bezugscommit:** HEAD `c1ce54d` (Phase F + Phase B + docs/qs committed)
@@ -2102,8 +2102,8 @@ Iter-2-Diff-Fokus hat alle 3 Major + 2 Counter-Drift-Minors aus Iter-1 sauber ad
 
 `desktop/src/index.html` +192/-3 LoC in einem File:
 - CSS +14 neue Klassen (banner.suggestion, suggestion-card, confidence-badge, wiki-link, bd-row-clickable, links-section)
-- HTML: `<div id="suggestionsBanner">` im Projects-Tab, neuer `<div id="bdDetailModal">` analog zum Achievement-Modal-Pattern, BrainDump-Tabellen-Zeilen clickable mit `event.stopPropagation()` auf Checkbox+Delete-Cells
-- JS: `openBraindumpDetail`, `renderLinks`, `wikiLabelFor`, `openLinkTarget`, `closeBraindumpDetail`, `deleteBraindumpFromDetail`, `refreshSuggestionsBanner`, `acceptSuggestion`, `dismissSuggestion`. Hook in `refreshProjects()` triggert `refreshSuggestionsBanner()`.
+- HTML: `<div id="suggestionsBanner">` im Projects-Tab, neuer `<div id="bdDetailModal">` analog zum Achievement-Modal-Pattern, Spark-Tabellen-Zeilen clickable mit `event.stopPropagation()` auf Checkbox+Delete-Cells
+- JS: `openSparkDetail`, `renderLinks`, `wikiLabelFor`, `openLinkTarget`, `closeSparkDetail`, `deleteSparkFromDetail`, `refreshSuggestionsBanner`, `acceptSuggestion`, `dismissSuggestion`. Hook in `refreshProjects()` triggert `refreshSuggestionsBanner()`.
 
 ### Build-Verifikation
 
@@ -2118,8 +2118,8 @@ Bundle-Frontend-Datei nicht eigenständig im Filesystem — Tauri embedded Asset
 #### SM-U-001-KOR — Race-Condition bei rekursiver Wikilink-Navigation
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Korrektheit
-- **Befund:** `openBraindumpDetail(id, evt)` ruft `await api(\`/braindump/${id}/links\`, ...)` und rendert das Result via `renderLinks`. Wenn der User schnell durch mehrere BrainDumps navigiert (Wikilink-Klick → `openLinkTarget('braindump', id)` → `openBraindumpDetail(id)`), kann der `await` eines früheren Requests ZURÜCKKOMMEN während der neuere Request bereits läuft. Resultat: kurzzeitig falsche Links im UI, bis der zweite `await` rendert. Kein Crash, kein Daten-Schaden — nur UI-Drift für 1-2s.
-- **Korrekturvorschlag:** Nach dem `await api(...)` einen Guard einfügen: `if (currentBdDetailId !== id) return;` vor dem `renderLinks(linksEl, data)`. Damit verfällt der Render wenn der User zwischenzeitlich zu einem anderen BrainDump navigiert hat. ~2 LoC. Alternativ AbortController, aber Guard reicht.
+- **Befund:** `openSparkDetail(id, evt)` ruft `await api(\`/spark/${id}/links\`, ...)` und rendert das Result via `renderLinks`. Wenn der User schnell durch mehrere Sparks navigiert (Wikilink-Klick → `openLinkTarget('spark', id)` → `openSparkDetail(id)`), kann der `await` eines früheren Requests ZURÜCKKOMMEN während der neuere Request bereits läuft. Resultat: kurzzeitig falsche Links im UI, bis der zweite `await` rendert. Kein Crash, kein Daten-Schaden — nur UI-Drift für 1-2s.
+- **Korrekturvorschlag:** Nach dem `await api(...)` einen Guard einfügen: `if (currentBdDetailId !== id) return;` vor dem `renderLinks(linksEl, data)`. Damit verfällt der Render wenn der User zwischenzeitlich zu einem anderen Spark navigiert hat. ~2 LoC. Alternativ AbortController, aber Guard reicht.
 - **Status:** offen, Phase-X-Bookmark
 - **Korrektur-Zyklen:** 0/2
 
@@ -2134,7 +2134,7 @@ Bundle-Frontend-Datei nicht eigenständig im Filesystem — Tauri embedded Asset
 #### SM-U-003-WAR — `acceptSuggestion` partial-Flag-Handling via `alert()` ist UX-blockierend
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Wartbarkeit / UX
-- **Befund:** Wenn die accept-Response `partial=true` enthält (assigns sind teilweise fehlgeschlagen — Edge-Case wenn BrainDump-IDs nicht mehr existieren), öffnet der Code ein blocking-`alert()`. UX-blockierend, aber Edge-Case. Eleganter wäre der existierende `globalBanner` (suggestion-Variant) mit Auto-Hide nach 5s.
+- **Befund:** Wenn die accept-Response `partial=true` enthält (assigns sind teilweise fehlgeschlagen — Edge-Case wenn Spark-IDs nicht mehr existieren), öffnet der Code ein blocking-`alert()`. UX-blockierend, aber Edge-Case. Eleganter wäre der existierende `globalBanner` (suggestion-Variant) mit Auto-Hide nach 5s.
 - **Korrekturvorschlag:** `globalBanner` mit info-Variant (oder neuer `.banner.warning`) verwenden: `showBanner('Projekt erstellt — X von Y Notizen verknüpft', 'warning')` statt `alert(...)`. Erfordert minimal-Refactor von `showBanner` falls heute nur Error-Variant supported.
 - **Status:** offen, Phase-X-Polish-Bookmark
 - **Korrektur-Zyklen:** 0/2
@@ -2142,8 +2142,8 @@ Bundle-Frontend-Datei nicht eigenständig im Filesystem — Tauri embedded Asset
 #### SM-U-004-PER — `wikiLabelFor` O(n) Array-Lookups pro Link-Render
 - **Schweregrad:** 🟢 Minor (Bookmark)
 - **Kategorie:** Performance
-- **Befund:** `wikiLabelFor(type, id)` macht `projects.find(...)` UND `braindumps.find(...)` für jeden Link. Bei 10 Links und 50 BrainDumps + 5 Projects: 10 × (50 + 5) = 550 Comparisons. Bei 5000 BrainDumps wäre das 50.000 Comparisons pro Modal-Open — spürbar. Aktuelle NEXUS-Skala (deutlich unter 100 BDs) macht das vernachlässigbar.
-- **Korrekturvorschlag:** Map-Caching: `const bdById = new Map(braindumps.map(b => [b.id, b]));` einmal pro Modal-Open. Oder lazily im `wikiLabelFor`-Caller. Phase-X-Bookmark — kein aktuelles Bottleneck, aber für Vault-Sprint relevant wenn Datenvolumen steigt.
+- **Befund:** `wikiLabelFor(type, id)` macht `projects.find(...)` UND `sparks.find(...)` für jeden Link. Bei 10 Links und 50 Sparks + 5 Projects: 10 × (50 + 5) = 550 Comparisons. Bei 5000 Sparks wäre das 50.000 Comparisons pro Modal-Open — spürbar. Aktuelle NEXUS-Skala (deutlich unter 100 BDs) macht das vernachlässigbar.
+- **Korrekturvorschlag:** Map-Caching: `const bdById = new Map(sparks.map(b => [b.id, b]));` einmal pro Modal-Open. Oder lazily im `wikiLabelFor`-Caller. Phase-X-Bookmark — kein aktuelles Bottleneck, aber für Vault-Sprint relevant wenn Datenvolumen steigt.
 - **Status:** offen, Phase-X-Bookmark
 - **Korrektur-Zyklen:** 0/2
 
@@ -2153,8 +2153,8 @@ Bundle-Frontend-Datei nicht eigenständig im Filesystem — Tauri embedded Asset
 - **Schweregrad:** 🟡 Major (für Phase-F-DoD), 🟢 Minor (für Phase-U-Scope)
 - **Kategorie:** Vollständigkeit / Lokalisierung
 - **Befund:** Beim Diff-Review von Phase U sind 7 englische User-facing Strings in `desktop/src/index.html` aufgefallen, die in Phase-F-Iteration 2 nicht erwischt wurden:
-  - Z. 679: `'Could not load braindumps: ' + e.message` (catch-Banner refreshBraindumps)
-  - Z. 730: `'No braindumps found.'` (empty-state)
+  - Z. 679: `'Could not load sparks: ' + e.message` (catch-Banner refreshSparks)
+  - Z. 730: `'No sparks found.'` (empty-state)
   - Z. 742: Tabellen-Header `<th>Category</th><th>Content</th><th>Date</th>` (3 Strings)
   - Z. 782: `'Could not load projects: ' + e.message` (catch-Banner refreshProjects)
   - Z. 800: `'No projects found.'` (empty-state)
@@ -2163,8 +2163,8 @@ Bundle-Frontend-Datei nicht eigenständig im Filesystem — Tauri embedded Asset
 
   Diese Strings sind in catch-Blöcken eingebettet — Phase F hat HTML-Source-Defaults und Toolbars/Modals/JS-Banner gegrept, aber catch-Bodies und Tabellen-Header nicht erfasst.
 - **Korrekturvorschlag:**
-  - Z. 679: `'BrainDumps konnten nicht geladen werden: '`
-  - Z. 730: `'Keine BrainDumps gefunden.'`
+  - Z. 679: `'Sparks konnten nicht geladen werden: '`
+  - Z. 730: `'Keine Sparks gefunden.'`
   - Z. 742: `<th>Kategorie</th><th>Inhalt</th><th>Datum</th>`
   - Z. 782: `'Projekte konnten nicht geladen werden: '`
   - Z. 800: `'Keine Projekte gefunden.'`
@@ -2177,16 +2177,16 @@ Bundle-Frontend-Datei nicht eigenständig im Filesystem — Tauri embedded Asset
 
 ### Was geprüft und OK befunden wurde
 
-- ✅ **Click-Handler-Race-Sicherung:** `<tr class="bd-row-clickable" onclick="openBraindumpDetail(...)">` mit `event.stopPropagation()` auf Checkbox-Cell und Delete-Button-Cell. Doppelte Defense durch `if (evt && evt.target && evt.target.tagName === 'INPUT') return;` in `openBraindumpDetail`. Beide Schutzmechanismen greifen unabhängig — robust gegen subtle Browser-Quirks.
-- ✅ **Sentinel-Filter wirkt vor Empty-Check:** `noop-marker`-Sentinel-Self-Links werden aus outgoing+incoming gefiltert, danach greift Empty-State korrekt. BrainDump mit nur Sentinel zeigt "Keine Verknüpfungen".
+- ✅ **Click-Handler-Race-Sicherung:** `<tr class="bd-row-clickable" onclick="openSparkDetail(...)">` mit `event.stopPropagation()` auf Checkbox-Cell und Delete-Button-Cell. Doppelte Defense durch `if (evt && evt.target && evt.target.tagName === 'INPUT') return;` in `openSparkDetail`. Beide Schutzmechanismen greifen unabhängig — robust gegen subtle Browser-Quirks.
+- ✅ **Sentinel-Filter wirkt vor Empty-Check:** `noop-marker`-Sentinel-Self-Links werden aus outgoing+incoming gefiltert, danach greift Empty-State korrekt. Spark mit nur Sentinel zeigt "Keine Verknüpfungen".
 - ✅ **Rekursive Modal-Navigation per `openLinkTarget`:** Modal bleibt offen, `currentBdDetailId` wird sauber überschrieben, async-Race ist Edge-Case (siehe SM-U-001-Minor).
-- ✅ **`silent: true` Pattern:** für `/braindump/{id}/links` und `/projects/suggestions` konsistent mit JJ-Sprint-`checkConnection`-Pattern. Errors werden nicht-blockierend in Empty-States kommuniziert.
+- ✅ **`silent: true` Pattern:** für `/spark/{id}/links` und `/projects/suggestions` konsistent mit JJ-Sprint-`checkConnection`-Pattern. Errors werden nicht-blockierend in Empty-States kommuniziert.
 - ✅ **Server-Response-Konsumption:** `acceptSuggestion` konsumiert das `partial`-Flag aus SM-B-006-Korrektur korrekt. Suggestions-Re-Fetch nach action.
 - ✅ **CSS-Konsistenz:** `.banner.suggestion` reuse-orientiert (orange-Tint analog `.badge-priority-medium` aus existierendem Code), `.confidence-badge` matches Pattern, `.wiki-link` nutzt `--primary-tint` aus PC-Sprint-Token-System.
-- ✅ **Empty-Handling überall:** Empty-State für Suggestions-Banner (`hidden`-Class), für BrainDump-Detail-Links ("Keine Verknüpfungen…"), für leere `pending`-Liste.
+- ✅ **Empty-Handling überall:** Empty-State für Suggestions-Banner (`hidden`-Class), für Spark-Detail-Links ("Keine Verknüpfungen…"), für leere `pending`-Liste.
 - ✅ **Tauri-Build EXIT=0:** Frontend-Stand wurde sauber in DEB+RPM eingebaut (mtime 10:06 frisch).
-- ✅ **Plan-DoD U-DSK-1 + U-DSK-2 erfüllt:** BrainDump-Detail-View zeigt Verknüpfungen, Klicks navigieren; Projects-Tab Banner zeigt pending Suggestions mit Approve/Verwerfen-Buttons.
-- ✅ **Phase-U-spezifische Strings deutsch:** alle 16+ neuen User-facing Strings deutsch (Lade…, Keine Verknüpfungen, Rückverweise, Konfidenz, Übernehmen, Verwerfen, Schließen, Löschen, BrainDump, Zusammenfassung, Projekt-Vorschläge, Notizen, Vorschlag, Fehler beim Übernehmen/Verwerfen, BrainDump löschen?, Verknüpfungen konnten nicht geladen werden).
+- ✅ **Plan-DoD U-DSK-1 + U-DSK-2 erfüllt:** Spark-Detail-View zeigt Verknüpfungen, Klicks navigieren; Projects-Tab Banner zeigt pending Suggestions mit Approve/Verwerfen-Buttons.
+- ✅ **Phase-U-spezifische Strings deutsch:** alle 16+ neuen User-facing Strings deutsch (Lade…, Keine Verknüpfungen, Rückverweise, Konfidenz, Übernehmen, Verwerfen, Schließen, Löschen, Spark, Zusammenfassung, Projekt-Vorschläge, Notizen, Vorschlag, Fehler beim Übernehmen/Verwerfen, Spark löschen?, Verknüpfungen konnten nicht geladen werden).
 
 ### Verdikt
 
@@ -2254,7 +2254,7 @@ GEÄNDERT (alles uncommitted gegen HEAD):
 
 ### Was geprüft und OK befunden wurde
 
-- ✅ **SM-F-RETRO-001 Korrektur (7/7):** alle 7 in der Iter-1-Liste genannten Strings korrekt ersetzt. Re-Grep nach `Could not load|No braindumps|No projects|<th>Category|<th>Content|<th>Date|No tasks|No achievements found` zeigt nur den 8. Restbestand (SM-X-RESIDUE-001) — ein Tippfehler meinerseits in der Iter-1-Inventur, kein Implementer-Fehler.
+- ✅ **SM-F-RETRO-001 Korrektur (7/7):** alle 7 in der Iter-1-Liste genannten Strings korrekt ersetzt. Re-Grep nach `Could not load|No sparks|No projects|<th>Category|<th>Content|<th>Date|No tasks|No achievements found` zeigt nur den 8. Restbestand (SM-X-RESIDUE-001) — ein Tippfehler meinerseits in der Iter-1-Inventur, kein Implementer-Fehler.
 - ✅ **SM-U-001 Race-Guard:** Z. 1509 (im try-Branch vor `renderLinks`) UND Z. 1512 (im catch-Branch vor `innerHTML`-Set) abgesichert — dual-defense, robust.
 - ✅ **SM-U-002 Sentinel-Filter:** `isSentinel`-Helper Z. 1521 mit kombiniertem `relation === 'noop-marker' && created_by === 'llm'`-Check, beide outgoing+incoming nutzen ihn (Z. 1522/1523). User-Manual-Links mit `relation='noop-marker'` und `created_by='user'` bleiben sichtbar — gewünschtes Verhalten per Iter-1-Korrekturvorschlag.
 - ✅ **SM-U-003 showBanner-Refactor:**
@@ -2266,7 +2266,7 @@ GEÄNDERT (alles uncommitted gegen HEAD):
   - `accept`/`dismiss` Error-Branches nutzen `'error'`-Variant + 8000ms Auto-Hide.
 - ✅ **showBanner Backwards-Compat — Caller-Audit:** 7 Caller geprüft, alle nutzen entweder default-Signatur (variant='error', kein Auto-Hide) oder explizit die neuen Args. Kein bestehender Caller bricht. Z. 1088 ist pre-existing-UX-Quirk, kein Refactor-Regress (siehe SM-X-PRE-001).
 - ✅ **`docs/LINKS.md` Vollständigkeit:** Datenmodell beider Tabellen mit Spalten-Erklärung, alle 7 Endpoints mit Validierungs-Fehlern, LLM-Trait-Default-Impl + EXTRACT_LINKS_PROMPT, Background-Task-Verhalten inkl. Sentinel-Mechanik, alle 4 env-Vars, bekannte Limitationen mit Schweregrad (SM-B-005 Race-Window mit Multi-User-Hinweis, Provider-Coverage Bookmark, Performance Bookmark), Test-Auflistung. Lückenlos.
-- ✅ **`HANDOVER.md` Update:** neuer 2026-05-02-Block oben, alter 2026-05-01-Block bleibt unverändert. Cross-CLI-Bookmark explizit (BrainDumpHistoryScreen + ProjectsScreen + NexusApiClient + DTOs + APK-Build + Tuvok-Final-Live). Klar genug für eine fremde Session in der AS-CLI.
+- ✅ **`HANDOVER.md` Update:** neuer 2026-05-02-Block oben, alter 2026-05-01-Block bleibt unverändert. Cross-CLI-Bookmark explizit (SparkHistoryScreen + ProjectsScreen + NexusApiClient + DTOs + APK-Build + Tuvok-Final-Live). Klar genug für eine fremde Session in der AS-CLI.
 - ✅ **`todo.md` SM-Block-Hierarchie:** Phase F/B/U-DSK done abgehakt, Phase U-AND als pending mit SM-U-AND-1..4 (4 Files, eindeutig zugeordnet), Phase X teils-done (SM-X-1..6 ✅ inkl. Polish-Fixes; SM-X-7..11 noch offen — Builds bereits jetzt grün, aber Commit + Bericht stehen aus). PC-Final-Gate-Auflagen als überholt markiert.
 - ✅ **CHANGELOG-Block-Hierarchie:** SM-Block oben (newest first), PC danach, JJ danach. Added/Changed/Fixed-Sektionen sauber pro Phase, keine Doppellistung. SM-Block ist umfangreich aber strukturiert (Phase B / Phase U / Phase F + Phase X / Bookmarks / Auflagen).
 - ✅ **Cross-Doc-Konsistenz:** Commit-Hashes `a640837 / 2b45fcd / c1ce54d / 5eff289` korrekt referenziert in CURRENT_STATE + todo + HANDOVER. CHANGELOG referenziert keine Hashes (Standard-Konvention).
@@ -2290,7 +2290,7 @@ Nach SM-X-RESIDUE-001-Fix: ✅ Freigabe für Phase-X-Commit + Sprint-Closure-Ber
 
 ## Synaptic Mosaic — Phase U (Android, Cross-CLI) — Iteration 1
 
-> **Datum:** 2026-05-02 — **Auftrag:** AS-CLI Diff-Review SM-U-AND-1..4 (BrainDumpHistoryScreen Bottom-Sheet + ProjectsScreen Suggestions-Banner + NexusApiClient 4 Funktionen + 2 DTO-Files) vor Commit. Cross-CLI-Lauf in der AS-CLI (`/home/kaik/Projekte/Apps/Nexus/android` als CWD).
+> **Datum:** 2026-05-02 — **Auftrag:** AS-CLI Diff-Review SM-U-AND-1..4 (SparkHistoryScreen Bottom-Sheet + ProjectsScreen Suggestions-Banner + NexusApiClient 4 Funktionen + 2 DTO-Files) vor Commit. Cross-CLI-Lauf in der AS-CLI (`/home/kaik/Projekte/Apps/Nexus/android` als CWD).
 
 ### Geprüft
 
@@ -2298,7 +2298,7 @@ Nach SM-X-RESIDUE-001-Fix: ✅ Freigabe für Phase-X-Commit + Sprint-Closure-Ber
 - `android/app/src/main/java/com/vibecode/nexus/data/model/Link.kt` (NEU, 23 LoC)
 - `android/app/src/main/java/com/vibecode/nexus/data/model/ProjectSuggestion.kt` (NEU, 24 LoC)
 - `android/app/src/main/java/com/vibecode/nexus/data/NexusApiClient.kt` (+30 LoC, 4 neue suspend-Funktionen)
-- `android/app/src/main/java/com/vibecode/nexus/ui/screen/BrainDumpHistoryScreen.kt` (+231 LoC, ModalBottomSheet + WikiLinkFlow + Sentinel-Filter)
+- `android/app/src/main/java/com/vibecode/nexus/ui/screen/SparkHistoryScreen.kt` (+231 LoC, ModalBottomSheet + WikiLinkFlow + Sentinel-Filter)
 - `android/app/src/main/java/com/vibecode/nexus/ui/screen/ProjectsScreen.kt` (+151 LoC, Top-Banner als LazyColumn-Item + SuggestionsBanner/Row)
 
 Build: `cd android && ./gradlew assembleDebug` EXIT=0 (18s, 4 executed/33 up-to-date), APK 66.5 MB unter `android/app/build/outputs/apk/debug/app-debug.apk`.
@@ -2308,14 +2308,14 @@ Build: `cd android && ./gradlew assembleDebug` EXIT=0 (18s, 4 executed/33 up-to-
 #### SM-U-AND-001-COD
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Code-Qualität
-- **Befund:** Bei Klick auf BrainDump-Wikilink, dessen Target-ID nicht in `entries` ist (z.B. zwischenzeitlich gelöschter BrainDump, oder Race-Window während noch-nicht-fertig-geladener Listen), passiert silent kein UI-Update — `entries.firstOrNull { it.id == newId }?.let { detailEntry = it }` (Z. 121) ist no-op. User-Confusion möglich bei stale Links.
-- **Korrekturvorschlag:** Bei `firstOrNull == null` → Snackbar "BrainDump nicht mehr verfügbar" oder Sheet schließen + Hinweis. Phase-X-Bookmark-Niveau.
+- **Befund:** Bei Klick auf Spark-Wikilink, dessen Target-ID nicht in `entries` ist (z.B. zwischenzeitlich gelöschter Spark, oder Race-Window während noch-nicht-fertig-geladener Listen), passiert silent kein UI-Update — `entries.firstOrNull { it.id == newId }?.let { detailEntry = it }` (Z. 121) ist no-op. User-Confusion möglich bei stale Links.
+- **Korrekturvorschlag:** Bei `firstOrNull == null` → Snackbar "Spark nicht mehr verfügbar" oder Sheet schließen + Hinweis. Phase-X-Bookmark-Niveau.
 - **Status:** offen — Phase-X-Bookmark
 
 #### SM-U-AND-002-WAR
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Wartbarkeit
-- **Befund:** `AssistChip(onClick = {}, enabled = false, label = ...)` wird dreimal als reines statisches Label genutzt (BrainDumpHistoryScreen Z. 174-178 Category, Z. 209-211 Tags; ProjectsScreen Z. 334-342 Konfidenz-Chip). Material-3-Disabled-Style ist semantisch "klickbar aber gerade aus", nicht "statisches Label". Code-Smell, nicht Funktionsbug.
+- **Befund:** `AssistChip(onClick = {}, enabled = false, label = ...)` wird dreimal als reines statisches Label genutzt (SparkHistoryScreen Z. 174-178 Category, Z. 209-211 Tags; ProjectsScreen Z. 334-342 Konfidenz-Chip). Material-3-Disabled-Style ist semantisch "klickbar aber gerade aus", nicht "statisches Label". Code-Smell, nicht Funktionsbug.
 - **Korrekturvorschlag:** Surface mit Pill-Shape, oder `SuggestionChip` mit no-op onClick, oder `Badge`. Bei Konfidenz-Chip wäre `AssistChipDefaults.assistChipColors(...)`-Override-Pattern (das schon angewandt wird) ein Smell-Reduzer, ändert aber nichts an der Semantik.
 - **Status:** offen — Folge-Sprint-Polish-Bookmark
 
@@ -2332,7 +2332,7 @@ Build: `cd android && ./gradlew assembleDebug` EXIT=0 (18s, 4 executed/33 up-to-
 #### SM-U-AND-004-VOL
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Vollständigkeit (relativ zur Desktop-Referenz)
-- **Befund:** Klick auf Project-Wikilink im Sheet zeigt Snackbar "Projekt im Projekte-Tab: <name>" und schließt das Sheet (BrainDumpHistoryScreen Z. 123-126), wechselt aber NICHT programmatisch auf den Projects-Tab. Desktop-Referenz tut Tab-Switch automatisch (`document.querySelector('.tab[data-tab="projects"]').click()`).
+- **Befund:** Klick auf Project-Wikilink im Sheet zeigt Snackbar "Projekt im Projekte-Tab: <name>" und schließt das Sheet (SparkHistoryScreen Z. 123-126), wechselt aber NICHT programmatisch auf den Projects-Tab. Desktop-Referenz tut Tab-Switch automatisch (`document.querySelector('.tab[data-tab="projects"]').click()`).
 - **Bewertung:** Out-of-Scope-Compromise — programmatic Tab-Switch würde MainActivity-NavController-Hookup und einen 5. File-Touchpoint (`MainActivity.kt`) erfordern, was Phase-U-Android-Scope (4 Files) sprengen würde. Snackbar ist handlungsfähig (User weiß welcher Tab).
 - **Korrekturvorschlag:** Folge-Sprint-Bookmark — Tab-Switch via Callback-Lambda an Screen-Composable, MainActivity setzt Tab-State entsprechend.
 - **Status:** offen — Folge-Sprint-Bookmark
@@ -2340,18 +2340,18 @@ Build: `cd android && ./gradlew assembleDebug` EXIT=0 (18s, 4 executed/33 up-to-
 #### SM-U-AND-005-PER
 - **Schweregrad:** 🟢 Minor
 - **Kategorie:** Performance / UX-Polish
-- **Befund:** Bei programmatic Sheet-Close (Project-Wikilink-Click → `detailEntry = null` Z. 125, oder rekursive BD-Switch via `onNavigateToBraindump`) wird das `ModalBottomSheet` ohne Hide-Animation entfernt — die `let`-Block-Bedingung wird falsy und das Sheet-Composable verschwindet aus der Composition. User sieht plötzliches Verschwinden statt Slide-down.
+- **Befund:** Bei programmatic Sheet-Close (Project-Wikilink-Click → `detailEntry = null` Z. 125, oder rekursive BD-Switch via `onNavigateToSpark`) wird das `ModalBottomSheet` ohne Hide-Animation entfernt — die `let`-Block-Bedingung wird falsy und das Sheet-Composable verschwindet aus der Composition. User sieht plötzliches Verschwinden statt Slide-down.
 - **Korrekturvorschlag:** `scope.launch { sheetState.hide() }.invokeOnCompletion { detailEntry = null }` für graceful close. Helper-Funktion `closeSheet(scope, sheetState, onDone)` wäre wiederverwendbar.
 - **Status:** offen — Folge-Sprint-Polish-Bookmark
 
 ### Was geprüft und in Ordnung
 
-- ✅ **DTO-Vertrag Backend-konform:** `Link` (10 Felder) matcht `core/src/links.rs::Link` 1:1 inkl. Nullability (`reason: String?`). `BrainDumpLinks { outgoing, incoming }` matcht JSON-Response von `handlers::get_braindump_links`. `ProjectSuggestion` (8 Felder) matcht `list_project_suggestions`-Enriched-JSON inkl. `member_braindump_ids` als `List<String>` (parse_member_ids gibt Vec). `AcceptSuggestionResponse` (5 Felder) matcht `accept_project_suggestion`-Response.
-- ✅ **Bearer-Auth:** alle 4 neuen NexusApiClient-Funktionen (`getBrainDumpLinks`, `listProjectSuggestions`, `acceptProjectSuggestion`, `dismissProjectSuggestion`) rufen `bearerAuth(token!!)` korrekt auf, sind durch `authedRequest`-Wrapper geschützt (token=null → Result.failure). Konsistent mit Bestand-Funktionen.
+- ✅ **DTO-Vertrag Backend-konform:** `Link` (10 Felder) matcht `core/src/links.rs::Link` 1:1 inkl. Nullability (`reason: String?`). `SparkLinks { outgoing, incoming }` matcht JSON-Response von `handlers::get_spark_links`. `ProjectSuggestion` (8 Felder) matcht `list_project_suggestions`-Enriched-JSON inkl. `member_spark_ids` als `List<String>` (parse_member_ids gibt Vec). `AcceptSuggestionResponse` (5 Felder) matcht `accept_project_suggestion`-Response.
+- ✅ **Bearer-Auth:** alle 4 neuen NexusApiClient-Funktionen (`getSparkLinks`, `listProjectSuggestions`, `acceptProjectSuggestion`, `dismissProjectSuggestion`) rufen `bearerAuth(token!!)` korrekt auf, sind durch `authedRequest`-Wrapper geschützt (token=null → Result.failure). Konsistent mit Bestand-Funktionen.
 - ✅ **`dismissProjectSuggestion` ohne `.body()`:** Backend liefert 204 No Content; Pattern identisch zu `deleteTask` (Z. 145-150). expectSuccess=true wirft bei 4xx/5xx — landet bei `onFailure`. Korrekt.
-- ✅ **Sentinel-Filter:** `Link::isSentinel()` prüft beide Bedingungen `relation == "noop-marker" && created_by == "llm"` (BrainDumpHistoryScreen Z. 308). Beide outgoing+incoming-Listen filtern (Z. 235-236). Identisch zu Desktop SM-U-002-Pattern. User-Manual-Links mit `relation='noop-marker'` (theoretisch möglich) bleiben sichtbar.
-- ✅ **Recursive Wikilink-Navigation:** `BrainDumpDetailSheet` re-keyed alle Per-Entry-States via `remember(entry.id)` (Z. 144-146) und `LaunchedEffect(entry.id)` (Z. 148). Beim Wechsel cancelled Compose den vorherigen Suspend-Job sauber → kein Race. Sheet-State bleibt offen über recompose hinweg (sheetState ohne Key-Param). Pattern korrekt.
-- ✅ **Wikilink-Label-Resolution:** `wikiLabelFor` (Z. 310-326) löst Project→`📁 name`, BrainDump→`📝 summary | raw_text.take(60) | id`. Identisch zur Desktop-Logik. O(n) `firstOrNull` ist akzeptabel bei < 100 BD (Map-Caching ist SM-U-004 Phase-X-Bookmark).
+- ✅ **Sentinel-Filter:** `Link::isSentinel()` prüft beide Bedingungen `relation == "noop-marker" && created_by == "llm"` (SparkHistoryScreen Z. 308). Beide outgoing+incoming-Listen filtern (Z. 235-236). Identisch zu Desktop SM-U-002-Pattern. User-Manual-Links mit `relation='noop-marker'` (theoretisch möglich) bleiben sichtbar.
+- ✅ **Recursive Wikilink-Navigation:** `SparkDetailSheet` re-keyed alle Per-Entry-States via `remember(entry.id)` (Z. 144-146) und `LaunchedEffect(entry.id)` (Z. 148). Beim Wechsel cancelled Compose den vorherigen Suspend-Job sauber → kein Race. Sheet-State bleibt offen über recompose hinweg (sheetState ohne Key-Param). Pattern korrekt.
+- ✅ **Wikilink-Label-Resolution:** `wikiLabelFor` (Z. 310-326) löst Project→`📁 name`, Spark→`📝 summary | raw_text.take(60) | id`. Identisch zur Desktop-Logik. O(n) `firstOrNull` ist akzeptabel bei < 100 BD (Map-Caching ist SM-U-004 Phase-X-Bookmark).
 - ✅ **`projects`-Load best-effort:** Bei Failure von `getProjects` rendert Project-Wikilinks die ID. Akzeptabel weil Fallback-Pfad in `wikiLabelFor` (Z. 318: `p?.name ?: id`) gibt sinnvollen Output. Single-User-System.
 - ✅ **`acceptProjectSuggestion`-Response-Handling:** `partial`-Flag sauber abgefangen (ProjectsScreen Z. 163-169). Erfolgs-Snackbar mit Project-Name (`„${res.name}"`) bei `partial=false` ist Mobile-UX-Verbesserung gegenüber Desktop (silent success), kein Regress.
 - ✅ **`dismissProjectSuggestion`-Lokal-Update:** Filter-Update läuft erst im `onSuccess`-Branch (Z. 181), nicht optimistisch. Bei Backend-Failure bleibt Suggestion sichtbar + Snackbar mit Fehler. Konsistent.
@@ -2375,7 +2375,7 @@ Build: `cd android && ./gradlew assembleDebug` EXIT=0 (18s, 4 executed/33 up-to-
 
 Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Final-Live-Gate.
 
-**Empfehlung an vc-chef:** Beide Imports entfernen (1 Edit pro Zeile, sicherer Pflicht-Mitfix), dann Phase-U-Android-Commit (`feat(synaptic): Phase U Android — BrainDump-Bottom-Sheet + Suggestions-Banner`). Anschließend Cross-CLI-Final-Live-Gate (SM-MAN-2 + SM-MAN-3): adb-Live-Smoke + Tuvok-Final-Live-Test (curl + Bundle + adb-Screenshots) bevor `v0.1.2`-Tag. 4 Bookmarks in den Sprint-Bericht / `todo.md`-Backlog aufnehmen.
+**Empfehlung an vc-chef:** Beide Imports entfernen (1 Edit pro Zeile, sicherer Pflicht-Mitfix), dann Phase-U-Android-Commit (`feat(synaptic): Phase U Android — Spark-Bottom-Sheet + Suggestions-Banner`). Anschließend Cross-CLI-Final-Live-Gate (SM-MAN-2 + SM-MAN-3): adb-Live-Smoke + Tuvok-Final-Live-Test (curl + Bundle + adb-Screenshots) bevor `v0.1.2`-Tag. 4 Bookmarks in den Sprint-Bericht / `todo.md`-Backlog aufnehmen.
 
 **WORKLOG-Ref:** AUFTRAG #15
 
@@ -2387,10 +2387,10 @@ Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Fina
 
 ### Setup-Status (Implementer-Pre-Smoke übernommen)
 
-- ✅ **Core neu gestartet** mit Release-Binary `core/target/release/nexus-core` (mtime 10:20, Phase-B inklusive). Pre-Restart-Detection: Vorinstanz war pre-Phase-B (404 für `/braindump/{id}/links`, 405 mit `Allow: DELETE` für `/projects/suggestions`) — klassischer Multi-Instance-Drift, der ohne diesen Test durchgerutscht wäre. Neu-Start log: `/tmp/sm-mosaic-and-core.log`.
+- ✅ **Core neu gestartet** mit Release-Binary `core/target/release/nexus-core` (mtime 10:20, Phase-B inklusive). Pre-Restart-Detection: Vorinstanz war pre-Phase-B (404 für `/spark/{id}/links`, 405 mit `Allow: DELETE` für `/projects/suggestions`) — klassischer Multi-Instance-Drift, der ohne diesen Test durchgerutscht wäre. Neu-Start log: `/tmp/sm-mosaic-and-core.log`.
 - ✅ **APK installiert** auf Pixel RFCX20J1PEX (`adb install -r app-debug.apk` → Success).
 - ✅ **App force-stop + start** clean (state=1, Activity Hist #0 vorhanden, kein FATAL/AndroidRuntime).
-- ✅ **Pre-Smokes curl:** /health, /api/setup-status, /braindump/{id}/links (200 mit `{"incoming":[],"outgoing":[]}`), /projects/suggestions (200 mit `[]`), /braindump/recategorize (200 mit `{"failed":0,"total":0,"updated":0}`) alle grün.
+- ✅ **Pre-Smokes curl:** /health, /api/setup-status, /spark/{id}/links (200 mit `{"incoming":[],"outgoing":[]}`), /projects/suggestions (200 mit `[]`), /spark/recategorize (200 mit `{"failed":0,"total":0,"updated":0}`) alle grün.
 
 ### Test-Items
 
@@ -2403,16 +2403,16 @@ Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Fina
   - `app-footer`: 3 ✅ (Footer)
   - `suggestionsBanner`: 2 ✅ (Phase-U-Desktop)
   - `Verknüpft mit`: 1 ✅ (BD-Detail-Modal)
-- **Phase-F-i18n-Re-Grep:** 1 echter Treffer Z. 430 `<button class="tab active" data-tab="braindumps">BrainDumps</button>`. Keine Phase-F-Drift, sondern bewusste Domain-Term-Entscheidung — andere 3 Tabs (Z. 431-433) sind deutsch (Projekte/Aufgaben/Erfolge); BrainDumps konsistent zu Android `BrainDumpHistoryScreen.kt` Z. 64. Phase-F-Tuvok-Gate hatte das durchgewunken. Z. 517 `<!-- New Task Modal -->` ist HTML-Kommentar (false-positive).
+- **Phase-F-i18n-Re-Grep:** 1 echter Treffer Z. 430 `<button class="tab active" data-tab="sparks">Sparks</button>`. Keine Phase-F-Drift, sondern bewusste Domain-Term-Entscheidung — andere 3 Tabs (Z. 431-433) sind deutsch (Projekte/Aufgaben/Erfolge); Sparks konsistent zu Android `SparkHistoryScreen.kt` Z. 64. Phase-F-Tuvok-Gate hatte das durchgewunken. Z. 517 `<!-- New Task Modal -->` ist HTML-Kommentar (false-positive).
 - **Verdikt Item 1:** ✅ grün.
 
 #### Item 2 — Daten-gefüllter Backend-Pfad
 
 - **`POST /links` mit `created_by="llm"` Test (SM-B-002 Server-Override):**
-  - Request-Body: `{"source_type":"braindump","source_id":"<bd1>","target_type":"braindump","target_id":"<bd2>","relation":"related","confidence":0.9,"created_by":"llm"}`
+  - Request-Body: `{"source_type":"spark","source_id":"<bd1>","target_type":"spark","target_id":"<bd2>","relation":"related","confidence":0.9,"created_by":"llm"}`
   - Response: 200 mit `created_by: "user"` ✅ — Server-Override greift wie spec.
   - Link-ID: `ccd1cdac-352b-4dec-b5b4-d3b7ea0c26b3`
-- **`GET /braindump/<bd1>/links` Re-Verifikation:** 2 outgoing-Links + 0 incoming.
+- **`GET /spark/<bd1>/links` Re-Verifikation:** 2 outgoing-Links + 0 incoming.
   - Link 1 (User-erzeugt): `id=ccd1cdac, confidence=0.9, created_by="user", relation="related"` — mein Test-Link.
   - Link 2 (LLM-erzeugt, **Bonus-Befund**): `id=1347b520, confidence=0.95, created_by="llm", relation="mentions", reason="Der Quelltext bezieht sich auf das Thema 'Essen und Kochen' …"`. Background-Task hat während der Pre-Smoke-Phase seinen ersten Cycle ausgeführt und einen echten LLM-Link erzeugt — Phase-B `extract_links_for_recent` live verifiziert mit Production-Konfidenz, sauber strukturierter Reason, und Domain-Daten aus dem Vault.
 - **DTO-Konformität für Android:** Alle Felder gemäß `Link`-Kotlin-DTO vorhanden (id/source_type/source_id/target_type/target_id/relation/confidence/reason/created_at/created_by). Confidence als REAL (Double in Kotlin), reason nullable wenn fehlt. ✅
@@ -2424,8 +2424,8 @@ Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Fina
 - **Lockscreen-Status:** `mFocusedWindow=Bouncer`, `mDreamingLockscreen=true` — PIN-Eingabe vor Display-Render. `adb shell input swipe`/`keyevent` haben keine Wirkung (PIN-secured Lockscreen).
 - **App-Lebenszeichen:** `dumpsys activity activities` zeigt `Task #36 visible=true visibleRequested=false ... MainActivity` — App ist im Process-Stack korrekt registriert, hat Boot durchlaufen, wartet auf Display-Frontgrund.
 - **Geforderte Screenshots gemäß Sprint-Plan + HANDOVER.md (offen):**
-  - Screenshot 1: BrainDump-Tab (App-Boot-Ansicht)
-  - Screenshot 2: BrainDump-Detail-Sheet (Tap auf BD-Card mit ID `6ce04e1d-...` → Bottom-Sheet öffnet, "Verknüpft mit"-Block zeigt 2 Wikilink-Chips für die in Item 2 erzeugten Links — User-Link mit 90% + LLM-Link mit 95%)
+  - Screenshot 1: Spark-Tab (App-Boot-Ansicht)
+  - Screenshot 2: Spark-Detail-Sheet (Tap auf BD-Card mit ID `6ce04e1d-...` → Bottom-Sheet öffnet, "Verknüpft mit"-Block zeigt 2 Wikilink-Chips für die in Item 2 erzeugten Links — User-Link mit 90% + LLM-Link mit 95%)
   - Screenshot 3: Projects-Tab (Suggestions-Banner ist aktuell `[]`, also nur Project-Cards sichtbar — Empty-State der Suggestions ist akzeptables Outcome, weil noch keine `suggest_auto_projects`-Cycle gelaufen ist; Test der Banner-Sichtbarkeit erst bei mid-confidence-Suggestion möglich)
 - **Auflage an Admin:** Pixel einmal entsperren (PIN), dann Iter-2-Screenshots in der gleichen Session anhängen.
 - **Verdikt Item 3:** ⏸️ offen — Auflage SM-LIVE-001-MAN.
@@ -2442,7 +2442,7 @@ Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Fina
 - **Schweregrad:** ⚠️ Auflage (nicht Code-Block)
 - **Kategorie:** Vollständigkeit (Live-Verifikation)
 - **Befund:** Lockscreen-PIN auf Pixel RFCX20J1PEX blockt UI-Render. Die 3 in HANDOVER.md "Final-Live-Test-Setup für AS-CLI" geforderten Screenshots können ohne Admin-Entsperrung nicht angefertigt werden. Backend-Pfade + Build + DTO + logcat sind technisch alle verifiziert; Mobile-UI-Visual ist die letzte fehlende Live-Bestätigung.
-- **Korrekturvorschlag:** Admin entsperrt Pixel einmal, danach Iter-2-Run dieser QS-Session: 3 `adb shell screencap -p`-Calls (BrainDump-Tab → Tap auf BD `6ce04e1d` → Bottom-Sheet-Screenshot mit 2 Wikilink-Chips → Projects-Tab-Screenshot). Bei grünen Screenshots → ✅ Final-Freigabe für `v0.1.2`-Tag.
+- **Korrekturvorschlag:** Admin entsperrt Pixel einmal, danach Iter-2-Run dieser QS-Session: 3 `adb shell screencap -p`-Calls (Spark-Tab → Tap auf BD `6ce04e1d` → Bottom-Sheet-Screenshot mit 2 Wikilink-Chips → Projects-Tab-Screenshot). Bei grünen Screenshots → ✅ Final-Freigabe für `v0.1.2`-Tag.
 - **Status:** offen — Admin-Auflage
 
 #### SM-LIVE-002-COD (Lerneffekt — kein Finding für diesen Sprint)
@@ -2454,11 +2454,11 @@ Nach SM-U-AND-003-Fix: ✅ Freigabe für Phase-U-Android-Commit + Cross-CLI-Fina
 
 ### Was geprüft und in Ordnung
 
-- ✅ **Backend-Endpoints alle Live-grün:** /health, /api/setup-status, /braindump/{id}/links, /projects/suggestions, /braindump/recategorize, /links (POST), /braindump/{id}/links (GET). Bearer-Auth-Pflicht respektiert (auth-DEBUG-Logs zeigen `bearer_valid=true` für POST /links und GET /braindump/recategorize).
+- ✅ **Backend-Endpoints alle Live-grün:** /health, /api/setup-status, /spark/{id}/links, /projects/suggestions, /spark/recategorize, /links (POST), /spark/{id}/links (GET). Bearer-Auth-Pflicht respektiert (auth-DEBUG-Logs zeigen `bearer_valid=true` für POST /links und GET /spark/recategorize).
 - ✅ **SM-B-002 Server-Override `created_by`:** verifiziert mit Live-Request — Client `"llm"` → Server `"user"`. SM-B-Pattern aus Phase-B-Iter-2 ist in Production wirksam.
 - ✅ **Phase-B Background-Task läuft live:** `extract_links_for_recent` hat während dieses Final-Live-Tests einen echten LLM-Link mit confidence=0.95 erzeugt — Bonus-Verifikation des `extract_links`-Trait-Overrides in `claude.rs` oder `ollama.rs`. Reason-String ist deutsch und thematisch sinnvoll.
 - ✅ **DTO-Konformität End-to-End:** Backend-JSON für Link enthält alle 10 Felder, die der Kotlin `Link`-DTO erwartet. Confidence als REAL → Double, reason als Option<String> → String?, alle anderen TEXT-Felder als String.
-- ✅ **Tauri-Bundle-Frontend-Inspection:** mtime-Audit + Source-Grep liefert 4/4 SM-Patterns vorhanden, Phase-F-DoD wahrt domänenspezifischen Term "BrainDumps" konsistent zu Android.
+- ✅ **Tauri-Bundle-Frontend-Inspection:** mtime-Audit + Source-Grep liefert 4/4 SM-Patterns vorhanden, Phase-F-DoD wahrt domänenspezifischen Term "Sparks" konsistent zu Android.
 - ✅ **logcat clean:** App-Boot ohne FATAL/AndroidRuntime/Exception nach `am force-stop` + `am start`. Kein Native-Crash, keine Runtime-Exception.
 - ✅ **Cross-CLI-Repo-Konsistenz:** HEAD `c468c24` (Phase-U-Android), bezogen auf Hauptsession-CLI-Vorgänger `1f68852` (Phase X). Branch main, working tree nur mit `?? .claude/` außerhalb des Sprints.
 
@@ -2488,9 +2488,9 @@ Admin hat Pixel RFCX20J1PEX entsperrt (`mFocusedWindow=MainActivity`, `mDreaming
 
 | Screenshot | Datei | Befund |
 |---|---|---|
-| 1 — BrainDump-Tab (App-Boot) | `/tmp/sm-live-1-braindumps.png` | ✅ Recording-Tab mit Mic, Bottom-Nav komplett deutsch (BrainDump\|Verlauf\|Aufgaben\|Projekte\|Einstellungen), Footer "Powered by VibeCode Solutions · NEXUS v0.1.0", grüner Connection-Dot |
+| 1 — Spark-Tab (App-Boot) | `/tmp/sm-live-1-sparks.png` | ✅ Recording-Tab mit Mic, Bottom-Nav komplett deutsch (Spark\|Verlauf\|Aufgaben\|Projekte\|Einstellungen), Footer "Powered by VibeCode Solutions · NEXUS v0.1.0", grüner Connection-Dot |
 | Verlauf-Tab | `/tmp/sm-live-2-verlauf.png` | ✅ Card-Liste mit 4 Cards (Random/Question/Worry/Task), alle deutsch lokalisiert, BD `6ce04e1d` als erste Card |
-| 2 — BrainDump-Detail-Sheet | `/tmp/sm-live-14-original-correct-tap.png` | ✅ ModalBottomSheet öffnet, Drag-Handle, Header "BrainDump", Category-Chip "Random" (AssistChip-Pattern aus SM-U-AND-002-WAR), Datum, Volltext, Zusammenfassungs-Block (Surface), HorizontalDivider, **"Verknüpft mit"-Section** mit 📝-Wikilink-Chip "Notiz zum Thema Essen und Kochen speichern" 95% (LLM-Link aus Phase-B Background-Task) + 📝-Chip "Erkundigung nach dem Warum Clippy..." (User-Link aus Iter-1 POST), **"Rückverweise"-Section** mit 📝-Chip "Asking for confirmation of presence and availability." Sentinel-Filter sichtbar funktional (kein noop-marker) |
+| 2 — Spark-Detail-Sheet | `/tmp/sm-live-14-original-correct-tap.png` | ✅ ModalBottomSheet öffnet, Drag-Handle, Header "Spark", Category-Chip "Random" (AssistChip-Pattern aus SM-U-AND-002-WAR), Datum, Volltext, Zusammenfassungs-Block (Surface), HorizontalDivider, **"Verknüpft mit"-Section** mit 📝-Wikilink-Chip "Notiz zum Thema Essen und Kochen speichern" 95% (LLM-Link aus Phase-B Background-Task) + 📝-Chip "Erkundigung nach dem Warum Clippy..." (User-Link aus Iter-1 POST), **"Rückverweise"-Section** mit 📝-Chip "Asking for confirmation of presence and availability." Sentinel-Filter sichtbar funktional (kein noop-marker) |
 | 3 — Projects-Tab | `/tmp/sm-live-4-projects.png` | ✅ Header "Projekte", Empty-State "Keine Projekte vorhanden" — DB hat keine Projekte und keine pending Suggestions, beide Empty-States akzeptabel |
 
 **logcat-Re-Check:** `FATAL\|AndroidRuntime\|Exception` weiterhin leer nach App-Restart-Cycle.
@@ -2509,11 +2509,11 @@ Admin hat Pixel RFCX20J1PEX entsperrt (`mFocusedWindow=MainActivity`, `mDreaming
 - **Kategorie:** Daten-Hygiene
 - **Befund:** Test-Link `ccd1cdac-352b-4dec-b5b4-d3b7ea0c26b3` (User-Link, BD `6ce04e1d` → `2720ef68`, conf=0.9, relation=related) wurde in Iter-1 absichtlich in der DB belassen für Iter-2-Screenshot-Verifikation. Nun sichtbar in der App als Wikilink-Chip mit Test-Reason — gehört nicht in Production-Daten.
 - **Korrekturvorschlag:** Implementer (Hauptsession-CLI nach Memory-Regel `feedback_workflow_split.md`) führt vor `v0.1.2`-Tag-Push aus: `curl -X DELETE -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7777/links/ccd1cdac-352b-4dec-b5b4-d3b7ea0c26b3` (erwartet 204 No Content).
-- **Status:** ✅ erledigt 2026-05-02 durch Hauptsession-CLI — DELETE_HTTP=204 verifiziert, danach `GET /braindump/.../links` liefert leere Listen für Test-BD. Sprint v0.1.2 tag-bereit.
+- **Status:** ✅ erledigt 2026-05-02 durch Hauptsession-CLI — DELETE_HTTP=204 verifiziert, danach `GET /spark/.../links` liefert leere Listen für Test-BD. Sprint v0.1.2 tag-bereit.
 
 ### Was geprüft und in Ordnung
 
-- ✅ **Phase-U-Android-DoD live erfüllt:** SM-U-AND-1 (Bottom-Sheet öffnet bei Card-Tap, Verknüpft-mit-Block + Wikilinks + Konfidenz sichtbar), SM-U-AND-3 (NexusApiClient ruft `/braindump/{id}/links` korrekt, liefert outgoing+incoming-Listen), SM-U-AND-4 (DTOs Backend-konform). SM-U-AND-2 (Suggestions-Banner) konnte nicht visuell verifiziert werden (DB hat `[]` Suggestions), Code-Pfad in AUFTRAG #15 statisch verifiziert — akzeptabel weil Empty-State-Code-Pfad korrekt rendert.
+- ✅ **Phase-U-Android-DoD live erfüllt:** SM-U-AND-1 (Bottom-Sheet öffnet bei Card-Tap, Verknüpft-mit-Block + Wikilinks + Konfidenz sichtbar), SM-U-AND-3 (NexusApiClient ruft `/spark/{id}/links` korrekt, liefert outgoing+incoming-Listen), SM-U-AND-4 (DTOs Backend-konform). SM-U-AND-2 (Suggestions-Banner) konnte nicht visuell verifiziert werden (DB hat `[]` Suggestions), Code-Pfad in AUFTRAG #15 statisch verifiziert — akzeptabel weil Empty-State-Code-Pfad korrekt rendert.
 - ✅ **Backend-Daten-Pfad live:** LLM-Link aus Phase-B Background-Task (`extract_links_for_recent` mit confidence=0.95) sichtbar im Sheet; User-Link aus Iter-1-POST sichtbar; Rückverweis (incoming-Link) sichtbar.
 - ✅ **Cross-CLI-Repo-Konsistenz:** HEAD `c468c24` Phase-U-Android steht unverändert nach Iter-2. `git restore` hat Implementer-Refactor-Versuch sauber zurückgerollt — working tree zeigt nur `M QS_FINDINGS.md` (meine Sektionen) + `?? .claude/`.
 - ✅ **Logcat clean:** App-Boot-Cycle ohne FATAL/AndroidRuntime/Exception, auch nach Force-Stop+Re-Start.

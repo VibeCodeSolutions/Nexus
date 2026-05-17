@@ -1,6 +1,6 @@
 # NEXUS — Sync zwischen Geräten
 
-Wie Tasks, Braindumps und Projekte zwischen Desktop und Mobil sichtbar werden, was funktioniert, was nicht.
+Wie Tasks, Sparks und Projekte zwischen Desktop und Mobil sichtbar werden, was funktioniert, was nicht.
 
 ## Modell auf einen Blick
 

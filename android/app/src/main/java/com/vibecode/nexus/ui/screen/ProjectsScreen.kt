@@ -160,7 +160,7 @@ fun ProjectsScreen(
                                                     .onSuccess { res ->
                                                         if (res.partial) {
                                                             snackbarHostState.showSnackbar(
-                                                                "Projekt erstellt — ${res.linked_braindumps} von ${res.requested_braindumps} Notizen verknüpft."
+                                                                "Projekt erstellt — ${res.linked_sparks} von ${res.requested_sparks} Notizen verknüpft."
                                                             )
                                                         } else {
                                                             snackbarHostState.showSnackbar("Projekt „${res.name}“ erstellt.")
@@ -305,7 +305,7 @@ private fun SuggestionRow(
     onDismiss: (String) -> Unit,
 ) {
     val confPct = (suggestion.confidence * 100).toInt()
-    val memberCount = suggestion.member_braindump_ids.size
+    val memberCount = suggestion.member_spark_ids.size
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = suggestion.name,

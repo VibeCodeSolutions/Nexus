@@ -16,7 +16,7 @@
 //! nexus_received: <ISO 8601 UTC>
 //! nexus_instructions: "<einzeilige Anweisung>"
 //! ---
-//! <braindump-Rohtext>
+//! <spark-Rohtext>
 //! ```
 
 use chrono::{DateTime, Utc};
@@ -34,13 +34,13 @@ pub struct InboxFrontmatter {
 /// Phase D macht das per Wizard konfigurierbar; bis dahin reicht eine eindeutige
 /// Direktive, die der Skill als „sortiere nach Tasks/Projekte/Notes"-Trigger erkennt.
 pub const DEFAULT_INBOX_INSTRUCTIONS: &str =
-    "Sortiere diesen BrainDump in Nexus/Outbox/<uuid>.md nach Tasks/Projekte/Notes.";
+    "Sortiere diesen Spark in Nexus/Outbox/<uuid>.md nach Tasks/Projekte/Notes.";
 
 /// Baut eine vollständige Markdown-Datei (Frontmatter + Body) für die Inbox.
 ///
 /// Der Body wird wörtlich übernommen — keine Eskapierung, kein Trimmen. Wenn
-/// der BrainDump-Text mit `---` beginnt, würde der Vault-Skill das Frontmatter
-/// als beendet sehen; das ist ein bewusster Trade-off (BrainDumps sind
+/// der Spark-Text mit `---` beginnt, würde der Vault-Skill das Frontmatter
+/// als beendet sehen; das ist ein bewusster Trade-off (Sparks sind
 /// gesprochene Notizen, kein Markdown-Quelltext).
 pub fn build_inbox_file(fm: &InboxFrontmatter, body: &str) -> String {
     let mut out = String::with_capacity(body.len() + 256);
@@ -134,7 +134,7 @@ pub struct OutboxFrontmatter {
     #[serde(default)]
     pub nexus_id: Option<String>,
     /// Inbox-File-Name (mit oder ohne `.md`), referenziert die ursprüngliche
-    /// BrainDump-Row über `braindumps.nexus_inbox_id`. Wenn vorhanden,
+    /// Spark-Row über `sparks.nexus_inbox_id`. Wenn vorhanden,
     /// flippt der Importer den Status von 'pending' auf 'done'.
     #[serde(default)]
     pub nexus_source_inbox: Option<String>,
@@ -206,13 +206,13 @@ mod tests {
 
     #[test]
     fn build_inbox_file_has_yaml_frontmatter_and_body() {
-        let out = build_inbox_file(&fixture(), "Mein gesprochener BrainDump.");
+        let out = build_inbox_file(&fixture(), "Mein gesprochener Spark.");
         assert!(out.starts_with("---\n"), "must start with yaml fence");
         assert!(out.contains("nexus_inbox_id: 01HZ1A2B3C4D5E6F7G8H9JKLMN\n"));
         assert!(out.contains("nexus_received: 2026-05-09T10:00:00+00:00\n"));
         assert!(out.contains("nexus_instructions: \"Sortiere"));
         assert!(out.contains("\n---\n"));
-        assert!(out.ends_with("Mein gesprochener BrainDump.\n"));
+        assert!(out.ends_with("Mein gesprochener Spark.\n"));
     }
 
     #[test]
@@ -231,14 +231,14 @@ mod tests {
 
     #[test]
     fn build_inbox_file_roundtrips_through_gray_matter() {
-        let out = build_inbox_file(&fixture(), "BrainDump-Body");
+        let out = build_inbox_file(&fixture(), "Spark-Body");
         let parsed = parse_outbox(&out).expect("gray_matter must parse our own output");
         let data = parsed.data.as_ref().expect("frontmatter present");
         assert_eq!(
             data["nexus_inbox_id"].as_string().unwrap(),
             "01HZ1A2B3C4D5E6F7G8H9JKLMN"
         );
-        assert_eq!(parsed.content.trim(), "BrainDump-Body");
+        assert_eq!(parsed.content.trim(), "Spark-Body");
     }
 
     #[test]

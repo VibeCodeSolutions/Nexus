@@ -4,7 +4,7 @@
 // `analyze_with_provider`-Refactor (NV1-003) nicht mehr nötig.
 #![allow(dead_code)]
 
-//! Sprint Nightvision NV-1 — Vision-LLM + OCR-Fallback für Foto-Braindumps.
+//! Sprint Nightvision NV-1 — Vision-LLM + OCR-Fallback für Foto-Sparks.
 //!
 //! Pipeline (siehe `docs/sprints/nightvision-photo-ocr.md`):
 //!
@@ -31,7 +31,7 @@ use crate::keystore;
 /// Ergebnis einer Bild-Analyse: extrahierte Textzeilen (in Lese-Reihenfolge)
 /// und vorgeschlagene Tags. Beide Listen können leer sein — z. B. wenn ein
 /// Bild keinen sinnvollen Text enthält. Der Aufrufer entscheidet dann, ob
-/// trotzdem ein Braindump angelegt wird (mit leerem `raw_text`).
+/// trotzdem ein Spark angelegt wird (mit leerem `raw_text`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VisionAnalysis {
     pub text_lines: Vec<String>,

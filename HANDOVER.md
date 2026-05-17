@@ -2,7 +2,7 @@
 
 > **Update 2026-05-02 nachmittag — Sprint Synaptic Mosaic ✅ released als `v0.1.2`.** Cross-CLI Tuvok-Final-Live-Gate Iter-2 grün durch AS-CLI (3 adb-Screenshots verifiziert + Phase-B-Background-Task hat live einen LLM-Link mit conf=0.95 erzeugt + logcat clean), SM-LIVE-CLEANUP-001 (Test-Link DELETE → 204) durch Hauptsession-CLI vor Tag. Tag `v0.1.2` getaggt + gepusht. Folge-Sprint-Bookmarks: SM-LIVE-002-COD (Multi-Instance-Drift bei Backend-Updates explizit als Closure-Auflage in künftigen Sprint-Plans aufnehmen — Sprint-Plan-Sektion "Setup: Core neu starten" wurde in dieser Sprint übersehen weil Hauptsession-CLI keinen direkten Cross-CLI-Smoke macht), SM-LIVE-003-PER, SM-U-AND-001/002/004/005, SM-B-005, Provider-Coverage, Vault-Implementierung.
 
-> **Update 2026-05-02 vormittag** — Sprint "Synaptic Mosaic" (v0.1.2-Bump): Phase F + B + U Desktop + X (Desktop-Anteil) Tuvok-grün und committed (`a640837` / `2b45fcd` / `c1ce54d` / `5eff289` + `1f68852`). Knowledge-Graph (BrainDump↔Projekt-Verknüpfungen + Auto-Projekt-Vorschläge) im Backend live, Desktop-UI mit BrainDump-Detail-Modal + Suggestions-Banner + Material-3-Polish. **Cross-CLI offen:** AS-CLI muss Phase-U-Android implementieren (`BrainDumpHistoryScreen` Bottom-Sheet + `ProjectsScreen` Top-Banner + `NexusApiClient` 4 Funktionen + Link/Suggestion DTOs) und APK bauen, danach Cross-CLI Tuvok-Final-Live (curl + adb-Screenshots) vor Tag-Push. Aktueller Stand → `CURRENT_STATE.md`. Doku → `docs/LINKS.md`. **Arbeitsweise für die AS-CLI-Session siehe Block "AS-CLI-Anlauf — Arbeitsweise" unten.**
+> **Update 2026-05-02 vormittag** — Sprint "Synaptic Mosaic" (v0.1.2-Bump): Phase F + B + U Desktop + X (Desktop-Anteil) Tuvok-grün und committed (`a640837` / `2b45fcd` / `c1ce54d` / `5eff289` + `1f68852`). Knowledge-Graph (Spark↔Projekt-Verknüpfungen + Auto-Projekt-Vorschläge) im Backend live, Desktop-UI mit Spark-Detail-Modal + Suggestions-Banner + Material-3-Polish. **Cross-CLI offen:** AS-CLI muss Phase-U-Android implementieren (`SparkHistoryScreen` Bottom-Sheet + `ProjectsScreen` Top-Banner + `NexusApiClient` 4 Funktionen + Link/Suggestion DTOs) und APK bauen, danach Cross-CLI Tuvok-Final-Live (curl + adb-Screenshots) vor Tag-Push. Aktueller Stand → `CURRENT_STATE.md`. Doku → `docs/LINKS.md`. **Arbeitsweise für die AS-CLI-Session siehe Block "AS-CLI-Anlauf — Arbeitsweise" unten.**
 
 ---
 
@@ -88,9 +88,9 @@ Bei Hook-Fail nicht umgehen — Root-Cause fixen.
 Nach Phase-U-Android + APK-Build kommt der Cross-CLI-Tuvok-Final-Live-Gate. Setup laut Sprint-Plan `~/.claude/plans/synaptic-mosaic.md` Sektion "Tuvok-Final-Live-Test":
 
 - **Setup**: Core neu starten (Release-Binary), APK reinstallieren auf Pixel, Tauri-Bundle ist bereits gebaut (Hauptsession-CLI hat DEB+RPM)
-- **Desktop-Smokes** (curl): `/health` → 200, `/api/setup-status` → JSON, `GET /braindump/{id}/links` → 200, Tauri-Bundle-Frontend grep auf `cycleTheme + app-footer + Verknüpft mit + suggestionsBanner`
-- **Android-Smokes** (adb): install -r, force-stop + start, Screenshot 1 (BrainDump-Tab), Screenshot 2 (BrainDump-Detail-Sheet mit Verknüpfungen), Screenshot 3 (Projects-Tab mit Suggestions-Banner falls pending), logcat-Tail nach `FATAL\|AndroidRuntime` muss leer sein
-- **End-to-End**: Echo-BrainDump via curl POST → Response unverändert dünn (kein `suggested_links`-Feld, extract_links läuft im Background — SM-PR-004), `recategorize_unsorted` triggern → Logs zeigen `extract_links_for_recent` + ggf. `suggest_auto_projects`-Aufruf, `GET /projects/suggestions` → Liste
+- **Desktop-Smokes** (curl): `/health` → 200, `/api/setup-status` → JSON, `GET /spark/{id}/links` → 200, Tauri-Bundle-Frontend grep auf `cycleTheme + app-footer + Verknüpft mit + suggestionsBanner`
+- **Android-Smokes** (adb): install -r, force-stop + start, Screenshot 1 (Spark-Tab), Screenshot 2 (Spark-Detail-Sheet mit Verknüpfungen), Screenshot 3 (Projects-Tab mit Suggestions-Banner falls pending), logcat-Tail nach `FATAL\|AndroidRuntime` muss leer sein
+- **End-to-End**: Echo-Spark via curl POST → Response unverändert dünn (kein `suggested_links`-Feld, extract_links läuft im Background — SM-PR-004), `recategorize_unsorted` triggern → Logs zeigen `extract_links_for_recent` + ggf. `suggest_auto_projects`-Aufruf, `GET /projects/suggestions` → Liste
 
 Findings als QS_FINDINGS.md-Sektion `## Synaptic Mosaic — Final-Live-Gate (Cross-CLI)`. Bei Major/Blocker → zurück zu Chakotay. **Max 2 Live-Test-Iterationen**, dann Eskalation.
 
@@ -100,8 +100,8 @@ Findings als QS_FINDINGS.md-Sektion `## Synaptic Mosaic — Final-Live-Gate (Cro
 2. **Sprint-Plan + WORKLOG + todo.md SM-Block überfliegen** für Stand.
 3. **Phase-U-Android implementieren** in 4 Files (siehe `todo.md` SM-U-AND-1..4):
    - `data/model/Link.kt` + `ProjectSuggestion.kt` (DTOs)
-   - `data/NexusApiClient.kt` (4 Funktionen: `getBraindumpLinks`, `acceptSuggestion`, `dismissSuggestion`, `listSuggestions`)
-   - `ui/screen/BrainDumpHistoryScreen.kt` (Bottom-Sheet auf Detail-Klick mit Verknüpft-mit-Block)
+   - `data/NexusApiClient.kt` (4 Funktionen: `getSparkLinks`, `acceptSuggestion`, `dismissSuggestion`, `listSuggestions`)
+   - `ui/screen/SparkHistoryScreen.kt` (Bottom-Sheet auf Detail-Klick mit Verknüpft-mit-Block)
    - `ui/screen/ProjectsScreen.kt` (Top-Banner für pending Suggestions)
 4. **Build**: `cd android && ./gradlew assembleDebug` EXIT=0
 5. **`Skill('vc-qualitaet')`** triggern für Phase-U-Android-Diff-Review (mit adb-Live-Smoke)
@@ -173,7 +173,7 @@ GitHub-Secrets gesetzt (in der Live-Session):
 
 End-to-End-Smoke-Test wurde angefangen, aber abgebrochen vor:
 - [ ] Handy-App + Desktop-App gepairt
-- [ ] BrainDump auf Handy → erscheint im Desktop-Dashboard
+- [ ] Spark auf Handy → erscheint im Desktop-Dashboard
 - [ ] Provider-Wechsel im Settings-Dialog (statt Onboarding-Wizard)
 - [ ] Installer testweise auf VM ausgerollt (Win11) und durchgeklickt
 
@@ -300,7 +300,7 @@ git push origin v0.1.0
 
 ## Offene Punkte fürs nächste Cowork
 
-1. **Pairing live durchspielen** (Handy + Desktop, BrainDump-Sync)
+1. **Pairing live durchspielen** (Handy + Desktop, Spark-Sync)
 2. **Win11-VM-Test** des MSI-Installers (SmartScreen-Hinweis ist im README dokumentiert)
 3. **Restart-Race-Condition** beim Provider-Save — entweder Frontend-Delay oder Server-Side-Live-Reload (`RwLock<Arc<dyn LlmProvider>>`)
 4. **Backlog-Tickets aus QS_FINDINGS.md** abarbeiten (in Reihenfolge von High zu Low)
@@ -336,7 +336,7 @@ git push origin v0.1.0
 - ✅ `cargo check` und `cargo build` (Core) sauber
 - ✅ Localhost-Test des Handshake-Endpoints (HTTP 200)
 - ❌ **E2E mit echter APK noch nicht bestätigt** — letzter Pair-Versuch zeigte im Core-Log nur `/health`-Pings vom Phone, keinen `path=/api/pair/handshake`-Hit
-- 🔍 **Verdacht:** APK auf Handy hatte alten Pair-State in EncryptedSharedPrefs (App startete direkt in BrainDump → mein neuer `completePairing()`-Pfad wurde nie durchlaufen). Lösung: in der App **Settings → Unpair** vor erneutem QR-Scan
+- 🔍 **Verdacht:** APK auf Handy hatte alten Pair-State in EncryptedSharedPrefs (App startete direkt in Spark → mein neuer `completePairing()`-Pfad wurde nie durchlaufen). Lösung: in der App **Settings → Unpair** vor erneutem QR-Scan
 - 🔍 **Reachability-Stolperfalle entdeckt:** Bei Dual-Stack-Networking (Ethernet+WiFi auf gleichem /24) kann das Phone die Server-IP timeout-en — ein Interface deaktivieren ist der schnelle Workaround
 
 ### Windows-Sprint vorbereitet (Chakotay-Kette)

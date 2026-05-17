@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
 
-/// Polymorpher Verknüpfungs-Knoten zwischen BrainDumps und Projekten.
+/// Polymorpher Verknüpfungs-Knoten zwischen Sparks und Projekten.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Link {
     pub id: String,
@@ -90,7 +90,7 @@ pub async fn delete_by_id(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error
 }
 
 /// Polymorphe Cleanup-Helper: löscht alle Links, die einen bestimmten Knoten als source ODER target haben.
-/// Wird in delete_braindump/delete_project aufgerufen, weil polymorphe FKs in SQLite nicht möglich sind.
+/// Wird in delete_spark/delete_project aufgerufen, weil polymorphe FKs in SQLite nicht möglich sind.
 pub async fn delete_for_node(pool: &SqlitePool, node_type: &str, node_id: &str) -> Result<u64, sqlx::Error> {
     let result = sqlx::query(
         "DELETE FROM links WHERE (source_type = ?1 AND source_id = ?2) OR (target_type = ?1 AND target_id = ?2)",
@@ -130,9 +130,9 @@ mod tests {
 
     fn sample_input(src: &str, tgt: &str) -> LinkInput {
         LinkInput {
-            source_type: "braindump".into(),
+            source_type: "spark".into(),
             source_id: src.into(),
-            target_type: "braindump".into(),
+            target_type: "spark".into(),
             target_id: tgt.into(),
             relation: "related".into(),
             confidence: 0.85,
@@ -148,7 +148,7 @@ mod tests {
         assert_eq!(link.source_id, "a");
         assert_eq!(link.target_id, "b");
         assert_eq!(link.relation, "related");
-        let listed = list_for_source(&pool, "braindump", "a").await.unwrap();
+        let listed = list_for_source(&pool, "spark", "a").await.unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, link.id);
     }
@@ -157,7 +157,7 @@ mod tests {
     async fn list_for_target_finds_inverse() {
         let pool = setup_pool().await;
         insert(&pool, &sample_input("a", "b")).await.unwrap();
-        let listed = list_for_target(&pool, "braindump", "b").await.unwrap();
+        let listed = list_for_target(&pool, "spark", "b").await.unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].source_id, "a");
     }
@@ -167,7 +167,7 @@ mod tests {
         let pool = setup_pool().await;
         let link = insert(&pool, &sample_input("a", "b")).await.unwrap();
         delete_by_id(&pool, &link.id).await.unwrap();
-        let listed = list_for_source(&pool, "braindump", "a").await.unwrap();
+        let listed = list_for_source(&pool, "spark", "a").await.unwrap();
         assert!(listed.is_empty());
     }
 
@@ -177,17 +177,17 @@ mod tests {
         insert(&pool, &sample_input("a", "b")).await.unwrap();
         insert(&pool, &sample_input("c", "a")).await.unwrap();
         insert(&pool, &sample_input("d", "e")).await.unwrap();
-        let removed = delete_for_node(&pool, "braindump", "a").await.unwrap();
+        let removed = delete_for_node(&pool, "spark", "a").await.unwrap();
         assert_eq!(removed, 2);
         // "d -> e" bleibt
-        let remaining = list_for_source(&pool, "braindump", "d").await.unwrap();
+        let remaining = list_for_source(&pool, "spark", "d").await.unwrap();
         assert_eq!(remaining.len(), 1);
     }
 
     #[tokio::test]
     async fn delete_for_node_no_match_returns_zero() {
         let pool = setup_pool().await;
-        let removed = delete_for_node(&pool, "braindump", "nope").await.unwrap();
+        let removed = delete_for_node(&pool, "spark", "nope").await.unwrap();
         assert_eq!(removed, 0);
     }
 }

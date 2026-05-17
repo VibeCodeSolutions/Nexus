@@ -175,7 +175,7 @@ fn is_loopback(addr: &SocketAddr) -> bool {
 /// Public paths (`/health`, `/api/setup-status`) are always allowed —
 /// these are unauthenticated probes the Wizard and any LAN peer may hit.
 /// The dashboard root `/` is *not* public: it renders all stored
-/// braindumps, projects and stats, and the default bind is `0.0.0.0`,
+/// sparks, projects and stats, and the default bind is `0.0.0.0`,
 /// so leaving `/` unauthenticated would leak everything to anyone on the
 /// same network. Bearer auth required.
 ///

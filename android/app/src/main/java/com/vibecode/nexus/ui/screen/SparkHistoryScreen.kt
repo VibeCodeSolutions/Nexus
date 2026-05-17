@@ -20,27 +20,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vibecode.nexus.data.NexusApiClient
-import com.vibecode.nexus.data.model.BrainDumpLinks
-import com.vibecode.nexus.data.model.BrainDumpResponse
+import com.vibecode.nexus.data.model.SparkLinks
+import com.vibecode.nexus.data.model.SparkResponse
 import com.vibecode.nexus.data.model.Link
 import com.vibecode.nexus.data.model.ProjectResponse
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
+fun SparkHistoryScreen(apiClient: NexusApiClient) {
     val scope = rememberCoroutineScope()
-    var entries by remember { mutableStateOf<List<BrainDumpResponse>>(emptyList()) }
+    var entries by remember { mutableStateOf<List<SparkResponse>>(emptyList()) }
     var projects by remember { mutableStateOf<List<ProjectResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-    var detailEntry by remember { mutableStateOf<BrainDumpResponse?>(null) }
+    var detailEntry by remember { mutableStateOf<SparkResponse?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     fun load() {
         scope.launch {
             isLoading = true
-            apiClient.getBrainDumps()
+            apiClient.getSparks()
                 .onSuccess { entries = it; isLoading = false }
                 .onFailure { errorMsg = it.message; isLoading = false }
             apiClient.getProjects().onSuccess { projects = it }
@@ -71,7 +71,7 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = "BrainDumps",
+                text = "Sparks",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 16.dp)
@@ -115,7 +115,7 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
                 errorMsg != null -> Text("Fehler: $errorMsg", color = MaterialTheme.colorScheme.error)
                 visibleEntries.isEmpty() -> Text(
                     when (activeFilter) {
-                        null -> "Keine BrainDumps vorhanden."
+                        null -> "Keine Sparks vorhanden."
                         "__unsorted__" -> "Keine unsortierten Einträge."
                         else -> "Keine Einträge in „$activeFilter\"."
                     },
@@ -128,7 +128,7 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
                             onClick = { detailEntry = entry },
                             onDelete = {
                                 scope.launch {
-                                    apiClient.deleteBrainDump(entry.id)
+                                    apiClient.deleteSpark(entry.id)
                                         .onSuccess {
                                             entries = entries.filter { it.id != entry.id }
                                             snackbarHostState.showSnackbar("Gelöscht")
@@ -147,12 +147,12 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
     }
 
     detailEntry?.let { entry ->
-        BrainDumpDetailSheet(
+        SparkDetailSheet(
             entry = entry,
             apiClient = apiClient,
             entries = entries,
             projects = projects,
-            onNavigateToBraindump = { newId ->
+            onNavigateToSpark = { newId ->
                 entries.firstOrNull { it.id == newId }?.let { detailEntry = it }
             },
             onNavigateToProject = { name ->
@@ -166,24 +166,24 @@ fun BrainDumpHistoryScreen(apiClient: NexusApiClient) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BrainDumpDetailSheet(
-    entry: BrainDumpResponse,
+private fun SparkDetailSheet(
+    entry: SparkResponse,
     apiClient: NexusApiClient,
-    entries: List<BrainDumpResponse>,
+    entries: List<SparkResponse>,
     projects: List<ProjectResponse>,
-    onNavigateToBraindump: (String) -> Unit,
+    onNavigateToSpark: (String) -> Unit,
     onNavigateToProject: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var links by remember(entry.id) { mutableStateOf<BrainDumpLinks?>(null) }
+    var links by remember(entry.id) { mutableStateOf<SparkLinks?>(null) }
     var linksError by remember(entry.id) { mutableStateOf<String?>(null) }
     var linksLoading by remember(entry.id) { mutableStateOf(true) }
 
     LaunchedEffect(entry.id) {
         linksLoading = true
         linksError = null
-        apiClient.getBrainDumpLinks(entry.id)
+        apiClient.getSparkLinks(entry.id)
             .onSuccess { links = it; linksLoading = false }
             .onFailure { linksError = it.message; linksLoading = false }
     }
@@ -200,7 +200,7 @@ private fun BrainDumpDetailSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "BrainDump",
+                text = "Spark",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -278,7 +278,7 @@ private fun BrainDumpDetailSheet(
                     } else {
                         if (visibleOut.isNotEmpty()) {
                             WikiLinkFlow(visibleOut, dirIsOut = true, entries = entries, projects = projects,
-                                onBraindump = onNavigateToBraindump, onProject = onNavigateToProject)
+                                onSpark = onNavigateToSpark, onProject = onNavigateToProject)
                         }
                         if (visibleIn.isNotEmpty()) {
                             Text(
@@ -287,7 +287,7 @@ private fun BrainDumpDetailSheet(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             WikiLinkFlow(visibleIn, dirIsOut = false, entries = entries, projects = projects,
-                                onBraindump = onNavigateToBraindump, onProject = onNavigateToProject)
+                                onSpark = onNavigateToSpark, onProject = onNavigateToProject)
                         }
                     }
                 }
@@ -301,9 +301,9 @@ private fun BrainDumpDetailSheet(
 private fun WikiLinkFlow(
     links: List<Link>,
     dirIsOut: Boolean,
-    entries: List<BrainDumpResponse>,
+    entries: List<SparkResponse>,
     projects: List<ProjectResponse>,
-    onBraindump: (String) -> Unit,
+    onSpark: (String) -> Unit,
     onProject: (String) -> Unit,
 ) {
     FlowRow(
@@ -320,7 +320,7 @@ private fun WikiLinkFlow(
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.clickable {
-                    if (type == "project") onProject(label) else onBraindump(id)
+                    if (type == "project") onProject(label) else onSpark(id)
                 }
             ) {
                 Row(
@@ -345,7 +345,7 @@ private fun Link.isSentinel(): Boolean = relation == "noop-marker" && created_by
 private fun wikiLabelFor(
     type: String,
     id: String,
-    entries: List<BrainDumpResponse>,
+    entries: List<SparkResponse>,
     projects: List<ProjectResponse>,
 ): String {
     if (type == "project") {
@@ -363,7 +363,7 @@ private fun wikiLabelFor(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissItem(
-    entry: BrainDumpResponse,
+    entry: SparkResponse,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {

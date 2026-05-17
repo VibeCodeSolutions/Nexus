@@ -1,15 +1,15 @@
-# Sprint Nightvision — Foto-Braindump-Pipeline
+# Sprint Nightvision — Foto-Spark-Pipeline
 
 **Stand:** 2026-05-17
 **Auftrag:** Daniels Handoff (`docs/design-refs/nightvision-features/nexus/project/BUILD-SPEC.md`) als Feature-Spec umsetzen.
-**Audit:** ~80% bereits vorhanden. Echter Neubau ist Foto-Braindump-Flow (Variante B). Rest sind Quick Wins (Volltextsuche, Settings-Toggles, Auto-Tag-UI).
+**Audit:** ~80% bereits vorhanden. Echter Neubau ist Foto-Spark-Flow (Variante B). Rest sind Quick Wins (Volltextsuche, Settings-Toggles, Auto-Tag-UI).
 
 ## Tech-Entscheidungen (fix)
 
 - **OCR-Strategie:** LLM-Vision primär, Tesseract als Fallback wenn Provider unkonfiguriert/fehlerhaft.
 - **Vision-Output:** Eine Anfrage liefert sowohl OCR-Text als auch Tag-Vorschläge (Strukturiert via JSON). Tesseract-Pfad triggert separaten LLM-Call für Tags.
-- **Streaming:** Server-Sent Events (axum-bestehend). Frame-Typen: `line` (OCR-Zeile), `tags` (Vorschlagsliste), `done` (braindump_id), `error`.
-- **Bild-Storage:** Filesystem unter `<data_dir>/braindump_images/<uuid>.jpg`, Pfad in DB. Kein BLOB.
+- **Streaming:** Server-Sent Events (axum-bestehend). Frame-Typen: `line` (OCR-Zeile), `tags` (Vorschlagsliste), `done` (spark_id), `error`.
+- **Bild-Storage:** Filesystem unter `<data_dir>/spark_images/<uuid>.jpg`, Pfad in DB. Kein BLOB.
 - **Dual-CLI:** Core + Desktop hier (this CLI). Android-UI separat via AS-CLI per Handoff-Doc (Memory: `feedback_workflow_split`).
 - **QS-Gate:** Vor jedem Commit Tuvok-Runde (Memory: `feedback_qs_tuvok`).
 
@@ -33,7 +33,7 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
 **Scope:** Vision-Abstraktion in `core/src/llm/` analog bestehendem `LlmProvider`. Eine vision-fähige Implementierung + Fallback-Logik.
 
 **Deliverables:**
-- Migration: `braindumps`-Tabelle erweitern um `source TEXT NOT NULL DEFAULT 'text'` (`'text' | 'photo'`) und `image_path TEXT NULL`.
+- Migration: `sparks`-Tabelle erweitern um `source TEXT NOT NULL DEFAULT 'text'` (`'text' | 'photo'`) und `image_path TEXT NULL`.
 - Neuer Trait `VisionProvider` in `core/src/llm/mod.rs` mit `analyze_image(bytes: &[u8], mime: &str) -> Result<VisionAnalysis>` (Felder: `text_lines: Vec<String>`, `suggested_tags: Vec<String>`).
 - Implementierung Groq via `OpenAiCompatibleProvider`-Erweiterung (Vision-Endpoint mit `image_url` data-URI).
 - Tesseract-Fallback: `pub async fn ocr_tesseract(bytes: &[u8]) -> Result<Vec<String>>` via `tokio::process::Command`. Feature-Gate via Config (`ocr.tesseract_enabled`).
@@ -48,26 +48,26 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
 
 ---
 
-### Sprint NV-2 — Core: Streaming-Endpoint `POST /braindump/from_image`
+### Sprint NV-2 — Core: Streaming-Endpoint `POST /spark/from_image`
 
 **Scope:** HTTP-Endpoint, der NV-1 ans Frontend ausliefert.
 
 **Deliverables:**
-- Handler in `core/src/handlers.rs`: `POST /braindump/from_image` mit `multipart/form-data` (Felder: `image`, optional `note`).
+- Handler in `core/src/handlers.rs`: `POST /spark/from_image` mit `multipart/form-data` (Felder: `image`, optional `note`).
 - Response: `text/event-stream` (SSE) mit Frame-Sequenz:
   ```
   event: line\ndata: {"text": "Sprint Planning"}
   event: line\ndata: {"text": "• Mustafa → USB-Stick"}
   event: tags\ndata: {"tags": ["BRAIN DUMP", "KAMERA"]}
-  event: done\ndata: {"braindump_id": "uuid", "image_url": "/api/images/uuid.jpg"}
+  event: done\ndata: {"spark_id": "uuid", "image_url": "/api/images/uuid.jpg"}
   ```
-- Bild persistieren nach `<data_dir>/braindump_images/`, Pfad in `braindumps.image_path` schreiben.
+- Bild persistieren nach `<data_dir>/spark_images/`, Pfad in `sparks.image_path` schreiben.
 - Statisches Routing `GET /api/images/:filename` für späteres Anzeigen.
 - Frames werden während Provider-Call gestreamt (Zeile für Zeile, sobald LLM Tokens chunked liefert — oder synthetisch nachträglich, falls Provider keine Streams unterstützt).
 - Auth: bestehendes Pattern aus anderen Endpoints übernehmen.
 - Integration-Tests in `core/tests/`: Mock-Vision-Provider, vollständiger Flow, SSE-Parser-Roundtrip.
 
-**DoD:** `curl -F image=@test.jpg /braindump/from_image` liefert SSE-Stream + persistierten Braindump. Bild abrufbar. Tuvok ✓.
+**DoD:** `curl -F image=@test.jpg /spark/from_image` liefert SSE-Stream + persistierten Spark. Bild abrufbar. Tuvok ✓.
 
 **Context-Schätzung:** ~30 %. Durchgängig machbar.
 
@@ -75,10 +75,10 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
 
 ### Sprint NV-3 — Desktop: Photo-Upload-Sheet + Streaming-UI
 
-**Scope:** Desktop-Frontend bekommt Foto-Variante des Braindump-Flows.
+**Scope:** Desktop-Frontend bekommt Foto-Variante des Spark-Flows.
 
 **Deliverables:**
-- `+Braindump`-Button zeigt Mini-Menü mit `Text` / `Foto` (oder: Foto-Icon im bestehenden CTA).
+- `+Spark`-Button zeigt Mini-Menü mit `Text` / `Foto` (oder: Foto-Icon im bestehenden CTA).
 - Foto-Variante öffnet Modal/Sheet im Nightvision-Stil (BUILD-SPEC Kap. 5.10 als visuelle Vorlage — adaptiert auf Desktop-Layout, da kein 9:16-Bezel):
   - File-Picker + Drag&Drop-Zone für Bilder.
   - Vorschau-Bereich (Image-Element).
@@ -86,7 +86,7 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
   - "Analysiere…"-Chip → "✓ Gespeichert"-Chip.
   - Tag-Vorschläge als Pills mit Accept/Reject (Click toggle).
 - SSE-Consumer via `EventSource` API.
-- Nach `done` → bestehende Braindump-Liste refresh, Detail-Sheet öffnet auf neuem Eintrag (optional).
+- Nach `done` → bestehende Spark-Liste refresh, Detail-Sheet öffnet auf neuem Eintrag (optional).
 - Design-Tokens: `NX.bg` / `NX.purple` / `NX.green` / Mono-Font — bereits im Nightvision-Theme vorhanden, keine neuen Tokens.
 - Manuelle Smoke-Tests: Happy-Path, Error-Path (Provider down), großes Bild (Resize-Pfad), Tesseract-Fallback.
 
@@ -101,11 +101,11 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
 **Scope:** Drei kleine Lücken aus Audit zusammen.
 
 **Deliverables:**
-- **Volltextsuche Core:** `list_braindumps` bekommt `?q=<term>` Param. SQL `LIKE`-Search auf `body` (FTS5 später falls nötig). Tests.
+- **Volltextsuche Core:** `list_sparks` bekommt `?q=<term>` Param. SQL `LIKE`-Search auf `body` (FTS5 später falls nötig). Tests.
 - **Volltextsuche Desktop:** Such-Eingabe oben (existiert bereits laut Audit) gegen neuen Param wiren. Debounce 250 ms.
 - **Settings Core:** 3 neue User-Prefs in `user_prefs` (oder bestehender Settings-Storage): `camera_analysis_enabled` (bool, default true), `auto_tags_enabled` (bool, default true), `notifications_filter` (enum: `all` / `tasks_only` / `none`).
 - **Settings Desktop:** Toggles in Settings-View nach BUILD-SPEC Kap. 5.15. Persistenz über Core-API.
-- **Auto-Tag-UI:** Im Braindump-Detail-Sheet (Text-Variante, falls vorhanden) Tag-Vorschläge anzeigen, wenn Core LLM-Tags geliefert hat. Accept/Reject pro Tag. Falls Detail-Sheet bereits Tags zeigt: Erweiterung um "vorgeschlagen vs. übernommen"-Distinction.
+- **Auto-Tag-UI:** Im Spark-Detail-Sheet (Text-Variante, falls vorhanden) Tag-Vorschläge anzeigen, wenn Core LLM-Tags geliefert hat. Accept/Reject pro Tag. Falls Detail-Sheet bereits Tags zeigt: Erweiterung um "vorgeschlagen vs. übernommen"-Distinction.
 - Smoke-Tests aller drei Features auf Desktop.
 
 **DoD:** Suche filtert Liste live. Settings-Toggles persistieren über App-Restart. Tag-Vorschläge erscheinen + können akzeptiert/abgelehnt werden. Tuvok ✓.
@@ -114,7 +114,7 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
 
 ---
 
-### Sprint NV-5 — Handoff-Doc für AS-CLI: Android Photo-Braindump
+### Sprint NV-5 — Handoff-Doc für AS-CLI: Android Photo-Spark
 
 **Scope:** Nur Dokumentation. AS-CLI implementiert die Android-Seite nach diesem Doc.
 
@@ -125,7 +125,7 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
   - **UI-Spec:** BUILD-SPEC Kap. 5.10 (`NxCameraSheet`) wörtlich übernehmen, plus Anmerkungen zu Material3-Compose-Mapping.
   - **CameraX-Setup:** Permission-Handling, Capture, in-memory Bytes an Ktor-Client.
   - **Ktor-SSE-Consumer:** Wie Frames konsumiert werden (es gibt kein nativer SSE-Client in Ktor — entweder `ContentNegotiation` + `streamRequestBody` oder dritter-Party Lib).
-  - **Integration:** Bestehende `BrainDumpScreen` bekommt zweiten FAB / Toggle für Foto-Modus. Existing `WikiLinkFlow` / `BrainDumpDetailSheet` werden nach Speicherung mit neuer Karte gefüttert.
+  - **Integration:** Bestehende `SparkScreen` bekommt zweiten FAB / Toggle für Foto-Modus. Existing `WikiLinkFlow` / `SparkDetailSheet` werden nach Speicherung mit neuer Karte gefüttert.
   - **DoD-Liste:** Permission flow, happy path, error path, fallback path, Auto-Tag-UI.
   - **Smoke-Checklist:** 5 konkrete Test-Szenarien.
 
@@ -153,7 +153,7 @@ NV-4 (Quick Wins) — unabhängig, kann jederzeit eingeschoben werden
 - Live-Kamera-Stream im Desktop (nur File-Upload + Drag&Drop). Begründung: WebRTC/getUserMedia in Tauri ist plattformspezifisch; Foto-Aufnahme passiert auf Mobile.
 - Bild-Editing (Crop/Rotate) — User schickt Foto wie es ist; Server downscaled nur.
 - Offline-Vision (lokales Llava über Ollama). Vorbehalten für späteres Sprint, sobald Modell-Größe akzeptabel.
-- Mehrere Bilder pro Braindump. v1: 1 Bild → 1 Braindump.
+- Mehrere Bilder pro Spark. v1: 1 Bild → 1 Spark.
 
 ## Risiken
 

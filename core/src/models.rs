@@ -1,40 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-// --- Gamification ---
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct XpEvent {
-    pub id: String,
-    pub action: String,
-    pub xp_amount: i64,
-    pub reference_id: Option<String>,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct UserStats {
-    pub id: i64,
-    pub total_xp: i64,
-    pub level: i64,
-    pub current_streak: i64,
-    pub longest_streak: i64,
-    pub last_active_date: Option<String>,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Achievement {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub icon: String,
-    pub unlocked_at: Option<String>,
-}
-
-// --- Domain ---
-
-/// Klassifikations-Status eines BrainDumps. Konstanten statt Enum, damit
+/// Klassifikations-Status eines Sparks. Konstanten statt Enum, damit
 /// die SQLite-Spalte (TEXT) nahtlos via FromRow zurückkommt — analog zur
 /// bestehenden String-Konvention für `category` und `Task::status`.
 pub mod classification_status {
@@ -46,7 +13,7 @@ pub mod classification_status {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct BrainDumpEntry {
+pub struct SparkEntry {
     pub id: String,
     pub created_at: String,
     pub raw_text: String,
@@ -58,15 +25,15 @@ pub struct BrainDumpEntry {
     pub classification_status: String,
     #[serde(default)]
     pub nexus_inbox_id: Option<String>,
-    #[serde(default = "default_braindump_source")]
+    #[serde(default = "default_spark_source")]
     pub source: String,
     #[serde(default)]
     pub image_path: Option<String>,
 }
 
-fn default_braindump_source() -> String { "text".to_string() }
+fn default_spark_source() -> String { "text".to_string() }
 
-pub mod braindump_source {
+pub mod spark_source {
     #[allow(dead_code)]
     pub const TEXT: &str = "text";
     #[allow(dead_code)]

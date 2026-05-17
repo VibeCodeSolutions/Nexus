@@ -1,11 +1,11 @@
-use crate::models::{BrainDumpEntry, Project, Task, UserStats};
+use crate::models::{SparkEntry, Project, Task};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-pub async fn insert(pool: &SqlitePool, raw_text: &str) -> Result<BrainDumpEntry, sqlx::Error> {
+pub async fn insert(pool: &SqlitePool, raw_text: &str) -> Result<SparkEntry, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
 
-    sqlx::query("INSERT INTO braindumps (id, raw_text) VALUES (?, ?)")
+    sqlx::query("INSERT INTO sparks (id, raw_text) VALUES (?, ?)")
         .bind(&id)
         .bind(raw_text)
         .execute(pool)
@@ -14,15 +14,15 @@ pub async fn insert(pool: &SqlitePool, raw_text: &str) -> Result<BrainDumpEntry,
     get_by_id(pool, &id).await
 }
 
-pub async fn get_by_id(pool: &SqlitePool, id: &str) -> Result<BrainDumpEntry, sqlx::Error> {
-    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM braindumps WHERE id = ?")
+pub async fn get_by_id(pool: &SqlitePool, id: &str) -> Result<SparkEntry, sqlx::Error> {
+    sqlx::query_as::<_, SparkEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM sparks WHERE id = ?")
         .bind(id)
         .fetch_one(pool)
         .await
 }
 
-pub async fn list(pool: &SqlitePool) -> Result<Vec<BrainDumpEntry>, sqlx::Error> {
-    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM braindumps ORDER BY created_at DESC")
+pub async fn list(pool: &SqlitePool) -> Result<Vec<SparkEntry>, sqlx::Error> {
+    sqlx::query_as::<_, SparkEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM sparks ORDER BY created_at DESC")
         .fetch_all(pool)
         .await
 }
@@ -32,7 +32,7 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<BrainDumpEntry>, sqlx::Error>
 pub async fn list_search(
     pool: &SqlitePool,
     q: &str,
-) -> Result<Vec<BrainDumpEntry>, sqlx::Error> {
+) -> Result<Vec<SparkEntry>, sqlx::Error> {
     let needle = q.trim();
     if needle.is_empty() {
         return list(pool).await;
@@ -43,10 +43,10 @@ pub async fn list_search(
         .replace('%', "\\%")
         .replace('_', "\\_");
     let pattern = format!("%{escaped}%");
-    sqlx::query_as::<_, BrainDumpEntry>(
+    sqlx::query_as::<_, SparkEntry>(
         "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, \
                 classification_status, nexus_inbox_id, source, image_path \
-         FROM braindumps \
+         FROM sparks \
          WHERE raw_text LIKE ?1 ESCAPE '\\' \
             OR (transcript IS NOT NULL AND transcript LIKE ?1 ESCAPE '\\') \
             OR (summary IS NOT NULL AND summary LIKE ?1 ESCAPE '\\') \
@@ -84,15 +84,15 @@ pub async fn user_pref_list(
     Ok(rows)
 }
 
-/// Ersetzt `tags_json` eines Braindumps mit der gegebenen Liste.
+/// Ersetzt `tags_json` eines Sparks mit der gegebenen Liste.
 /// Hält Tag-Order bei, dedupliziert nicht (Caller-Verantwortung).
-pub async fn update_braindump_tags(
+pub async fn update_spark_tags(
     pool: &SqlitePool,
     id: &str,
     tags: &[String],
 ) -> Result<(), sqlx::Error> {
     let tags_json = serde_json::to_string(tags).unwrap_or_else(|_| "[]".to_string());
-    let res = sqlx::query("UPDATE braindumps SET tags_json = ? WHERE id = ?")
+    let res = sqlx::query("UPDATE sparks SET tags_json = ? WHERE id = ?")
         .bind(&tags_json)
         .bind(id)
         .execute(pool)
@@ -157,7 +157,7 @@ pub async fn delete_project(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Err
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("DELETE FROM braindump_projects WHERE project_id = ?")
+    sqlx::query("DELETE FROM spark_projects WHERE project_id = ?")
         .bind(id)
         .execute(&mut *tx)
         .await?;
@@ -171,15 +171,15 @@ pub async fn delete_project(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Err
     Ok(())
 }
 
-/// Gibt alle Braindumps mit category='Idea' zurück, inkl. ihrem verknüpften project_id (oder NULL).
-pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(BrainDumpEntry, Option<String>)>, sqlx::Error> {
+/// Gibt alle Sparks mit category='Idea' zurück, inkl. ihrem verknüpften project_id (oder NULL).
+pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(SparkEntry, Option<String>)>, sqlx::Error> {
     let rows = sqlx::query(
         "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, \
                 b.tags_json, b.classification_status, b.nexus_inbox_id, \
                 b.source, b.image_path, \
                 bp.project_id \
-         FROM braindumps b \
-         LEFT JOIN braindump_projects bp ON b.id = bp.braindump_id \
+         FROM sparks b \
+         LEFT JOIN spark_projects bp ON b.id = bp.spark_id \
          WHERE LOWER(b.category) = 'idea' \
          ORDER BY b.created_at DESC",
     )
@@ -188,7 +188,7 @@ pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(BrainDump
 
     let result = rows.into_iter().map(|row| {
         use sqlx::Row;
-        let entry = BrainDumpEntry {
+        let entry = SparkEntry {
             id: row.get("id"),
             created_at: row.get("created_at"),
             raw_text: row.get("raw_text"),
@@ -208,20 +208,20 @@ pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(BrainDump
     Ok(result)
 }
 
-pub async fn assign_braindump_to_project(pool: &SqlitePool, braindump_id: &str, project_id: &str) -> Result<(), sqlx::Error> {
-    sqlx::query("INSERT OR IGNORE INTO braindump_projects (braindump_id, project_id) VALUES (?, ?)")
-        .bind(braindump_id)
+pub async fn assign_spark_to_project(pool: &SqlitePool, spark_id: &str, project_id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT OR IGNORE INTO spark_projects (spark_id, project_id) VALUES (?, ?)")
+        .bind(spark_id)
         .bind(project_id)
         .execute(pool)
         .await?;
     Ok(())
 }
 
-pub async fn get_project_braindumps(pool: &SqlitePool, project_id: &str) -> Result<Vec<BrainDumpEntry>, sqlx::Error> {
-    sqlx::query_as::<_, BrainDumpEntry>(
+pub async fn get_project_sparks(pool: &SqlitePool, project_id: &str) -> Result<Vec<SparkEntry>, sqlx::Error> {
+    sqlx::query_as::<_, SparkEntry>(
         "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, b.tags_json, b.classification_status, b.nexus_inbox_id, b.source, b.image_path \
-         FROM braindumps b \
-         INNER JOIN braindump_projects bp ON b.id = bp.braindump_id \
+         FROM sparks b \
+         INNER JOIN spark_projects bp ON b.id = bp.spark_id \
          WHERE bp.project_id = ? \
          ORDER BY b.created_at DESC"
     )
@@ -274,12 +274,12 @@ pub async fn find_task_by_external_id(
     .await
 }
 
-/// Backfill: Für alle Braindumps mit category='Task' ohne zugehörigen Task einen anlegen.
+/// Backfill: Für alle Sparks mit category='Task' ohne zugehörigen Task einen anlegen.
 /// Läuft idempotent beim Start; erzeugt keine Duplikate dank nexus_external_id.
-pub async fn backfill_tasks_from_braindumps(pool: &SqlitePool) -> Result<usize, sqlx::Error> {
-    let orphans = sqlx::query_as::<_, crate::models::BrainDumpEntry>(
+pub async fn backfill_tasks_from_sparks(pool: &SqlitePool) -> Result<usize, sqlx::Error> {
+    let orphans = sqlx::query_as::<_, crate::models::SparkEntry>(
         "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path \
-         FROM braindumps WHERE LOWER(category) = 'task'",
+         FROM sparks WHERE LOWER(category) = 'task'",
     )
     .fetch_all(pool)
     .await?;
@@ -360,24 +360,24 @@ pub async fn delete_task(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error>
     Ok(())
 }
 
-pub async fn delete_braindump(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
-    // Sprint Nightvision NV2-001: Bei Foto-Braindumps das zugehörige Image-File
-    // mitlöschen, damit `braindump_images_dir` nicht mit Waisen vollläuft.
+pub async fn delete_spark(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
+    // Sprint Nightvision NV2-001: Bei Foto-Sparks das zugehörige Image-File
+    // mitlöschen, damit `spark_images_dir` nicht mit Waisen vollläuft.
     // image_path *vor* dem DB-Delete lesen — danach ist die Row weg.
     let image_path: Option<String> = sqlx::query_scalar(
-        "SELECT image_path FROM braindumps WHERE id = ?",
+        "SELECT image_path FROM sparks WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
     .await?
     .flatten();
 
-    sqlx::query("DELETE FROM braindumps WHERE id = ?")
+    sqlx::query("DELETE FROM sparks WHERE id = ?")
         .bind(id)
         .execute(pool)
         .await?;
     // SM-PR-005: polymorphe Links cleanup nach Delete (kein FK in SQLite)
-    let _ = crate::links::delete_for_node(pool, "braindump", id).await?;
+    let _ = crate::links::delete_for_node(pool, "spark", id).await?;
 
     // File-Unlink ist Best-Effort: Fehler werden nur geloggt, weil die
     // DB-Konsistenz (Row weg) wichtiger ist als der Filesystem-Cleanup.
@@ -386,7 +386,7 @@ pub async fn delete_braindump(pool: &SqlitePool, id: &str) -> Result<(), sqlx::E
         if !path.is_empty() {
             if let Err(e) = tokio::fs::remove_file(&path).await {
                 tracing::warn!(
-                    "delete_braindump {id}: image_path={path} konnte nicht entfernt werden: {e}"
+                    "delete_spark {id}: image_path={path} konnte nicht entfernt werden: {e}"
                 );
             }
         }
@@ -394,218 +394,6 @@ pub async fn delete_braindump(pool: &SqlitePool, id: &str) -> Result<(), sqlx::E
     Ok(())
 }
 
-// --- Gamification ---
-
-const XP_BRAINDUMP: i64 = 10;
-const XP_TASK_DONE: i64 = 25;
-const XP_PROJECT_CREATED: i64 = 50;
-const XP_STREAK_BONUS: i64 = 15;
-
-/// XP needed for a given level: 100 * level^1.5
-fn xp_for_level(level: i64) -> i64 {
-    (100.0 * (level as f64).powf(1.5)) as i64
-}
-
-fn level_from_xp(total_xp: i64) -> i64 {
-    let mut lvl = 1i64;
-    while xp_for_level(lvl + 1) <= total_xp {
-        lvl += 1;
-    }
-    lvl
-}
-
-pub async fn award_xp(pool: &SqlitePool, action: &str, xp: i64, reference_id: Option<&str>) -> Result<UserStats, sqlx::Error> {
-    let id = Uuid::new_v4().to_string();
-
-    sqlx::query("INSERT INTO xp_events (id, action, xp_amount, reference_id) VALUES (?, ?, ?, ?)")
-        .bind(&id)
-        .bind(action)
-        .bind(xp)
-        .bind(reference_id)
-        .execute(pool)
-        .await?;
-
-    // Update total XP
-    sqlx::query("UPDATE user_stats SET total_xp = total_xp + ?, updated_at = datetime('now') WHERE id = 1")
-        .bind(xp)
-        .execute(pool)
-        .await?;
-
-    // Recalc level
-    let stats = get_user_stats(pool).await?;
-    let new_level = level_from_xp(stats.total_xp);
-    if new_level != stats.level {
-        sqlx::query("UPDATE user_stats SET level = ?, updated_at = datetime('now') WHERE id = 1")
-            .bind(new_level)
-            .execute(pool)
-            .await?;
-    }
-
-    get_user_stats(pool).await
-}
-
-pub async fn update_streak(pool: &SqlitePool) -> Result<UserStats, sqlx::Error> {
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let stats = get_user_stats(pool).await?;
-
-    if stats.last_active_date.as_deref() == Some(&today) {
-        return Ok(stats); // Already active today
-    }
-
-    let yesterday = (chrono::Utc::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-    let new_streak = if stats.last_active_date.as_deref() == Some(yesterday.as_str()) {
-        stats.current_streak + 1
-    } else {
-        1
-    };
-    let longest = std::cmp::max(stats.longest_streak, new_streak);
-
-    sqlx::query("UPDATE user_stats SET current_streak = ?, longest_streak = ?, last_active_date = ?, updated_at = datetime('now') WHERE id = 1")
-        .bind(new_streak)
-        .bind(longest)
-        .bind(&today)
-        .execute(pool)
-        .await?;
-
-    // Streak bonus XP for streaks >= 2
-    if new_streak >= 2 {
-        award_xp(pool, "streak_bonus", XP_STREAK_BONUS, None).await?;
-    }
-
-    get_user_stats(pool).await
-}
-
-pub async fn get_user_stats(pool: &SqlitePool) -> Result<crate::models::UserStats, sqlx::Error> {
-    sqlx::query_as::<_, crate::models::UserStats>(
-        "SELECT id, total_xp, level, current_streak, longest_streak, last_active_date, updated_at FROM user_stats WHERE id = 1"
-    )
-    .fetch_one(pool)
-    .await
-}
-
-pub async fn get_xp_history(pool: &SqlitePool, limit: i64) -> Result<Vec<crate::models::XpEvent>, sqlx::Error> {
-    sqlx::query_as::<_, crate::models::XpEvent>(
-        "SELECT id, action, xp_amount, reference_id, created_at FROM xp_events ORDER BY created_at DESC LIMIT ?"
-    )
-    .bind(limit)
-    .fetch_all(pool)
-    .await
-}
-
-pub async fn get_achievements(pool: &SqlitePool) -> Result<Vec<crate::models::Achievement>, sqlx::Error> {
-    sqlx::query_as::<_, crate::models::Achievement>(
-        "SELECT id, name, description, icon, unlocked_at FROM achievements ORDER BY unlocked_at DESC NULLS LAST, name ASC"
-    )
-    .fetch_all(pool)
-    .await
-}
-
-async fn unlock_achievement(pool: &SqlitePool, achievement_id: &str) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query("UPDATE achievements SET unlocked_at = datetime('now') WHERE id = ? AND unlocked_at IS NULL")
-        .bind(achievement_id)
-        .execute(pool)
-        .await?;
-    Ok(result.rows_affected() > 0)
-}
-
-/// Check and unlock achievements based on current state. Returns newly unlocked IDs.
-pub async fn check_achievements(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
-    use sqlx::Row;
-    let mut unlocked = Vec::new();
-
-    // Count braindumps
-    let bd_count: i64 = sqlx::query("SELECT COUNT(*) as c FROM braindumps")
-        .fetch_one(pool).await?.get("c");
-
-    // Count done tasks
-    let tasks_done: i64 = sqlx::query("SELECT COUNT(*) as c FROM tasks WHERE status = 'done'")
-        .fetch_one(pool).await?.get("c");
-
-    // Count projects
-    let proj_count: i64 = sqlx::query("SELECT COUNT(*) as c FROM projects")
-        .fetch_one(pool).await?.get("c");
-
-    let stats = get_user_stats(pool).await?;
-
-    let checks: Vec<(&str, bool)> = vec![
-        ("first_braindump", bd_count >= 1),
-        ("braindump_10", bd_count >= 10),
-        ("braindump_50", bd_count >= 50),
-        ("first_task_done", tasks_done >= 1),
-        ("tasks_done_10", tasks_done >= 10),
-        ("tasks_done_50", tasks_done >= 50),
-        ("first_project", proj_count >= 1),
-        ("projects_5", proj_count >= 5),
-        ("streak_3", stats.longest_streak >= 3),
-        ("streak_7", stats.longest_streak >= 7),
-        ("streak_30", stats.longest_streak >= 30),
-        ("level_5", stats.level >= 5),
-        ("level_10", stats.level >= 10),
-        ("xp_1000", stats.total_xp >= 1000),
-    ];
-
-    for (id, condition) in checks {
-        if condition && unlock_achievement(pool, id).await? {
-            unlocked.push(id.to_string());
-        }
-    }
-
-    Ok(unlocked)
-}
-
-/// Convenience: award XP for a braindump, update streak, check achievements
-pub async fn on_braindump_created(pool: &SqlitePool, braindump_id: &str) -> Result<Vec<String>, sqlx::Error> {
-    update_streak(pool).await?;
-    award_xp(pool, "braindump", XP_BRAINDUMP, Some(braindump_id)).await?;
-    check_achievements(pool).await
-}
-
-/// Convenience: award XP for task completion.
-///
-/// Idempotent in the XP dimension — flipping a task done → open → done must
-/// not let the user farm XP. We check `xp_events` for an existing
-/// `task_done` row referencing this task; if present, we only re-evaluate
-/// achievements (state may have changed elsewhere) and skip the XP award.
-///
-/// Returns `(xp_awarded, newly_unlocked_achievements)`. The handler uses
-/// `xp_awarded` so the client UI doesn't claim "+25 XP" on a no-op.
-pub async fn on_task_completed(pool: &SqlitePool, task_id: &str) -> Result<(bool, Vec<String>), sqlx::Error> {
-    use sqlx::Row;
-    let row = sqlx::query(
-        "SELECT COUNT(*) AS c FROM xp_events WHERE action = 'task_done' AND reference_id = ?"
-    )
-    .bind(task_id)
-    .fetch_one(pool)
-    .await?;
-    let already: i64 = row.get("c");
-
-    // Streak ist eine Tagesaktivität — auch ein Re-Toggle eines alten Tasks
-    // soll den Streak fortführen, wenn das letzte aktive Datum nicht heute ist.
-    // `update_streak` ist intern idempotent (no-op bei `last_active_date == today`),
-    // daher steht der Aufruf vor dem XP-Idempotenz-Pfad.
-    update_streak(pool).await?;
-
-    if already > 0 {
-        let achievements = check_achievements(pool).await?;
-        return Ok((false, achievements));
-    }
-
-    award_xp(pool, "task_done", XP_TASK_DONE, Some(task_id)).await?;
-    let achievements = check_achievements(pool).await?;
-    Ok((true, achievements))
-}
-
-/// Convenience: award XP for project creation
-pub async fn on_project_created(pool: &SqlitePool, project_id: &str) -> Result<Vec<String>, sqlx::Error> {
-    update_streak(pool).await?;
-    award_xp(pool, "project_created", XP_PROJECT_CREATED, Some(project_id)).await?;
-    check_achievements(pool).await
-}
-
-/// XP needed to reach next level
-pub fn xp_to_next_level(stats: &crate::models::UserStats) -> i64 {
-    xp_for_level(stats.level + 1) - stats.total_xp
-}
 
 #[cfg(test)]
 mod tests {
@@ -634,81 +422,6 @@ mod tests {
 
         let entries = list(&pool).await.unwrap();
         assert_eq!(entries.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_gamification_xp_and_achievements() {
-        let pool = db::init_in_memory().await.unwrap();
-
-        // Initial stats
-        let stats = get_user_stats(&pool).await.unwrap();
-        assert_eq!(stats.total_xp, 0);
-        assert_eq!(stats.level, 1);
-        assert_eq!(stats.current_streak, 0);
-
-        // Create a braindump and trigger gamification
-        let entry = insert(&pool, "Test Gedanke").await.unwrap();
-        let unlocked = on_braindump_created(&pool, &entry.id).await.unwrap();
-        assert!(unlocked.contains(&"first_braindump".to_string()));
-
-        let stats = get_user_stats(&pool).await.unwrap();
-        assert_eq!(stats.total_xp, 10); // XP_BRAINDUMP
-        assert_eq!(stats.current_streak, 1);
-
-        // Create a task, complete it
-        let task = create_task(&pool, "Test task", None, None).await.unwrap();
-        update_task(&pool, &task.id, Some("done"), None).await.unwrap();
-        let (xp_awarded, unlocked) = on_task_completed(&pool, &task.id).await.unwrap();
-        assert!(xp_awarded);
-        assert!(unlocked.contains(&"first_task_done".to_string()));
-
-        let stats = get_user_stats(&pool).await.unwrap();
-        assert_eq!(stats.total_xp, 35); // 10 + 25
-
-        // Level calc
-        assert_eq!(super::level_from_xp(0), 1);
-        assert_eq!(super::level_from_xp(281), 1); // xp_for_level(2) = 282
-        assert_eq!(super::level_from_xp(282), 2);
-    }
-
-    #[tokio::test]
-    async fn test_task_done_xp_is_idempotent() {
-        let pool = db::init_in_memory().await.unwrap();
-
-        let task = create_task(&pool, "Idempotenz", None, None).await.unwrap();
-
-        // First completion → XP awarded
-        let (awarded1, _) = on_task_completed(&pool, &task.id).await.unwrap();
-        assert!(awarded1, "first task_done must award XP");
-        let stats_after_first = get_user_stats(&pool).await.unwrap();
-        assert_eq!(stats_after_first.total_xp, XP_TASK_DONE);
-
-        // Toggle done a second time → must NOT award XP again
-        let (awarded2, _) = on_task_completed(&pool, &task.id).await.unwrap();
-        assert!(!awarded2, "second task_done must NOT award XP again");
-        let stats_after_second = get_user_stats(&pool).await.unwrap();
-        assert_eq!(
-            stats_after_second.total_xp, stats_after_first.total_xp,
-            "task-done XP must be idempotent per task"
-        );
-
-        // And a third time, just to be sure
-        let (awarded3, _) = on_task_completed(&pool, &task.id).await.unwrap();
-        assert!(!awarded3);
-        let stats_after_third = get_user_stats(&pool).await.unwrap();
-        assert_eq!(stats_after_third.total_xp, stats_after_first.total_xp);
-
-        // xp_events should have exactly ONE task_done row for this task
-        use sqlx::Row;
-        let row = sqlx::query(
-            "SELECT COUNT(*) AS c FROM xp_events WHERE action = 'task_done' AND reference_id = ?"
-        )
-        .bind(&task.id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-        let count: i64 = row.get("c");
-        assert_eq!(count, 1);
     }
 
     #[tokio::test]
@@ -759,21 +472,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_braindump_tags_replaces_and_404s() {
+    async fn test_update_spark_tags_replaces_and_404s() {
         let pool = db::init_in_memory().await.unwrap();
         let entry = insert(&pool, "Test").await.unwrap();
 
-        update_braindump_tags(&pool, &entry.id, &["a".into(), "b".into()])
+        update_spark_tags(&pool, &entry.id, &["a".into(), "b".into()])
             .await
             .unwrap();
         let fetched = get_by_id(&pool, &entry.id).await.unwrap();
         assert_eq!(fetched.tags_json, "[\"a\",\"b\"]");
 
-        update_braindump_tags(&pool, &entry.id, &[]).await.unwrap();
+        update_spark_tags(&pool, &entry.id, &[]).await.unwrap();
         let cleared = get_by_id(&pool, &entry.id).await.unwrap();
         assert_eq!(cleared.tags_json, "[]");
 
-        let err = update_braindump_tags(&pool, "no-such-id", &["x".into()]).await;
+        let err = update_spark_tags(&pool, "no-such-id", &["x".into()]).await;
         assert!(matches!(err, Err(sqlx::Error::RowNotFound)));
     }
 

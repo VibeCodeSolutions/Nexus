@@ -25,13 +25,13 @@ fn escape_html(s: &str) -> String {
 }
 
 #[derive(Deserialize)]
-pub struct BrainDumpRequest {
+pub struct SparkRequest {
     pub text: String,
 }
 
-pub async fn post_braindump(
+pub async fn post_spark(
     State(state): State<AppState>,
-    Json(payload): Json<BrainDumpRequest>,
+    Json(payload): Json<SparkRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     if payload.text.trim().is_empty() {
         return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Text darf nicht leer sein"}))));
@@ -83,7 +83,7 @@ pub async fn post_braindump(
     // Entry mit Kategorisierung updaten (inkl. Pending-Status + Inbox-ID
     // wenn der Provider dafür einen Wert geliefert hat).
     sqlx::query(
-        "UPDATE braindumps SET category = ?, summary = ?, tags_json = ?, \
+        "UPDATE sparks SET category = ?, summary = ?, tags_json = ?, \
          classification_status = ?, nexus_inbox_id = ? WHERE id = ?",
     )
     .bind(&category)
@@ -122,20 +122,7 @@ pub async fn post_braindump(
         }
     }
 
-    // Gamification: XP + Achievements
-    let new_achievements = repo::on_braindump_created(&state.pool, &updated.id).await.unwrap_or_default();
-    let stats = repo::get_user_stats(&state.pool).await.ok();
-
-    let mut response = json!(updated);
-    if let Some(obj) = response.as_object_mut() {
-        obj.insert("xp_gained".to_string(), json!(10));
-        obj.insert("new_achievements".to_string(), json!(new_achievements));
-        if let Some(s) = stats {
-            obj.insert("stats".to_string(), json!({"total_xp": s.total_xp, "level": s.level, "streak": s.current_streak}));
-        }
-    }
-
-    Ok(Json(response))
+    Ok(Json(json!(updated)))
 }
 
 pub async fn list_ideas(
@@ -155,14 +142,14 @@ pub async fn list_ideas(
 }
 
 #[derive(Deserialize)]
-pub struct BraindumpListQuery {
+pub struct SparkListQuery {
     #[serde(default)]
     pub q: Option<String>,
 }
 
-pub async fn list_braindumps(
+pub async fn list_sparks(
     State(state): State<AppState>,
-    Query(params): Query<BraindumpListQuery>,
+    Query(params): Query<SparkListQuery>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let entries = match params.q.as_deref() {
         Some(needle) if !needle.trim().is_empty() => {
@@ -213,21 +200,21 @@ pub async fn set_user_pref(
 }
 
 #[derive(Deserialize)]
-pub struct UpdateBraindumpTagsRequest {
+pub struct UpdateSparkTagsRequest {
     pub tags: Vec<String>,
 }
 
-pub async fn update_braindump_tags(
+pub async fn update_spark_tags(
     State(state): State<AppState>,
     Path(id): Path<String>,
-    Json(body): Json<UpdateBraindumpTagsRequest>,
+    Json(body): Json<UpdateSparkTagsRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<Value>)> {
-    repo::update_braindump_tags(&state.pool, &id, &body.tags)
+    repo::update_spark_tags(&state.pool, &id, &body.tags)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": format!("Braindump {id} nicht gefunden")})),
+                Json(json!({"error": format!("Spark {id} nicht gefunden")})),
             ),
             other => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -237,7 +224,7 @@ pub async fn update_braindump_tags(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn get_braindump(
+pub async fn get_spark(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -254,14 +241,14 @@ pub async fn get_braindump(
 pub struct CreateProjectRequest {
     pub name: String,
     pub description: String,
-    pub braindump_ids: Vec<String>,
+    pub spark_ids: Vec<String>,
 }
 
-pub async fn delete_braindump(
+pub async fn delete_spark(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<Value>)> {
-    repo::delete_braindump(&state.pool, &id)
+    repo::delete_spark(&state.pool, &id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     Ok(StatusCode::NO_CONTENT)
@@ -297,26 +284,13 @@ pub async fn create_project(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
-    for bid in &payload.braindump_ids {
-        repo::assign_braindump_to_project(&state.pool, bid, &project.id)
+    for bid in &payload.spark_ids {
+        repo::assign_spark_to_project(&state.pool, bid, &project.id)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     }
 
-    // Gamification: XP für Projekterstellung
-    let new_achievements = repo::on_project_created(&state.pool, &project.id).await.unwrap_or_default();
-    let stats = repo::get_user_stats(&state.pool).await.ok();
-
-    let mut response = json!(project);
-    if let Some(obj) = response.as_object_mut() {
-        obj.insert("xp_gained".to_string(), json!(50));
-        obj.insert("new_achievements".to_string(), json!(new_achievements));
-        if let Some(s) = stats {
-            obj.insert("stats".to_string(), json!({"total_xp": s.total_xp, "level": s.level, "streak": s.current_streak}));
-        }
-    }
-
-    Ok(Json(response))
+    Ok(Json(json!(project)))
 }
 
 pub async fn list_projects(
@@ -340,11 +314,11 @@ pub async fn delete_project(
     Ok(Json(json!({"deleted": id})))
 }
 
-pub async fn get_project_braindumps(
+pub async fn get_project_sparks(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let entries = repo::get_project_braindumps(&state.pool, &id)
+    let entries = repo::get_project_sparks(&state.pool, &id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
@@ -437,23 +411,7 @@ pub async fn update_task(
     .await
     .map_err(|e| (StatusCode::NOT_FOUND, Json(json!({"error": format!("Task nicht gefunden: {e}")}))))?;
 
-    // Gamification: XP bei Task-Abschluss (nur beim *ersten* Übergang nach done)
-    let mut response = json!(task);
-    if payload.status.as_deref() == Some("done") {
-        let (xp_awarded, new_achievements) = repo::on_task_completed(&state.pool, &id)
-            .await
-            .unwrap_or((false, Vec::new()));
-        let stats = repo::get_user_stats(&state.pool).await.ok();
-        if let Some(obj) = response.as_object_mut() {
-            obj.insert("xp_gained".to_string(), json!(if xp_awarded { 25 } else { 0 }));
-            obj.insert("new_achievements".to_string(), json!(new_achievements));
-            if let Some(s) = stats {
-                obj.insert("stats".to_string(), json!({"total_xp": s.total_xp, "level": s.level, "streak": s.current_streak}));
-            }
-        }
-    }
-
-    Ok(Json(response))
+    Ok(Json(json!(task)))
 }
 
 pub async fn delete_task(
@@ -465,54 +423,6 @@ pub async fn delete_task(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
     Ok(Json(json!({"deleted": id})))
-}
-
-// --- Gamification Endpoints ---
-
-pub async fn get_stats(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let stats = repo::get_user_stats(&state.pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-
-    let xp_to_next = repo::xp_to_next_level(&stats);
-
-    Ok(Json(json!({
-        "total_xp": stats.total_xp,
-        "level": stats.level,
-        "xp_to_next_level": xp_to_next,
-        "current_streak": stats.current_streak,
-        "longest_streak": stats.longest_streak,
-        "last_active_date": stats.last_active_date
-    })))
-}
-
-pub async fn get_achievements(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let achievements = repo::get_achievements(&state.pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-
-    Ok(Json(json!(achievements)))
-}
-
-#[derive(Deserialize)]
-pub struct XpHistoryQuery {
-    pub limit: Option<i64>,
-}
-
-pub async fn get_xp_history(
-    State(state): State<AppState>,
-    Query(params): Query<XpHistoryQuery>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let limit = params.limit.unwrap_or(50);
-    let events = repo::get_xp_history(&state.pool, limit)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-
-    Ok(Json(json!(events)))
 }
 
 pub async fn dashboard(
@@ -529,9 +439,6 @@ pub async fn dashboard(
         .map_err(|e| {
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
         })?;
-
-    let stats = repo::get_user_stats(&state.pool).await.ok();
-    let achievements = repo::get_achievements(&state.pool).await.unwrap_or_default();
 
     let project_rows: Vec<String> = projects.iter().map(|p| {
         format!(
@@ -565,46 +472,6 @@ pub async fn dashboard(
         )
     }).collect();
 
-    // Gamification HTML
-    let stats_html = if let Some(ref s) = stats {
-        let xp_next = repo::xp_to_next_level(s);
-        let xp_for_next = xp_next + s.total_xp;
-        let xp_in_level = s.total_xp - (100.0 * (s.level as f64).powf(1.5)) as i64;
-        let xp_level_range = xp_for_next - (100.0 * (s.level as f64).powf(1.5)) as i64;
-        let progress_pct = if xp_level_range > 0 { (xp_in_level * 100) / xp_level_range } else { 0 };
-        format!(
-            r#"<div class="stats-grid">
-  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Level</div></div>
-  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Total XP</div></div>
-  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Streak</div></div>
-  <div class="stat-card"><div class="stat-value">{}</div><div class="stat-label">Longest Streak</div></div>
-</div>
-<div class="xp-bar-container">
-  <div class="xp-bar" style="width: {}%"></div>
-  <span class="xp-bar-text">{} XP bis Level {}</span>
-</div>"#,
-            s.level, s.total_xp, s.current_streak, s.longest_streak,
-            progress_pct.max(2), xp_next, s.level + 1
-        )
-    } else {
-        String::new()
-    };
-
-    let unlocked: Vec<&crate::models::Achievement> = achievements.iter().filter(|a| a.unlocked_at.is_some()).collect();
-    let locked: Vec<&crate::models::Achievement> = achievements.iter().filter(|a| a.unlocked_at.is_none()).collect();
-
-    let achievements_html = {
-        let unlocked_html: String = unlocked.iter().map(|a| {
-            format!(r#"<div class="achievement unlocked"><div class="ach-icon">{}</div><div><strong>{}</strong><br><small>{}</small></div></div>"#,
-                escape_html(&a.icon), escape_html(&a.name), escape_html(&a.description))
-        }).collect::<Vec<_>>().join("");
-        let locked_html: String = locked.iter().map(|a| {
-            format!(r#"<div class="achievement locked"><div class="ach-icon">?</div><div><strong>{}</strong><br><small>{}</small></div></div>"#,
-                escape_html(&a.name), escape_html(&a.description))
-        }).collect::<Vec<_>>().join("");
-        format!("{}{}", unlocked_html, locked_html)
-    };
-
     let html = format!(r#"<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -625,41 +492,23 @@ pub async fn dashboard(
   .cat-random {{ background: #2a2a2a; color: #a0a0a0; }}
   .cat-unsorted {{ background: #2a2a2a; color: #808080; }}
   .empty {{ color: #606080; font-style: italic; margin-top: 2rem; }}
-  .stats-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0; }}
-  .stat-card {{ background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 1.2rem; text-align: center; }}
-  .stat-value {{ font-size: 2rem; font-weight: 700; color: #7c5cbf; }}
-  .stat-label {{ color: #9090b0; font-size: 0.85em; margin-top: 0.3rem; }}
-  .xp-bar-container {{ background: #1a1a2e; border-radius: 8px; height: 28px; position: relative; margin: 1rem 0 2rem; overflow: hidden; border: 1px solid #2a2a4a; }}
-  .xp-bar {{ background: linear-gradient(90deg, #7c5cbf, #a07ce0); height: 100%; border-radius: 8px; transition: width 0.5s; }}
-  .xp-bar-text {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.8em; font-weight: 600; }}
-  .achievements-grid {{ display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 1rem 0; }}
-  .achievement {{ display: flex; align-items: center; gap: 0.6rem; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; padding: 0.8rem 1rem; min-width: 220px; }}
-  .achievement.unlocked {{ border-color: #7c5cbf; }}
-  .achievement.locked {{ opacity: 0.5; }}
-  .ach-icon {{ font-size: 1.5rem; }}
 </style>
 </head>
 <body>
 <h1>NEXUS Dashboard</h1>
-<h2>Stats</h2>
-{}
-<h2>Achievements</h2>
-<div class="achievements-grid">{}</div>
 <h2>Projekte</h2>
 <p>{} Projekte</p>
 {}
-<h2>BrainDumps</h2>
-<p>{} BrainDumps</p>
+<h2>Sparks</h2>
+<p>{} Sparks</p>
 {}
 </body>
 </html>"#,
-        stats_html,
-        achievements_html,
         projects.len(),
         projects_html,
         entries.len(),
         if entries.is_empty() {
-            "<p class=\"empty\">Noch keine BrainDumps. Sprich deinen ersten Gedanken ein!</p>".to_string()
+            "<p class=\"empty\">Noch keine Sparks. Sprich deinen ersten Gedanken ein!</p>".to_string()
         } else {
             format!("<table><thead><tr><th>Zeit</th><th>Kategorie</th><th>Text</th><th>Summary</th><th>Tags</th></tr></thead><tbody>{}</tbody></table>", rows.join(""))
         }
@@ -687,8 +536,8 @@ pub async fn recategorize_unsorted_inner(
     limit: usize,
 ) -> Result<RecategorizeStats, sqlx::Error> {
     let clamped = limit.clamp(1, 200);
-    let entries = sqlx::query_as::<_, crate::models::BrainDumpEntry>(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM braindumps WHERE category = 'Unsorted' OR category IS NULL LIMIT ?"
+    let entries = sqlx::query_as::<_, crate::models::SparkEntry>(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM sparks WHERE category = 'Unsorted' OR category IS NULL LIMIT ?"
     )
     .bind(clamped as i64)
     .fetch_all(pool)
@@ -708,7 +557,7 @@ pub async fn recategorize_unsorted_inner(
                     crate::models::classification_status::DONE
                 };
                 let result = sqlx::query(
-                    "UPDATE braindumps SET category = ?, summary = ?, tags_json = ?, \
+                    "UPDATE sparks SET category = ?, summary = ?, tags_json = ?, \
                      classification_status = ?, nexus_inbox_id = ? WHERE id = ?",
                 )
                 .bind(&classification.category)
@@ -756,7 +605,7 @@ pub async fn recategorize_unsorted_inner(
 /// Obsidian-Briefkasten Phase C: Outbox-Sync.
 /// Scannt `<vault>/Nexus/Outbox/`, importiert jedes File nach
 /// `nexus_type` (task/project/note → DB-Mutation; habit/journal →
-/// skip mit Begründung), flippt source-BrainDumps von 'pending' auf
+/// skip mit Begründung), flippt source-Sparks von 'pending' auf
 /// 'done', archiviert erfolgreiche Files in `_processed/`.
 ///
 /// 412 PRECONDITION_FAILED, wenn kein Vault-Pfad konfiguriert ist
@@ -817,7 +666,7 @@ pub async fn unsorted_count(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM braindumps WHERE category = 'Unsorted' OR category IS NULL"
+        "SELECT COUNT(*) FROM sparks WHERE category = 'Unsorted' OR category IS NULL"
     )
     .fetch_one(&state.pool)
     .await
@@ -957,7 +806,7 @@ pub async fn onboard_set_provider(
             }
             // Existenz-Check als frühe Diagnose. Wir verlangen ein
             // Verzeichnis (kein File), damit der Provider später nicht
-            // bei jedem BrainDump auf einer kaputten Pfad-Annahme bricht.
+            // bei jedem Spark auf einer kaputten Pfad-Annahme bricht.
             let p = std::path::Path::new(trimmed);
             if !p.is_dir() {
                 return Err((
@@ -1181,7 +1030,7 @@ pub async fn diag_list(
 }
 
 // =============================================================================
-// Sprint Nightvision NV-2 — Foto-Braindump-Endpoint
+// Sprint Nightvision NV-2 — Foto-Spark-Endpoint
 // =============================================================================
 
 /// Hard limit für Multipart-Bildgröße (10 MB). Größere Uploads werden mit
@@ -1205,7 +1054,7 @@ pub(crate) enum PipelineFrame {
     Line(String),
     Tags(Vec<String>),
     Done {
-        braindump_id: String,
+        spark_id: String,
         image_url: String,
         text_line_count: usize,
         tag_count: usize,
@@ -1228,19 +1077,19 @@ impl PipelineFrame {
                 .json_data(json!({ "tags": tags }))
                 .unwrap_or_else(|_| Event::default().event("tags").data("[]")),
             PipelineFrame::Done {
-                braindump_id,
+                spark_id,
                 image_url,
                 text_line_count,
                 tag_count,
             } => Event::default()
                 .event("done")
                 .json_data(json!({
-                    "braindump_id": braindump_id,
+                    "spark_id": spark_id,
                     "image_url": image_url,
                     "text_line_count": text_line_count,
                     "tag_count": tag_count,
                 }))
-                .unwrap_or_else(|_| Event::default().event("done").data(braindump_id.clone())),
+                .unwrap_or_else(|_| Event::default().event("done").data(spark_id.clone())),
             PipelineFrame::Error { stage, message } => Event::default()
                 .event("error")
                 .json_data(json!({ "stage": stage, "message": message }))
@@ -1259,19 +1108,19 @@ impl PipelineFrame {
     }
 }
 
-/// `POST /braindump/from_image` — Multipart-Upload eines Fotos, das durch
+/// `POST /spark/from_image` — Multipart-Upload eines Fotos, das durch
 /// die Vision-Pipeline (Groq → Tesseract-Fallback) gejagt wird. Antwortet
 /// als Server-Sent-Events-Stream mit Frame-Sequenz:
 ///
 /// * `event: line, data: {"text": "<Zeile>"}` — pro OCR-Zeile
 /// * `event: tags, data: {"tags": ["<TAG>", ...]}` — KI-Vorschläge
-/// * `event: done, data: {"braindump_id": "...", "image_url": "/api/images/..."}` — persistiert
+/// * `event: done, data: {"spark_id": "...", "image_url": "/api/images/..."}` — persistiert
 /// * `event: error, data: {"message": "<grund>"}` — Pipeline gescheitert
 ///
 /// Multipart-Felder:
 /// * `image` (pflicht): Bild-Bytes (jpeg/png), max [`NV_IMAGE_MAX_BYTES`]
 /// * `note`  (optional): zusätzliche Textnotiz, wird dem `raw_text` vorangestellt
-pub async fn post_braindump_from_image(
+pub async fn post_spark_from_image(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<Response, (StatusCode, String)> {
@@ -1336,11 +1185,11 @@ pub async fn post_braindump_from_image(
     // verfügbar ist, wenn der Provider-Call fehlschlägt und der User es manuell
     // erneut probieren will.
     let image_id = uuid::Uuid::new_v4().to_string();
-    let images_dir = (*state.braindump_images_dir).clone();
+    let images_dir = (*state.spark_images_dir).clone();
     tokio::fs::create_dir_all(&images_dir).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("braindump_images-Dir nicht anlegbar: {e}"),
+            format!("spark_images-Dir nicht anlegbar: {e}"),
         )
     })?;
     let image_filename = format!("{image_id}.jpg");
@@ -1373,7 +1222,7 @@ pub async fn post_braindump_from_image(
     let prepared_bytes = prepared.bytes;
 
     tokio::spawn(async move {
-        run_photo_braindump_pipeline(
+        run_photo_spark_pipeline(
             state_for_task,
             prepared_bytes,
             prepared_mime,
@@ -1394,10 +1243,10 @@ pub async fn post_braindump_from_image(
 }
 
 /// Background-Task: ruft die Vision-Pipeline auf, streamt Frames in den
-/// Channel, und persistiert den fertigen Braindump in der DB. Fehler werden
+/// Channel, und persistiert den fertigen Spark in der DB. Fehler werden
 /// als `error`-Frame durchgereicht (kein Panic — der Stream-Reader sieht
 /// den Frame und kann die UI entsprechend updaten).
-async fn run_photo_braindump_pipeline(
+async fn run_photo_spark_pipeline(
     state: AppState,
     image_bytes: Vec<u8>,
     mime: String,
@@ -1432,7 +1281,7 @@ async fn run_photo_braindump_pipeline(
                 .send(PipelineFrame::Tags(analysis.suggested_tags.clone()))
                 .await;
 
-            // Braindump persistieren. `raw_text` = optionale Note + OCR-Zeilen
+            // Spark persistieren. `raw_text` = optionale Note + OCR-Zeilen
             // (zwei Zeilenumbrüche dazwischen, falls beides vorhanden). Tags als
             // JSON-Array, Source = 'photo', image_path = absoluter Pfad zur
             // gespeicherten JPEG.
@@ -1441,15 +1290,15 @@ async fn run_photo_braindump_pipeline(
                 (Some(n), true) => n.to_string(),
                 (None, _) => analysis.text_lines.join("\n"),
             };
-            let braindump_id = uuid::Uuid::new_v4().to_string();
+            let spark_id = uuid::Uuid::new_v4().to_string();
             let tags_json = serde_json::to_string(&analysis.suggested_tags)
                 .unwrap_or_else(|_| "[]".to_string());
 
             let insert = sqlx::query(
-                "INSERT INTO braindumps (id, raw_text, source, image_path, tags_json) \
+                "INSERT INTO sparks (id, raw_text, source, image_path, tags_json) \
                  VALUES (?, ?, 'photo', ?, ?)",
             )
-            .bind(&braindump_id)
+            .bind(&spark_id)
             .bind(&body)
             .bind(image_path.to_string_lossy().as_ref())
             .bind(&tags_json)
@@ -1460,7 +1309,7 @@ async fn run_photo_braindump_pipeline(
                 Ok(_) => {
                     let _ = tx
                         .send(PipelineFrame::Done {
-                            braindump_id,
+                            spark_id,
                             image_url: format!("/api/images/{image_filename}"),
                             text_line_count: analysis.text_lines.len(),
                             tag_count: analysis.suggested_tags.len(),
@@ -1489,17 +1338,17 @@ async fn run_photo_braindump_pipeline(
 }
 
 /// `GET /api/images/:filename` — statisches Routing für gespeicherte
-/// Foto-Braindump-Bilder. Whitelist erlaubt nur reine `<uuid>.jpg`-Filenames,
+/// Foto-Spark-Bilder. Whitelist erlaubt nur reine `<uuid>.jpg`-Filenames,
 /// damit Path-Traversal-Versuche (`../`, absolute Pfade, alternative Mime-
 /// Endungen) im Bound landen.
-pub async fn serve_braindump_image(
+pub async fn serve_spark_image(
     State(state): State<AppState>,
     Path(filename): Path<String>,
 ) -> Result<Response, (StatusCode, String)> {
     if !is_safe_image_filename(&filename) {
         return Err((StatusCode::BAD_REQUEST, "Ungültiger Dateiname.".into()));
     }
-    let path = state.braindump_images_dir.join(&filename);
+    let path = state.spark_images_dir.join(&filename);
     let bytes = tokio::fs::read(&path).await.map_err(|e| match e.kind() {
         std::io::ErrorKind::NotFound => (StatusCode::NOT_FOUND, "Bild nicht gefunden.".into()),
         _ => (
@@ -1510,7 +1359,7 @@ pub async fn serve_braindump_image(
     Ok((
         [
             (header::CONTENT_TYPE, "image/jpeg"),
-            // Foto-Braindumps sind unveränderlich (UUID-Filename), daher
+            // Foto-Sparks sind unveränderlich (UUID-Filename), daher
             // dürfen Clients großzügig cachen. 1 h reicht für UI-Refreshs
             // ohne Risiko eines stale Bildes.
             (header::CACHE_CONTROL, "public, max-age=3600"),
@@ -1520,7 +1369,7 @@ pub async fn serve_braindump_image(
         .into_response())
 }
 
-/// Pflicht-Filter für [`serve_braindump_image`]: nur `<hex/uuid>.jpg`-Namen
+/// Pflicht-Filter für [`serve_spark_image`]: nur `<hex/uuid>.jpg`-Namen
 /// (`a-z0-9-`) in Lower-Case mit fester Extension durchlassen.
 fn is_safe_image_filename(name: &str) -> bool {
     let Some((stem, ext)) = name.rsplit_once('.') else {
@@ -1537,7 +1386,7 @@ fn is_safe_image_filename(name: &str) -> bool {
 }
 
 #[cfg(test)]
-mod nv_photo_braindump_tests {
+mod nv_photo_spark_tests {
     use super::*;
     use crate::db;
     use crate::llm::NoOpProvider;
@@ -1594,7 +1443,7 @@ mod nv_photo_braindump_tests {
                 model: None,
                 tesseract_enabled: false,
             }),
-            braindump_images_dir: Arc::new(images_dir),
+            spark_images_dir: Arc::new(images_dir),
             default_provider_name: Arc::new("noop".into()),
         }
     }
@@ -1619,7 +1468,7 @@ mod nv_photo_braindump_tests {
     }
 
     #[tokio::test]
-    async fn pipeline_streams_lines_tags_done_and_persists_braindump() {
+    async fn pipeline_streams_lines_tags_done_and_persists_spark() {
         let pool = db::init_in_memory().await.expect("in-memory db");
         let tmp_images = tempfile::tempdir().expect("tempdir");
         let state = make_state_with_images_dir(pool.clone(), tmp_images.path().to_path_buf());
@@ -1637,13 +1486,13 @@ mod nv_photo_braindump_tests {
 
         let (tx, rx) = tokio::sync::mpsc::channel::<PipelineFrame>(16);
 
-        let images_dir = (*state.braindump_images_dir).clone();
+        let images_dir = (*state.spark_images_dir).clone();
         let image_filename = "test-photo.jpg".to_string();
         let image_path = images_dir.join(&image_filename);
         std::fs::create_dir_all(&images_dir).expect("mkdir images");
         std::fs::write(&image_path, b"fake-jpeg-bytes").expect("write image");
 
-        let task = tokio::spawn(run_photo_braindump_pipeline(
+        let task = tokio::spawn(run_photo_spark_pipeline(
             state.clone(),
             b"fake-jpeg-bytes".to_vec(),
             "image/jpeg".to_string(),
@@ -1672,12 +1521,12 @@ mod nv_photo_braindump_tests {
         }
         match &frames[4] {
             PipelineFrame::Done {
-                braindump_id,
+                spark_id,
                 image_url,
                 text_line_count,
                 tag_count,
             } => {
-                assert!(!braindump_id.is_empty());
+                assert!(!spark_id.is_empty());
                 assert!(image_url.ends_with(&image_filename));
                 assert_eq!(*text_line_count, 3);
                 assert_eq!(*tag_count, 2);
@@ -1687,11 +1536,11 @@ mod nv_photo_braindump_tests {
 
         // DB-Persistierung verifizieren.
         let row: (String, String, Option<String>, String) = sqlx::query_as(
-            "SELECT raw_text, source, image_path, tags_json FROM braindumps LIMIT 1",
+            "SELECT raw_text, source, image_path, tags_json FROM sparks LIMIT 1",
         )
         .fetch_one(&pool)
         .await
-        .expect("braindump row");
+        .expect("spark row");
         assert_eq!(row.1, "photo");
         assert!(row.0.starts_with("Sprint-Notiz"));
         assert!(row.0.contains("Sprint Planning"));
@@ -1707,7 +1556,7 @@ mod nv_photo_braindump_tests {
 
         let (tx, rx) = tokio::sync::mpsc::channel::<PipelineFrame>(8);
 
-        let task = tokio::spawn(run_photo_braindump_pipeline(
+        let task = tokio::spawn(run_photo_spark_pipeline(
             state.clone(),
             b"x".to_vec(),
             "image/jpeg".to_string(),
@@ -1731,8 +1580,8 @@ mod nv_photo_braindump_tests {
             other => panic!("expected error frame, got {other:?}"),
         }
 
-        // Keine Braindump-Persistenz bei Vision-Fehler.
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM braindumps")
+        // Keine Spark-Persistenz bei Vision-Fehler.
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sparks")
             .fetch_one(&pool)
             .await
             .expect("count");
@@ -1747,7 +1596,7 @@ mod nv_photo_braindump_tests {
             PipelineFrame::Line("hello".into()),
             PipelineFrame::Tags(vec!["A".into()]),
             PipelineFrame::Done {
-                braindump_id: "bd-1".into(),
+                spark_id: "bd-1".into(),
                 image_url: "/api/images/x.jpg".into(),
                 text_line_count: 1,
                 tag_count: 1,
@@ -1824,10 +1673,10 @@ fn err400(msg: &str) -> (StatusCode, Json<Value>) {
 }
 
 fn validate_node_type(t: &str) -> Result<(), (StatusCode, Json<Value>)> {
-    if t == "braindump" || t == "project" {
+    if t == "spark" || t == "project" {
         Ok(())
     } else {
-        Err(err400("source_type/target_type muss 'braindump' oder 'project' sein"))
+        Err(err400("source_type/target_type muss 'spark' oder 'project' sein"))
     }
 }
 
@@ -1847,12 +1696,12 @@ pub async fn create_link(
     Ok(Json(json!(link)))
 }
 
-pub async fn get_braindump_links(
+pub async fn get_spark_links(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let outgoing = links::list_for_source(&state.pool, "braindump", &id).await.map_err(err500)?;
-    let incoming = links::list_for_target(&state.pool, "braindump", &id).await.map_err(err500)?;
+    let outgoing = links::list_for_source(&state.pool, "spark", &id).await.map_err(err500)?;
+    let incoming = links::list_for_target(&state.pool, "spark", &id).await.map_err(err500)?;
     Ok(Json(json!({ "outgoing": outgoing, "incoming": incoming })))
 }
 
@@ -1880,12 +1729,12 @@ pub async fn list_project_suggestions(
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let pending = suggestions::list_pending(&state.pool).await.map_err(err500)?;
     let enriched: Vec<Value> = pending.into_iter().map(|row| {
-        let ids = suggestions::parse_member_ids(&row.member_braindump_ids);
+        let ids = suggestions::parse_member_ids(&row.member_spark_ids);
         json!({
             "id": row.id,
             "name": row.name,
             "description": row.description,
-            "member_braindump_ids": ids,
+            "member_spark_ids": ids,
             "confidence": row.confidence,
             "reason": row.reason,
             "created_at": row.created_at,
@@ -1909,11 +1758,11 @@ pub async fn accept_project_suggestion(
     let project = repo::create_project(&state.pool, &suggestion.name, &suggestion.description)
         .await
         .map_err(err500)?;
-    let bd_ids = suggestions::parse_member_ids(&suggestion.member_braindump_ids);
+    let bd_ids = suggestions::parse_member_ids(&suggestion.member_spark_ids);
     // SM-B-006: Erfolgs-Counter — assign-Failures werden geschluckt, aber nicht mehr mitgezählt.
     let mut linked = 0_usize;
     for bd_id in &bd_ids {
-        if repo::assign_braindump_to_project(&state.pool, bd_id, &project.id).await.is_ok() {
+        if repo::assign_spark_to_project(&state.pool, bd_id, &project.id).await.is_ok() {
             linked += 1;
         }
     }
@@ -1922,8 +1771,8 @@ pub async fn accept_project_suggestion(
     Ok(Json(json!({
         "project_id": project.id,
         "name": project.name,
-        "linked_braindumps": linked,
-        "requested_braindumps": bd_ids.len(),
+        "linked_sparks": linked,
+        "requested_sparks": bd_ids.len(),
         "partial": partial,
     })))
 }
@@ -1945,7 +1794,7 @@ pub struct LinkExtractStats {
     pub failed: usize,
 }
 
-/// Holt die n neuesten BrainDumps ohne LLM-erzeugte Links und lässt den Provider
+/// Holt die n neuesten Sparks ohne LLM-erzeugte Links und lässt den Provider
 /// Verknüpfungen zu den jüngeren Geschwistern + allen Projekten extrahieren.
 /// Confidence-Schwelle env-konfigurierbar via NEXUS_LINK_CONFIDENCE_MIN (default 0.7).
 pub async fn extract_links_for_recent(
@@ -1960,11 +1809,11 @@ pub async fn extract_links_for_recent(
         .unwrap_or(0.7);
     let mut stats = LinkExtractStats::default();
 
-    // Hole BrainDumps, die noch keine LLM-erzeugten Links als source haben
-    let candidates: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
+    // Hole Sparks, die noch keine LLM-erzeugten Links als source haben
+    let candidates: Vec<crate::models::SparkEntry> = sqlx::query_as(
         "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, b.tags_json, b.classification_status, b.nexus_inbox_id, b.source, b.image_path \
-         FROM braindumps b \
-         WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.source_type='braindump' AND l.source_id=b.id AND l.created_by='llm') \
+         FROM sparks b \
+         WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.source_type='spark' AND l.source_id=b.id AND l.created_by='llm') \
          ORDER BY b.created_at DESC \
          LIMIT ?",
     )
@@ -1976,25 +1825,25 @@ pub async fn extract_links_for_recent(
         return Ok(stats);
     }
 
-    // Kontext: alle Projekte + die letzten 30 BrainDumps insgesamt
+    // Kontext: alle Projekte + die letzten 30 Sparks insgesamt
     let projects: Vec<crate::models::Project> = sqlx::query_as(
         "SELECT id, name, description, created_at, status, nexus_external_id FROM projects ORDER BY created_at DESC LIMIT 50",
     )
     .fetch_all(pool)
     .await?;
-    let recent_bds: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM braindumps ORDER BY created_at DESC LIMIT 30",
+    let recent_bds: Vec<crate::models::SparkEntry> = sqlx::query_as(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM sparks ORDER BY created_at DESC LIMIT 30",
     )
     .fetch_all(pool)
     .await?;
 
     for bd in &candidates {
         stats.processed += 1;
-        // Kandidaten sind alle anderen recent BrainDumps + alle Projekte
+        // Kandidaten sind alle anderen recent Sparks + alle Projekte
         let mut nodes: Vec<NodeRef> = recent_bds.iter()
             .filter(|c| c.id != bd.id)
             .map(|c| NodeRef {
-                node_type: "braindump".into(),
+                node_type: "spark".into(),
                 id: c.id.clone(),
                 label: c.summary.clone().unwrap_or_else(|| c.raw_text.chars().take(80).collect()),
             })
@@ -2010,7 +1859,7 @@ pub async fn extract_links_for_recent(
                 let mut wrote_any = false;
                 for sug in suggestions.into_iter().filter(|s| s.confidence >= confidence_min) {
                     let input = LinkInput {
-                        source_type: "braindump".into(),
+                        source_type: "spark".into(),
                         source_id: bd.id.clone(),
                         target_type: sug.target_type,
                         target_id: sug.target_id,
@@ -2025,13 +1874,13 @@ pub async fn extract_links_for_recent(
                     }
                 }
                 // SM-B-001: Sentinel bei 0 LLM-Treffern — der NOT-EXISTS-Filter überspringt
-                // den BrainDump beim nächsten Cycle, sonst Cost-Loop bei API-LLMs.
+                // den Spark beim nächsten Cycle, sonst Cost-Loop bei API-LLMs.
                 // Nur bei Ok(...), nicht bei Err — temporäre LLM-Fehler dürfen retryen.
                 if !wrote_any {
                     let sentinel = LinkInput {
-                        source_type: "braindump".into(),
+                        source_type: "spark".into(),
                         source_id: bd.id.clone(),
-                        target_type: "braindump".into(),
+                        target_type: "spark".into(),
                         target_id: bd.id.clone(),
                         relation: "noop-marker".into(),
                         confidence: 0.0,
@@ -2060,7 +1909,7 @@ pub struct AutoProjectStats {
     pub failed: usize,
 }
 
-/// Lädt n unkategorisierte/Random BrainDumps + leitet sie an den LLM-Provider.
+/// Lädt n unkategorisierte/Random Sparks + leitet sie an den LLM-Provider.
 /// Confidence >= AUTO_PROJECT_CONFIDENCE_MIN (default 0.8) → direkt erstellen.
 /// Confidence im Bereich [LINK_CONFIDENCE_MIN, AUTO) → in project_suggestions persistieren.
 pub async fn suggest_auto_projects(
@@ -2077,8 +1926,8 @@ pub async fn suggest_auto_projects(
         .unwrap_or(0.5);
     let mut stats = AutoProjectStats::default();
 
-    let entries: Vec<crate::models::BrainDumpEntry> = sqlx::query_as(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM braindumps \
+    let entries: Vec<crate::models::SparkEntry> = sqlx::query_as(
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM sparks \
          WHERE category IN ('Random', 'Unsorted') OR category IS NULL \
          ORDER BY created_at DESC LIMIT 20",
     )
@@ -2092,15 +1941,15 @@ pub async fn suggest_auto_projects(
     match llm.suggest_projects(&entries).await {
         Ok(proposals) => {
             for proposal in proposals {
-                if proposal.braindump_ids.len() < 2 {
+                if proposal.spark_ids.len() < 2 {
                     continue;
                 }
                 if proposal.confidence >= auto_min {
                     if let Ok(project) = repo::create_project(pool, &proposal.name, &proposal.description).await {
                         // SM-B-007: Erfolgs-Counter — assign-Failures werden geschluckt, aber nicht mehr mitgezählt.
                         let mut linked = 0_usize;
-                        for bd_id in &proposal.braindump_ids {
-                            if repo::assign_braindump_to_project(pool, bd_id, &project.id).await.is_ok() {
+                        for bd_id in &proposal.spark_ids {
+                            if repo::assign_spark_to_project(pool, bd_id, &project.id).await.is_ok() {
                                 linked += 1;
                             }
                         }
@@ -2111,7 +1960,7 @@ pub async fn suggest_auto_projects(
                     let input = ProjectSuggestionInput {
                         name: proposal.name,
                         description: proposal.description,
-                        member_braindump_ids: proposal.braindump_ids,
+                        member_spark_ids: proposal.spark_ids,
                         confidence: proposal.confidence,
                         reason: proposal.reason,
                     };
@@ -2176,7 +2025,7 @@ mod settings_tests {
 mod synaptic_phase_b_tests {
     use super::*;
     use crate::llm::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion};
-    use crate::models::BrainDumpEntry;
+    use crate::models::SparkEntry;
     use std::sync::Arc;
 
     struct MockLlm {
@@ -2191,7 +2040,7 @@ mod synaptic_phase_b_tests {
         async fn categorize_and_summarize(&self, _text: &str) -> Result<Classification, String> {
             unimplemented!("MockLlm: categorize_and_summarize ist nicht im Phase-B-Testpfad");
         }
-        async fn suggest_projects(&self, _entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String> {
+        async fn suggest_projects(&self, _entries: &[SparkEntry]) -> Result<Vec<ProjectSuggestion>, String> {
             if self.fail_projects { Err("mock-fail-projects".into()) } else { Ok(self.proposals.clone()) }
         }
         async fn extract_links(&self, _src: &str, _cands: &[NodeRef]) -> Result<Vec<LinkSuggestion>, String> {
@@ -2202,7 +2051,7 @@ mod synaptic_phase_b_tests {
     async fn setup_pool() -> SqlitePool {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         sqlx::query(
-            "CREATE TABLE braindumps (
+            "CREATE TABLE sparks (
                 id TEXT PRIMARY KEY NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 raw_text TEXT NOT NULL,
@@ -2227,10 +2076,10 @@ mod synaptic_phase_b_tests {
             )",
         ).execute(&pool).await.unwrap();
         sqlx::query(
-            "CREATE TABLE braindump_projects (
-                braindump_id TEXT NOT NULL,
+            "CREATE TABLE spark_projects (
+                spark_id TEXT NOT NULL,
                 project_id TEXT NOT NULL,
-                PRIMARY KEY (braindump_id, project_id)
+                PRIMARY KEY (spark_id, project_id)
             )",
         ).execute(&pool).await.unwrap();
         sqlx::query(
@@ -2252,7 +2101,7 @@ mod synaptic_phase_b_tests {
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT '',
-                member_braindump_ids TEXT NOT NULL,
+                member_spark_ids TEXT NOT NULL,
                 confidence REAL NOT NULL,
                 reason TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -2270,7 +2119,7 @@ mod synaptic_phase_b_tests {
     }
 
     async fn insert_bd(pool: &SqlitePool, id: &str, text: &str, category: &str) {
-        sqlx::query("INSERT INTO braindumps (id, raw_text, summary, category) VALUES (?, ?, ?, ?)")
+        sqlx::query("INSERT INTO sparks (id, raw_text, summary, category) VALUES (?, ?, ?, ?)")
             .bind(id).bind(text).bind(format!("Summary {id}")).bind(category)
             .execute(pool).await.unwrap();
     }
@@ -2282,7 +2131,7 @@ mod synaptic_phase_b_tests {
             started_at: std::time::Instant::now(),
             obsidian_sync_lock: std::sync::Arc::new(tokio::sync::Mutex::new(())),
             vision_config: std::sync::Arc::new(crate::config::VisionConfig::default()),
-            braindump_images_dir: std::sync::Arc::new(std::env::temp_dir().join("nexus-test-images")),
+            spark_images_dir: std::sync::Arc::new(std::env::temp_dir().join("nexus-test-images")),
             default_provider_name: std::sync::Arc::new("noop".to_string()),
         }
     }
@@ -2297,9 +2146,9 @@ mod synaptic_phase_b_tests {
         let llm = Arc::new(MockLlm { suggestions: vec![], proposals: vec![], fail_links: false, fail_projects: false });
         let state = make_state(pool.clone(), llm);
         let input = LinkInput {
-            source_type: "braindump".into(),
+            source_type: "spark".into(),
             source_id: "src".into(),
-            target_type: "braindump".into(),
+            target_type: "spark".into(),
             target_id: "tgt".into(),
             relation: "related".into(),
             confidence: 1.0,
@@ -2321,14 +2170,14 @@ mod synaptic_phase_b_tests {
         insert_bd(&pool, "ka", "Kandidat A", "Random").await;
         insert_bd(&pool, "kb", "Kandidat B", "Random").await;
         // Pre-Marker für ka und kb, sodass nur src als Source-Kandidat geladen wird
-        sqlx::query("INSERT INTO links (id, source_type, source_id, target_type, target_id, relation, confidence, created_by) VALUES ('s_ka','braindump','ka','braindump','ka','noop-marker',0.0,'llm')")
+        sqlx::query("INSERT INTO links (id, source_type, source_id, target_type, target_id, relation, confidence, created_by) VALUES ('s_ka','spark','ka','spark','ka','noop-marker',0.0,'llm')")
             .execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO links (id, source_type, source_id, target_type, target_id, relation, confidence, created_by) VALUES ('s_kb','braindump','kb','braindump','kb','noop-marker',0.0,'llm')")
+        sqlx::query("INSERT INTO links (id, source_type, source_id, target_type, target_id, relation, confidence, created_by) VALUES ('s_kb','spark','kb','spark','kb','noop-marker',0.0,'llm')")
             .execute(&pool).await.unwrap();
         let llm = MockLlm {
             suggestions: vec![
-                LinkSuggestion { target_type: "braindump".into(), target_id: "ka".into(), relation: "related".into(), confidence: 0.9, reason: None },
-                LinkSuggestion { target_type: "braindump".into(), target_id: "kb".into(), relation: "related".into(), confidence: 0.6, reason: None },
+                LinkSuggestion { target_type: "spark".into(), target_id: "ka".into(), relation: "related".into(), confidence: 0.9, reason: None },
+                LinkSuggestion { target_type: "spark".into(), target_id: "kb".into(), relation: "related".into(), confidence: 0.6, reason: None },
             ],
             proposals: vec![],
             fail_links: false,
@@ -2402,7 +2251,7 @@ mod synaptic_phase_b_tests {
             proposals: vec![ProjectSuggestion {
                 name: "Auto-Projekt".into(),
                 description: "Test".into(),
-                braindump_ids: vec!["bd1".into(), "bd2".into(), "bd3".into()],
+                spark_ids: vec!["bd1".into(), "bd2".into(), "bd3".into()],
                 confidence: 0.85,
                 reason: Some("Mock".into()),
             }],
@@ -2417,7 +2266,7 @@ mod synaptic_phase_b_tests {
         let projects: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM projects WHERE name='Auto-Projekt'")
             .fetch_one(&pool).await.unwrap();
         assert_eq!(projects.0, 1);
-        let assigns: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM braindump_projects")
+        let assigns: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM spark_projects")
             .fetch_one(&pool).await.unwrap();
         assert_eq!(assigns.0, 3);
     }
@@ -2434,7 +2283,7 @@ mod synaptic_phase_b_tests {
             proposals: vec![ProjectSuggestion {
                 name: "Maybe-Projekt".into(),
                 description: "Test".into(),
-                braindump_ids: vec!["bd1".into(), "bd2".into()],
+                spark_ids: vec!["bd1".into(), "bd2".into()],
                 confidence: 0.65,
                 reason: Some("Mock".into()),
             }],

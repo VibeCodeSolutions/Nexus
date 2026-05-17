@@ -7,7 +7,7 @@ data class ProjectSuggestion(
     val id: String,
     val name: String,
     val description: String,
-    val member_braindump_ids: List<String> = emptyList(),
+    val member_spark_ids: List<String> = emptyList(),
     val confidence: Double,
     val reason: String? = null,
     val created_at: String,
@@ -18,7 +18,7 @@ data class ProjectSuggestion(
 data class AcceptSuggestionResponse(
     val project_id: String,
     val name: String,
-    val linked_braindumps: Int,
-    val requested_braindumps: Int,
+    val linked_sparks: Int,
+    val requested_sparks: Int,
     val partial: Boolean,
 )

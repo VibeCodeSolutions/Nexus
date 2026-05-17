@@ -52,7 +52,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var braindumpCount by remember { mutableStateOf<Int?>(null) }
+    var sparkCount by remember { mutableStateOf<Int?>(null) }
     var unsortedCount by remember { mutableStateOf(0) }
     var openTaskCount by remember { mutableStateOf<Int?>(null) }
     var projectCount by remember { mutableStateOf<Int?>(null) }
@@ -61,11 +61,11 @@ fun DashboardScreen(
         if (!isPaired) return@LaunchedEffect
         scope.launch {
             coroutineScope {
-                val bd = async { apiClient.getBrainDumps() }
+                val bd = async { apiClient.getSparks() }
                 val ts = async { apiClient.getTasks() }
                 val ps = async { apiClient.getProjects() }
                 bd.await().onSuccess { entries ->
-                    braindumpCount = entries.size
+                    sparkCount = entries.size
                     unsortedCount = entries.count {
                         it.category.isNullOrBlank() || it.category.equals("Unsorted", ignoreCase = true)
                     }
@@ -123,10 +123,10 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            QuickActionButton("🧠", "Braindumps") { onNavigate("history") }
+            QuickActionButton("🧠", "Sparks") { onNavigate("history") }
             QuickActionButton("✏️", "Neue Aufgabe") { onCreateTask() }
             QuickActionButton("📁", "Projekte") { onNavigate("projects") }
-            QuickActionButton("🎙️", "Aufnehmen") { onNavigate("braindump") }
+            QuickActionButton("🎙️", "Aufnehmen") { onNavigate("spark") }
         }
 
         // Alert-Card (only when unsorted > 0)
@@ -156,9 +156,9 @@ fun DashboardScreen(
         ) {
             item {
                 OverviewCard(
-                    count = braindumpCount?.toString() ?: "—",
+                    count = sparkCount?.toString() ?: "—",
                     icon = "🧠",
-                    label = "BRAINDUMPS",
+                    label = "SPARKS",
                     onClick = { onNavigate("history") }
                 )
             }
@@ -236,7 +236,7 @@ private fun AlertCard(count: Int, onClick: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "$count Braindump${if (count == 1) "" else "s"} unsortiert",
+                    text = "$count Spark${if (count == 1) "" else "s"} unsortiert",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground

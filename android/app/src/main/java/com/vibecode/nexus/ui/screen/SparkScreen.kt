@@ -56,13 +56,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vibecode.nexus.data.NexusApiClient
-import com.vibecode.nexus.data.model.BrainDumpResponse
+import com.vibecode.nexus.data.model.SparkResponse
 import com.vibecode.nexus.speech.RecognizerState
 import com.vibecode.nexus.speech.SpeechRecognizerManager
 import kotlinx.coroutines.launch
 
 @Composable
-fun BrainDumpScreen(
+fun SparkScreen(
     speechManager: SpeechRecognizerManager,
     apiClient: NexusApiClient,
     isPaired: Boolean,
@@ -78,7 +78,7 @@ fun BrainDumpScreen(
 
     var editableText by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
-    var lastResult by remember { mutableStateOf<BrainDumpResponse?>(null) }
+    var lastResult by remember { mutableStateOf<SparkResponse?>(null) }
 
     // Sync finalText into editable field
     LaunchedEffect(speechState.finalText) {
@@ -117,7 +117,7 @@ fun BrainDumpScreen(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "BrainDump",
+                        text = "Spark",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -215,7 +215,7 @@ fun BrainDumpScreen(
                             }
                             isSending = true
                             scope.launch {
-                                val result = apiClient.sendBrainDump(editableText)
+                                val result = apiClient.sendSpark(editableText)
                                 isSending = false
                                 result.onSuccess { response ->
                                     lastResult = response
@@ -267,7 +267,7 @@ fun BrainDumpScreen(
                             contentDescription = null,
                             modifier = Modifier.padding(end = 8.dp)
                         )
-                        Text("Neuer BrainDump")
+                        Text("Neuer Spark")
                     }
                 }
 
@@ -278,7 +278,7 @@ fun BrainDumpScreen(
 }
 
 @Composable
-private fun ResultCard(result: BrainDumpResponse) {
+private fun ResultCard(result: SparkResponse) {
     Card(
         modifier = Modifier
             .fillMaxWidth()

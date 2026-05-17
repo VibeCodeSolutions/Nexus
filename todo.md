@@ -15,7 +15,7 @@
 ### Milestone 1 — Shell & Design System (`index.html` Grundstruktur)
 
 - [ ] **NV-M1-A** — Sidebar-Navigation ersetzt horizontale Tabs
-  - Struktur: `<aside class="sidebar">` mit `.nav-item[data-view]`-Buttons (Braindumps, Aufgaben, Projekte | Kalender disabled, Erfolge | Settings)
+  - Struktur: `<aside class="sidebar">` mit `.nav-item[data-view]`-Buttons (Sparks, Aufgaben, Projekte | Kalender disabled, Erfolge | Settings)
   - Topbar: Logo + Status-Pills + Theme-Toggle + Settings-Icon
   - Shell-CSS: `display:grid; grid-template-columns: 220px 1fr`, Topbar 56px fixed
   - DoD: Alle bestehenden 4 Views navigierbar via Sidebar; Tab-Leiste weg; Topbar zeigt Status-Dot und Theme-Toggle
@@ -27,32 +27,32 @@
   - DoD: Beide Themes (dark/light) visuell intakt; keine Broken-Layouts
 
 - [ ] **NV-M1-C** — JS-Architektur: `Views{}`-Modul-Pattern + `navigate()`
-  - Alle bestehenden View-Init-Funktionen in `Views.braindumps`, `Views.tasks`, `Views.projects`, `Views.achievements` verpacken
+  - Alle bestehenden View-Init-Funktionen in `Views.sparks`, `Views.tasks`, `Views.projects`, `Views.achievements` verpacken
   - Jedes Modul hat `init()` und `destroy()` (Event-Listener cleanup)
   - Globale Variablen auf Allowlist reduzieren: `_activeView`, `_authToken`, `_serverUrl`, `_theme`
-  - DoD: `navigate('tasks')` → destroy braindumps, init tasks. Back-Navigation: kein Event-Listener-Leak
+  - DoD: `navigate('tasks')` → destroy sparks, init tasks. Back-Navigation: kein Event-Listener-Leak
 
 - **Gate M1:** Alle 4 Views per Sidebar erreichbar. Dark + Light Theme. JS-Konsole ohne Fehler. Kein `style=`-Attribut im gesamten HTML.
 
 ### Milestone 2 — Dashboard View (Home-Übersicht, neu)
 
 - [ ] **NV-M2-A** — Status-Pills in Topbar (dynamisch)
-  - `STATUS OK / FEHLER` (Verbindung), `N UNSORTIERT` (aus `/braindump/unsorted/count`), `N AUFGABEN` (offene Tasks)
+  - `STATUS OK / FEHLER` (Verbindung), `N UNSORTIERT` (aus `/spark/unsorted/count`), `N AUFGABEN` (offene Tasks)
   - Pill-Komponente: `--r-pill`, kleiner Border, farbige Dot-Indikatoren
-  - DoD: Pills laden beim Start, refreshen nach Braindump-Submit
+  - DoD: Pills laden beim Start, refreshen nach Spark-Submit
 
 - [ ] **NV-M2-B** — Quick-Action-Buttons (Zeile mit Kreisen)
-  - 3 Buttons: 🎙 Braindump, ✏️ Aufgabe, 🔍 Suche (vorerst disabled)
+  - 3 Buttons: 🎙 Spark, ✏️ Aufgabe, 🔍 Suche (vorerst disabled)
   - Styling: 40×40px, rund, `--bg-surface`, Hover: `--primary-tint`
-  - DoD: Braindump-Button öffnet Braindump-View + fokussiert Input; Aufgabe öffnet Task-Modal
+  - DoD: Spark-Button öffnet Spark-View + fokussiert Input; Aufgabe öffnet Task-Modal
 
 - [ ] **NV-M2-C** — Alert-Card (Unsortiert-Banner)
-  - Erscheint wenn `unsorted_count > 0`, klicken → Braindump-View gefiltert auf Unsortiert
+  - Erscheint wenn `unsorted_count > 0`, klicken → Spark-View gefiltert auf Unsortiert
   - Styling: Amber-Tint, Warndreick-Icon, Pfeil rechts
   - DoD: 0 Unsortierte → Banner weg; N > 0 → Banner mit korrektem Count
 
 - [ ] **NV-M2-D** — 2×2 Overview-Grid (Plantry-Muster)
-  - 4 Cards: Braindumps (Gesamt-Count), Aufgaben (Offen), Projekte (Aktive), Erfolge (XP oder Badge-Count)
+  - 4 Cards: Sparks (Gesamt-Count), Aufgaben (Offen), Projekte (Aktive), Erfolge (XP oder Badge-Count)
   - Count-Badge oben rechts in Card, groß (28px), `--primary`
   - Card-Label: UPPERCASE, 11px, `--text-dim`
   - Klick navigiert zur jeweiligen View
@@ -60,11 +60,11 @@
 
 - **Gate M2:** Dashboard ist neuer Default-Tab beim Start. Alle Counts laden korrekt. Alert-Banner reagiert auf Zustand. Quick-Actions funktionieren.
 
-### Milestone 3 — Braindump View (Redesign bestehend)
+### Milestone 3 — Spark View (Redesign bestehend)
 
 - [ ] **NV-M3-A** — Toolbar: Filter-Pills + CTA-Button
   - Filter-Pills: Alle / je Kategorie (dynamisch aus API) — `role="tablist"`, Pill-Styling
-  - CTA: `+ Braindump` als `btn-cta` (full-width, pill, `--primary`)
+  - CTA: `+ Spark` als `btn-cta` (full-width, pill, `--primary`)
   - DoD: Filter ändert angezeigte Liste; CTA öffnet Eingabe-Bereich
 
 - [ ] **NV-M3-B** — Entry-Cards (Plantry-Muster)
@@ -78,7 +78,7 @@
   - Inhalt: Volltext, Kategorie, Datum, verknüpfte Projekte (Wikilinks), "Tasks extrahieren"-Button (FEAT-001)
   - DoD: Panel öffnet/schließt ohne Layout-Sprung; ESC schließt; kein Modal mehr
 
-- **Gate M3:** Braindump-View vollständig redesigned. Detail-Panel ersetzt Modal. Filter-Pills funktionieren. Entry-Cards mit Badges.
+- **Gate M3:** Spark-View vollständig redesigned. Detail-Panel ersetzt Modal. Filter-Pills funktionieren. Entry-Cards mit Badges.
 
 ### Milestone 4 — Aufgaben View (Redesign bestehend)
 
@@ -92,8 +92,8 @@
 ### Milestone 5 — Projekte View (Redesign bestehend)
 
 - [ ] **NV-M5-A** — Grid-Layout (2-spaltig) statt Liste
-- [ ] **NV-M5-B** — Projekt-Card: Name, Task-Progress-Bar, letzter Braindump-Link, %-Badge
-- [ ] **NV-M5-C** — Detail-Panel: Projekt-Tasks + verknüpfte Braindumps
+- [ ] **NV-M5-B** — Projekt-Card: Name, Task-Progress-Bar, letzter Spark-Link, %-Badge
+- [ ] **NV-M5-C** — Detail-Panel: Projekt-Tasks + verknüpfte Sparks
 - **Gate M5:** Projekte als Grid-Cards. Detail-Panel zeigt Tasks + Links.
 
 ### Milestone 6 — Polish, Reserved Slots, Erfolge View
@@ -110,7 +110,7 @@
 |---|---|---|---|
 | M1 | Shell + Design System | — | 1 Tag |
 | M2 | Dashboard View | M1 | 1 Tag |
-| M3 | Braindump View | M1 | 1–2 Tage |
+| M3 | Spark View | M1 | 1–2 Tage |
 | M4 | Aufgaben View | M1 | 1 Tag |
 | M5 | Projekte View | M1 | 1 Tag |
 | M6 | Polish + Reserved Slots | M1–M5 | 0.5 Tage |
@@ -121,15 +121,15 @@
 
 ## 🚀 Nächste Features (Priorisiert 2026-05-16, Admin)
 
-### FEAT-001 — KI-Aufgabensplitting aus Braindumps
+### FEAT-001 — KI-Aufgabensplitting aus Sparks
 
-**Idee:** Ein Spracheintrag kann mehrere Themen enthalten. Aktuell wird der gesamte Text als ein Eintrag gespeichert und mit einer Kategorie versehen. Mit diesem Feature analysiert die KI den Braindump und extrahiert automatisch einzelne Action-Items als Tasks.
+**Idee:** Ein Spracheintrag kann mehrere Themen enthalten. Aktuell wird der gesamte Text als ein Eintrag gespeichert und mit einer Kategorie versehen. Mit diesem Feature analysiert die KI den Spark und extrahiert automatisch einzelne Action-Items als Tasks.
 
 **Aktueller Stand:** 1 Spracheingabe → 1 DB-Eintrag → 1 LLM-Call → 1 Kategorie. Kein Splitting, keine automatische Task-Erstellung.
 
 **Gewünschtes Verhalten:**
 - Nutzer spricht 1 Minute über 5 Themen → App erstellt 5 Tasks mit Titel, Kategorie und optionalem Fälligkeitsdatum
-- Der ursprüngliche Braindump-Text bleibt als Quelle erhalten
+- Der ursprüngliche Spark-Text bleibt als Quelle erhalten
 - Splitting passiert im Hintergrund (analog zu `recategorize_unsorted`)
 
 **Umsetzungsplan:**
@@ -137,17 +137,17 @@
   - Datei: `core/src/llm/mod.rs` (neuer Trait-Default), alle Provider-Implementierungen
   - DoD: Prompt extrahiert aus "Kauf Milch, ruf Kai an, Todo-App fixen bis Freitag" → 3 Tasks korrekt
 
-- [ ] **FEAT-001-B** — Neuer Endpoint `POST /braindump/{id}/extract-tasks`
+- [ ] **FEAT-001-B** — Neuer Endpoint `POST /spark/{id}/extract-tasks`
   - Datei: `core/src/handlers.rs`, `core/src/main.rs` (Route)
   - Response: `{ "created": [task_id, ...], "count": N }`
-  - DoD: Call auf bestehenden Braindump → Tasks in DB, Antwort in <3s
+  - DoD: Call auf bestehenden Spark → Tasks in DB, Antwort in <3s
 
-- [ ] **FEAT-001-C** — Optionaler Auto-Extract nach `POST /braindump` (Query-Param `?auto_extract=true` oder Settings-Toggle)
-  - Datei: `core/src/handlers.rs::create_braindump`
+- [ ] **FEAT-001-C** — Optionaler Auto-Extract nach `POST /spark` (Query-Param `?auto_extract=true` oder Settings-Toggle)
+  - Datei: `core/src/handlers.rs::create_spark`
   - DoD: Mobile App kann Auto-Extract aktivieren; Desktop-Settings-Modal hat Toggle
 
-- [ ] **FEAT-001-D** — UI: "Tasks extrahieren"-Button im Braindump-Detail (Desktop + Android)
-  - Dateien: `desktop/src/index.html` (Detail-Modal), `android/.../BrainDumpHistoryScreen.kt`
+- [ ] **FEAT-001-D** — UI: "Tasks extrahieren"-Button im Spark-Detail (Desktop + Android)
+  - Dateien: `desktop/src/index.html` (Detail-Modal), `android/.../SparkHistoryScreen.kt`
   - DoD: Button sichtbar, Klick → Tasks erscheinen in Tasks-Tab ohne Reload
 
 **Aufwand:** ~3–5 Tage (Backend + beide UIs). Infrastruktur (Tasks-Tabelle, LLM-Anbindung, Background-Tasks) bereits vorhanden.
@@ -166,7 +166,7 @@
 - iCal-Export als Alternative ohne OAuth (`.ics`-Datei download)
 
 **Umsetzungsplan:**
-- [ ] **FEAT-002-A** — `GET /braindump/export.ics` — iCal-Feed aller Braindumps mit Datum
+- [ ] **FEAT-002-A** — `GET /spark/export.ics` — iCal-Feed aller Sparks mit Datum
   - Datei: `core/src/handlers.rs`, Crate: `icalendar` (crates.io)
   - DoD: URL in Kalender-App eingetragen → Events sichtbar, Bearer-geschützt
 
@@ -298,7 +298,7 @@
 
 ---
 
-## 🐙 Sprint "Joyful Jellyfish" (2026-05-01) — Bugfix + Settings + Braindump-Hardening
+## 🐙 Sprint "Joyful Jellyfish" (2026-05-01) — Bugfix + Settings + Spark-Hardening
 
 > Plan-File: `~/.claude/plans/folgende-punkte-sind-joyful-jellyfish.md`
 > Auslöser: Admin-Dogfooding-Findings (Refresh grau, Mobile-Task-Sync, Diag-Stand leer, Settings-Wechsel fehlt, Unsorted-Lifecycle).
@@ -371,9 +371,9 @@
   - Fix: Provider/Model/Key-Felder + "LLM testen"-Button; `setup-status`-Check ruft Wizard-Modal wenn `paired=false` ODER `provider_configured=false`
   - DoD: `~/.nexus_token` löschen, App neu → Wizard erscheint statt leerem Tasks-Tab; Provider-Save flackert nicht mehr (siehe **N-013-COD**)
 
-- **Tuvok-Gate C:** Provider-Switch beide Devices, Wizard-Reset Android, Erststart-Wizard Desktop, alle drei mit erfolgreichem Braindump-Test.
+- **Tuvok-Gate C:** Provider-Switch beide Devices, Wizard-Reset Android, Erststart-Wizard Desktop, alle drei mit erfolgreichem Spark-Test.
 
-### Phase-D — Braindump-Auto-Recategorize
+### Phase-D — Spark-Auto-Recategorize
 
 - [x] **JJ-D1-COD** — `recategorize_unsorted_inner` extrahieren + Limit (JJ-PR-004 / N-006-PER)
   - Datei: `core/src/handlers.rs:532-580`
@@ -386,13 +386,13 @@
   - **Single-Core-Garant (JJ-PR-005):** Beim Server-Start TCP-Connect-Test auf 7777 — wenn lebt, Abbruch mit klarer Fehlermeldung. Verhindert Doppelstart von Sidecar + Service.
   - DoD: Logs zeigen sauberen Backoff, kein Loop, sauberer Shutdown auf SIGTERM; zweiter Core-Start auf 7777 wird abgewiesen
 
-- [x] **JJ-D3-COD** — `GET /braindump/unsorted/count`
+- [x] **JJ-D3-COD** — `GET /spark/unsorted/count`
   - Datei: `core/src/handlers.rs`
   - Fix: Cheap COUNT(*) WHERE category='Unsorted' OR category IS NULL
-  - DoD: <50ms Response auf 1000 Braindumps
+  - DoD: <50ms Response auf 1000 Sparks
 
 - [x] **JJ-D4-COD** — UI: Unsorted-Badge beide Devices
-  - Datei: `desktop/src/index.html` (Braindump-Tab Toolbar), `android/app/src/main/java/com/vibecode/nexus/ui/screen/BrainDumpHistoryScreen.kt`
+  - Datei: `desktop/src/index.html` (Spark-Tab Toolbar), `android/app/src/main/java/com/vibecode/nexus/ui/screen/SparkHistoryScreen.kt`
   - Fix: Badge "Unsortiert (N)", Klick filtert Liste
   - DoD: Beide Devices zeigen Count, Filter funktional
 
@@ -417,7 +417,7 @@
 ### Phase-E — Vault-Design-Dokument (Doku-only, nach F)
 
 - [x] **JJ-E1-DOC** — `docs/VAULT-DESIGN.md` (neu)
-  - Inhalt: MD-Source-of-Truth + FTS5-Index, Scope Braindumps+Projects+Notes, Layout `~/.nexus/vault/{braindumps,projects,notes,.index}`, Frontmatter-Schema (ULID/type/created_at/category/tags/projects-Wikilinks), WikiLink-Regex+Edges-Tabelle, `nexus migrate-to-vault` CLI-Pseudo-Code, Feature-Flag `NEXUS_VAULT_ENABLED`, LLM-Kontext-Top5-Match, cytoscape.js-Graph, Crash-Safety, Aufwandsschätzung 7-11 Tage
+  - Inhalt: MD-Source-of-Truth + FTS5-Index, Scope Sparks+Projects+Notes, Layout `~/.nexus/vault/{sparks,projects,notes,.index}`, Frontmatter-Schema (ULID/type/created_at/category/tags/projects-Wikilinks), WikiLink-Regex+Edges-Tabelle, `nexus migrate-to-vault` CLI-Pseudo-Code, Feature-Flag `NEXUS_VAULT_ENABLED`, LLM-Kontext-Top5-Match, cytoscape.js-Graph, Crash-Safety, Aufwandsschätzung 7-11 Tage
   - DoD: Tuvok+Seven+nexus-rust-qa reviewen als implementationsfähig für nächsten Sprint
 
 - **Tuvok-Gate E:** Trio-Review (Tuvok/Seven/nexus-rust-qa). Bei grün: Phase E.0 abgeschlossen, Implementierung ist Sprint-Material.
@@ -494,13 +494,13 @@
 
 - [x] **SM-B-1** Migration `20260501_001_links.sql` + `links.rs` Modul (5 CRUD-Tests).
 - [x] **SM-B-2** Migration `20260502_001_project_suggestions.sql` + `suggestions.rs` Modul.
-- [x] **SM-B-3** 7 Bearer-pflichtige Endpoints (`POST /links`, `DELETE /links/{id}`, GET `/braindump|projects/{id}/links`, suggestions GET/accept/dismiss).
+- [x] **SM-B-3** 7 Bearer-pflichtige Endpoints (`POST /links`, `DELETE /links/{id}`, GET `/spark|projects/{id}/links`, suggestions GET/accept/dismiss).
 - [x] **SM-B-4** Trait `LlmProvider::extract_links` Default-Impl + Override claude.rs+ollama.rs.
 - [x] **SM-B-6** Background-Task `extract_links_for_recent` + `suggest_auto_projects` mit env-Confidence-Schwellen.
 - [x] **SM-B-001-COD** Sentinel-Marker (Cost-Loop-Schutz).
 - [x] **SM-B-002-SIC** Server-Override `created_by="user"` für POST /links.
 - [x] **SM-B-003-VOL** Mock-LLM-Provider + 5 Branching-Tests (Plan-DoD übererfüllt: 11 Tests).
-- [x] **SM-B-005-KOR** Cleanup-Cascade in `delete_braindump`/`delete_project` (mit Race-Window-Bookmark).
+- [x] **SM-B-005-KOR** Cleanup-Cascade in `delete_spark`/`delete_project` (mit Race-Window-Bookmark).
 - [x] **SM-B-006/007-KOR** Counter-Drift-Korrektur in `accept_project_suggestion` + `suggest_auto_projects`.
 - [x] **SM-B-008-KOR** Bonus-Discovery: `transcript`-Spalte in 3 Phase-B-SELECTs ergänzt.
 - [ ] **SM-B-004 verworfen** als Plan-Bug (sqlx-migrate Version-Kollision bei gleichem Datum-Prefix).
@@ -510,14 +510,14 @@
 
 #### Phase U Desktop (Commit `5eff289`)
 
-- [x] **SM-U-DSK-1** BrainDump-Detail-Modal (NEU) mit Verknüpft-mit-Block + Wikilinks.
+- [x] **SM-U-DSK-1** Spark-Detail-Modal (NEU) mit Verknüpft-mit-Block + Wikilinks.
 - [x] **SM-U-DSK-2** Suggestions-Banner im Projects-Tab mit Übernehmen/Verwerfen-Buttons.
 - [x] **SM-U-DSK-3** 14 neue CSS-Klassen unter PC-Token-System.
 - **Tuvok-Gate U Desktop:** ✅ GRÜN (Iter-1, 0 Major, 4 Minor als Phase-X-Bookmarks).
 
 #### Phase U Android (AS-CLI Cross-CLI) — Commit `c468c24`
 
-- [x] **SM-U-AND-1** `BrainDumpHistoryScreen.kt` — Bottom-Sheet für Verknüpfungen beim Detail-Klick (rekursive Sheet-Nav via `remember(id)+LaunchedEffect(id)`).
+- [x] **SM-U-AND-1** `SparkHistoryScreen.kt` — Bottom-Sheet für Verknüpfungen beim Detail-Klick (rekursive Sheet-Nav via `remember(id)+LaunchedEffect(id)`).
 - [x] **SM-U-AND-2** `ProjectsScreen.kt` — Top-Banner für pending Suggestions.
 - [x] **SM-U-AND-3** `NexusApiClient.kt` — 4 neue Funktionen.
 - [x] **SM-U-AND-4** `data/model/Link.kt` + `ProjectSuggestion.kt` — DTOs.

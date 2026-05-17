@@ -43,8 +43,8 @@ import com.vibecode.nexus.data.NexusApiClient
 import com.vibecode.nexus.data.UiPreferences
 import com.vibecode.nexus.speech.SpeechRecognizerManager
 import com.vibecode.nexus.ui.components.NexusFooter
-import com.vibecode.nexus.ui.screen.BrainDumpHistoryScreen
-import com.vibecode.nexus.ui.screen.BrainDumpScreen
+import com.vibecode.nexus.ui.screen.SparkHistoryScreen
+import com.vibecode.nexus.ui.screen.SparkScreen
 import com.vibecode.nexus.ui.screen.DashboardScreen
 import com.vibecode.nexus.ui.screen.PairScreen
 import com.vibecode.nexus.ui.screen.ProjectsScreen
@@ -65,11 +65,11 @@ data class BottomNavItem(
 
 class MainActivity : ComponentActivity() {
 
-    // Sprint Nightvision: Dashboard als Home, BrainDumps (History) statt Recording-Screen
+    // Sprint Nightvision: Dashboard als Home, Sparks (History) statt Recording-Screen
     // in der Nav. Recording bleibt per Deep-Link/QuickAction vom Dashboard erreichbar.
     private val bottomNavItems = listOf(
         BottomNavItem("dashboard", "Home", Icons.Default.Home),
-        BottomNavItem("history", "Braindumps", Icons.Default.Psychology),
+        BottomNavItem("history", "Sparks", Icons.Default.Psychology),
         BottomNavItem("tasks", "Aufgaben", Icons.Default.Checklist),
         BottomNavItem("projects", "Projekte", Icons.Default.Folder),
         BottomNavItem("settings", "Settings", Icons.Default.Settings),
@@ -242,8 +242,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        composable("braindump") {
-                            BrainDumpScreen(
+                        composable("spark") {
+                            SparkScreen(
                                 speechManager = speechManager,
                                 apiClient = apiClient,
                                 isPaired = isPaired,
@@ -255,7 +255,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("history") {
-                            BrainDumpHistoryScreen(apiClient = apiClient)
+                            SparkHistoryScreen(apiClient = apiClient)
                         }
                         composable("tasks") {
                             TasksScreen(

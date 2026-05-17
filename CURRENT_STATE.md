@@ -8,12 +8,12 @@
 
 ## Sprint "Obsidian-Briefkasten" (2026-05-03 → laufend)
 
-Auslöser: File-basierte LLM-Bridge zwischen Nexus und Obsidian-Vault. Statt synchroner LLM-Klassifikation schreibt Nexus BrainDumps in den Vault, ein Vault-seitiges Sortier-Skill (kepano/obsidian-skills) erzeugt Outbox-Files, Nexus konsumiert die zurück. Architektur-Entscheidungen vom Admin freigegeben: R1 Pending-Pattern · R2 DB-Migration mit DEFAULT 'done' · R3 File-Truth stateless.
+Auslöser: File-basierte LLM-Bridge zwischen Nexus und Obsidian-Vault. Statt synchroner LLM-Klassifikation schreibt Nexus Sparks in den Vault, ein Vault-seitiges Sortier-Skill (kepano/obsidian-skills) erzeugt Outbox-Files, Nexus konsumiert die zurück. Architektur-Entscheidungen vom Admin freigegeben: R1 Pending-Pattern · R2 DB-Migration mit DEFAULT 'done' · R3 File-Truth stateless.
 
 **Phasen:**
-- ✅ **Phase A — Foundation** (`5b1ef45`): Migration `20260503_001_obsidian_briefkasten.sql` mit `classification_status` + `nexus_inbox_id`, BrainDumpEntry-Erweiterung, Config + Keystore-Hooks für `vault_path`, `gray_matter = "0.2"`. Tuvok ✅ ohne Auflagen, 2 Minor-Bookmarks (OB-A-MIN-1 gray_matter-Bump, OB-A-MIN-2 Migration-Roundtrip-Test).
-- ✅ **Phase B — Inbox-Writer + Provider** (uncommitted, bereit): Pre-Step OB-A-MIN-1 erledigt (`gray_matter = "0.3"`). Neuer Modul-Baum `core/src/obsidian/{mod,frontmatter,mailbox}.rs` (atomic write via tmp+rename, YAML-Quoting injection-safe, gray_matter-Roundtrip-Test). `core/src/llm/obsidian.rs` ObsidianProvider mit Pending-Pattern: classify schreibt Inbox-File und gibt sofort `Classification{category:"Pending",inbox_id:Some(uuid)}` zurück. `Classification.inbox_id: Option<String>` mit `#[serde(default)]` → bestehende JSON-Provider unverändert kompatibel. `handlers::post_braindump` + `recategorize_unsorted_inner` persistieren `classification_status` + `nexus_inbox_id`. `setup_status`/`onboard_set_provider`/`settings_models` haben obsidian-Arme analog noop. Tuvok-Iter-1 (qs-20260509-001) Auflagen-Verdikt mit 1 Major (OB-B-MAJ-1 obsidian/noop nicht in `set_default_provider`-Validation) + 2 Minor → Findings-Gate-Fix: neue `SKIP_PROVIDERS`-Konstante + `is_acceptable_default`-Helper in keystore.rs, 3 neue Unit-Tests. cargo test 42/42 grün, clippy clean. Freigabe erteilt.
-- ✅ **Phase C — Outbox-Importer** (uncommitted, bereit): Typisierter Frontmatter-Parser (`OutboxFrontmatter` + `NexusType`-Enum + `parse_outbox_typed`). Neue `obsidian/importer.rs` mit Scanner (md-only, ignoriert .tmp + _processed/), Dispatcher (Task→repo::create_task, Project→create_project mit body als description, Note→nur Status-Flip, Habit/Journal→Skipped wegen fehlendem DB-Schema), `flip_source_braindump` (UPDATE braindumps SET classification_status='done' + Category/Summary/Tags aus Outbox-Frontmatter, idempotent via `AND classification_status='pending'`-Klausel), Best-Effort Wikilink-Resolution (eindeutige Name-Matches), Atomic Archive nach `_processed/` mit `.dup-N`-Schutz vor Überschreibung. Neuer Endpoint `POST /api/obsidian/sync` (Bearer-pflichtig, 412 PRECONDITION_FAILED ohne Vault-Pfad). 60/60 Tests grün (18 neu für Phase C: 7 frontmatter, 11 importer), clippy clean. Tuvok-Iter-1 (qs-20260509-002) ✅ Freigabe — 0 Blocker / 0 Major / 7 Minor (alle Folge-Sprint-Bookmarks).
+- ✅ **Phase A — Foundation** (`5b1ef45`): Migration `20260503_001_obsidian_briefkasten.sql` mit `classification_status` + `nexus_inbox_id`, SparkEntry-Erweiterung, Config + Keystore-Hooks für `vault_path`, `gray_matter = "0.2"`. Tuvok ✅ ohne Auflagen, 2 Minor-Bookmarks (OB-A-MIN-1 gray_matter-Bump, OB-A-MIN-2 Migration-Roundtrip-Test).
+- ✅ **Phase B — Inbox-Writer + Provider** (uncommitted, bereit): Pre-Step OB-A-MIN-1 erledigt (`gray_matter = "0.3"`). Neuer Modul-Baum `core/src/obsidian/{mod,frontmatter,mailbox}.rs` (atomic write via tmp+rename, YAML-Quoting injection-safe, gray_matter-Roundtrip-Test). `core/src/llm/obsidian.rs` ObsidianProvider mit Pending-Pattern: classify schreibt Inbox-File und gibt sofort `Classification{category:"Pending",inbox_id:Some(uuid)}` zurück. `Classification.inbox_id: Option<String>` mit `#[serde(default)]` → bestehende JSON-Provider unverändert kompatibel. `handlers::post_spark` + `recategorize_unsorted_inner` persistieren `classification_status` + `nexus_inbox_id`. `setup_status`/`onboard_set_provider`/`settings_models` haben obsidian-Arme analog noop. Tuvok-Iter-1 (qs-20260509-001) Auflagen-Verdikt mit 1 Major (OB-B-MAJ-1 obsidian/noop nicht in `set_default_provider`-Validation) + 2 Minor → Findings-Gate-Fix: neue `SKIP_PROVIDERS`-Konstante + `is_acceptable_default`-Helper in keystore.rs, 3 neue Unit-Tests. cargo test 42/42 grün, clippy clean. Freigabe erteilt.
+- ✅ **Phase C — Outbox-Importer** (uncommitted, bereit): Typisierter Frontmatter-Parser (`OutboxFrontmatter` + `NexusType`-Enum + `parse_outbox_typed`). Neue `obsidian/importer.rs` mit Scanner (md-only, ignoriert .tmp + _processed/), Dispatcher (Task→repo::create_task, Project→create_project mit body als description, Note→nur Status-Flip, Habit/Journal→Skipped wegen fehlendem DB-Schema), `flip_source_spark` (UPDATE sparks SET classification_status='done' + Category/Summary/Tags aus Outbox-Frontmatter, idempotent via `AND classification_status='pending'`-Klausel), Best-Effort Wikilink-Resolution (eindeutige Name-Matches), Atomic Archive nach `_processed/` mit `.dup-N`-Schutz vor Überschreibung. Neuer Endpoint `POST /api/obsidian/sync` (Bearer-pflichtig, 412 PRECONDITION_FAILED ohne Vault-Pfad). 60/60 Tests grün (18 neu für Phase C: 7 frontmatter, 11 importer), clippy clean. Tuvok-Iter-1 (qs-20260509-002) ✅ Freigabe — 0 Blocker / 0 Major / 7 Minor (alle Folge-Sprint-Bookmarks).
 - ✅ **Phase D — Wizard + Singleflight** (uncommitted, bereit): `run_onboard` in main.rs hat „Obsidian-Briefkasten" als Provider-Option mit Vault-Pfad-Input + Existenz-Check. `SetProviderRequest` bekommt optional `vault_path`-Feld; `onboard_set_provider` für „obsidian"-Pfad validiert (trim/empty + `Path::is_dir`) und persistiert via `keystore::set_vault_path`. `SetupStatus.vault_path` (skip_serializing_if Option::is_none) für Frontend-Anzeige. Frontend `desktop/src/index.html`: PROVIDERS-Liste um Obsidian-Eintrag erweitert, neuer 'obsidian'-Branch in `renderProviderDetail` (Text-Input + „Ordner wählen…"-Button via `data-action="pick-vault"` → `pickVaultFolder()` mit `window.__TAURI__.dialog.open` und Alert-Fallback). `saveProvider` erweitert um optional `vaultPath`-Param. **OB-C-MIN-5 mit-fixed**: `AppState.obsidian_sync_lock: Arc<tokio::sync::Mutex<()>>`; `obsidian_sync` nutzt `try_lock` → 409 CONFLICT bei laufendem Sync (kein Blocking, sofortiges User-Feedback). Tuvok-Iter-1 (qs-20260509-003) ✅ Freigabe ohne Findings — 0 Blocker / 0 Major / 0 Minor.
 - ✅ **Phase E — Schema-Migration + Robustheits-Bookmarks** (uncommitted, bereit): Migration `20260509_001_obsidian_external_ids.sql` mit `ALTER TABLE tasks/projects ADD COLUMN nexus_external_id` + partial `UNIQUE`-Index `WHERE nexus_external_id IS NOT NULL`. Repo: dünne `create_task`/`create_project`-Wrapper auf `*_with_external_id`-Variante; neue `find_*_by_external_id`-Optionals. Importer dispatch_task/project: vorab Lookup → Re-Use bei Treffer, sonst Insert mit external-id (OB-C-MIN-4). EXDEV-Fallback `move_or_copy_remove` mit `is_cross_device`-Detection (raw_os_error 18/17 ∪ ErrorKind::CrossesDevices, OB-C-MIN-2). Note ohne `nexus_source_inbox` → Skipped statt Imported (OB-C-MIN-7). Symlink-Vertrauensmodell als Doc-Kommentar in `scan_outbox` (OB-C-MIN-1). 65/65 Tests grün (5 neu für Phase E). Tuvok-Iter-1 (qs-20260509-004) ✅ Freigabe ohne Findings.
 - ⏳ **Phase F — Win11-VM-Smoke (Admin-Aufgabe)**: `docs/SMOKE_HAPPY_THOMPSON.md` Sektion 8a–8f durchklicken in Win11-VM. Bei grün → `bash scripts/bump-version.sh 0.1.3` → Tag → Push → Release.
@@ -22,7 +22,7 @@ Auslöser: File-basierte LLM-Bridge zwischen Nexus und Obsidian-Vault. Statt syn
 - OB-A-MIN-2 Migration-Roundtrip-Test (post-Migration-Schema-Verifikation)
 - OB-B-MIN-2 gray_matter 0.4+ beim nächsten Dependency-Bump checken
 - OB-C-MIN-3 OutboxFrontmatter::nexus_type als typed enum statt String (kosmetisch, toter Err-Pfad in dispatch)
-- OB-C-MIN-6 HTTP-Endpoint-Test-Infrastruktur (reqwest + spawned axum) — gilt für post_braindump+Obsidian + sync-Endpoint allgemein
+- OB-C-MIN-6 HTTP-Endpoint-Test-Infrastruktur (reqwest + spawned axum) — gilt für post_spark+Obsidian + sync-Endpoint allgemein
 - Vault-only Note (Phase F): wenn User Notes direkt im Vault anlegt, Nexus-DB hat aktuell keine eigene Note-Tabelle — eigener Mini-Sprint klären, ob das je gebraucht wird
 
 ---
@@ -105,14 +105,14 @@ Auslöser: Erster nativer Win11-Smoke-Test auf Dualboot-Partition deckte 8 Findi
 
 ## Sprint "Synaptic Mosaic" (2026-05-02)
 
-Auslöser: Knowledge-Graph-Scope (Wikilinks zwischen BrainDumps/Projekten + Auto-Projekt-Bildung aus thematischen Clustern) plus Phase-F-Aufräum-Sammelaufgabe (UI-Lokalisierung, Settings-Bug, Tauri-Bundle-Refresh).
+Auslöser: Knowledge-Graph-Scope (Wikilinks zwischen Sparks/Projekten + Auto-Projekt-Bildung aus thematischen Clustern) plus Phase-F-Aufräum-Sammelaufgabe (UI-Lokalisierung, Settings-Bug, Tauri-Bundle-Refresh).
 
 - ✅ **Phase F — Frontend-Bugs + i18n** (`a640837 feat(synaptic): Phase F`): Desktop alle UI-Strings deutsch (Header/Tabs/Toolbars/Modals/JS-Banner + JS-dynamisch "Alle Kategorien"-Fix), `core/src/diag.rs` 4 deutsche Backend-Strings (SM-PR-006), Android Bottom-Nav + SettingsScreen + TasksScreen status/priority-Mappings (Offen/Erledigt, Niedrig/Mittel/Hoch). `docs/i18n-strings-de.md` (NEU) als Working-Doc + Lerneffekt-Sammlung für Variable-basierte/JS-dynamische Strings. Iter-2 mit SM-F-1 + SM-F-2 in 1 Korrektur-Zyklus geheilt.
-- ✅ **Phase B — Backend Links + Auto-Projekt** (`2b45fcd feat(synaptic): Phase B`): 2 neue Migrations (`links` + `project_suggestions`), 2 neue Module (`core/src/links.rs` + `core/src/suggestions.rs`), 7 Bearer-pflichtige Endpoints, `LlmProvider::extract_links`-Trait-Default-Impl + Override für Claude+Ollama, `EXTRACT_LINKS_PROMPT` (deutsch), Background-Task-Erweiterung mit Sentinel-Marker (Cost-Loop-Schutz SM-B-001), Cleanup-Cascade in `delete_braindump`/`delete_project`, 6 Mock-LLM-Tests + 5 Inline-CRUD-Tests (= 11 Tests Plan-DoD-übererfüllt). Iter-2 hat 3 Major (SM-B-001 Sentinel, SM-B-002 Server-Override `created_by`, SM-B-003 Mock-LLM-Tests) + 2 Counter-Drift-Minors + Bonus-Discovery `transcript`-Spalte in 1 Zyklus geheilt. SM-B-004 (Migration-Rename per Plan) als Plan-Bug zurückgenommen — sqlx-migrate-Version-Kollision.
-- ✅ **Phase U Desktop — Verknüpfungen + Suggestions-Banner** (`5eff289 feat(synaptic): Phase U Desktop`): Neuer BrainDump-Detail-Modal (analog `settingsModal`-Pattern, +192 LoC) mit Volltext+Tags+Summary+Verknüpft-mit-Section, Tabellen-Zeilen clickable mit dual-defense (`event.stopPropagation` auf inner-cells + Tag-Check), `renderLinks` filtert noop-marker-Sentinels, `wikiLabelFor` mit 📁/📝-Icons, `openLinkTarget` rekursiv für BrainDumps und Tab-Switch für Projects. Suggestions-Banner im Projects-Tab mit Confidence-Badge + Member-Count + Übernehmen/Verwerfen-Buttons, `partial`-Flag-Konsumption. 14 neue CSS-Klassen unter Material-3-Token-System aus PC-Sprint. Tuvok-Iter-1 ✅ (0 Major, 4 Minor als Phase-X-Bookmarks).
+- ✅ **Phase B — Backend Links + Auto-Projekt** (`2b45fcd feat(synaptic): Phase B`): 2 neue Migrations (`links` + `project_suggestions`), 2 neue Module (`core/src/links.rs` + `core/src/suggestions.rs`), 7 Bearer-pflichtige Endpoints, `LlmProvider::extract_links`-Trait-Default-Impl + Override für Claude+Ollama, `EXTRACT_LINKS_PROMPT` (deutsch), Background-Task-Erweiterung mit Sentinel-Marker (Cost-Loop-Schutz SM-B-001), Cleanup-Cascade in `delete_spark`/`delete_project`, 6 Mock-LLM-Tests + 5 Inline-CRUD-Tests (= 11 Tests Plan-DoD-übererfüllt). Iter-2 hat 3 Major (SM-B-001 Sentinel, SM-B-002 Server-Override `created_by`, SM-B-003 Mock-LLM-Tests) + 2 Counter-Drift-Minors + Bonus-Discovery `transcript`-Spalte in 1 Zyklus geheilt. SM-B-004 (Migration-Rename per Plan) als Plan-Bug zurückgenommen — sqlx-migrate-Version-Kollision.
+- ✅ **Phase U Desktop — Verknüpfungen + Suggestions-Banner** (`5eff289 feat(synaptic): Phase U Desktop`): Neuer Spark-Detail-Modal (analog `settingsModal`-Pattern, +192 LoC) mit Volltext+Tags+Summary+Verknüpft-mit-Section, Tabellen-Zeilen clickable mit dual-defense (`event.stopPropagation` auf inner-cells + Tag-Check), `renderLinks` filtert noop-marker-Sentinels, `wikiLabelFor` mit 📁/📝-Icons, `openLinkTarget` rekursiv für Sparks und Tab-Switch für Projects. Suggestions-Banner im Projects-Tab mit Confidence-Badge + Member-Count + Übernehmen/Verwerfen-Buttons, `partial`-Flag-Konsumption. 14 neue CSS-Klassen unter Material-3-Token-System aus PC-Sprint. Tuvok-Iter-1 ✅ (0 Major, 4 Minor als Phase-X-Bookmarks).
 - ✅ **Phase X (Desktop-Anteil)** (`1f68852 docs(synaptic): Phase X` + `932fb86 docs(handover): Arbeitsweise-Block`): CHANGELOG SM-Block, CURRENT_STATE Sprint-Block, todo SM-Block, `docs/LINKS.md` NEU, HANDOVER Cross-CLI-Bookmark + Arbeitsweise-Block, Phase-F-Restbestand (8 englische Strings) gefixt, SM-U-001/002/003 Polish (Race-Guard + Sentinel-`created_by`-Check + showBanner-Refactor mit success/suggestion/error-Variants). Tuvok ⚠️ Iter-1 → 1-Edit-Mitfix → ✅.
-- ✅ **Phase U Android (AS-CLI, Cross-CLI)** (`c468c24 feat(synaptic): Phase U Android`): BrainDumpHistoryScreen Bottom-Sheet mit Verknüpft-mit-Block (rekursive Sheet-Nav via remember(id)+LaunchedEffect(id)), ProjectsScreen Suggestions-Banner, NexusApiClient 4 Funktionen, Link/ProjectSuggestion DTOs. Tuvok Iter-1 ⚠️ → 2 unused-imports-Mitfix → ✅. 4 Polish-Bookmarks für Folge-Sprints.
-- ✅ **Cross-CLI Tuvok-Final-Live-Gate** (AS-CLI, Iter-2): Tauri-Bundle-Frontend-Inspection 4/4 SM-Patterns, daten-gefüllter Backend-Pfad (POST /links Server-Override + Background-Task hat live einen LLM-Link mit conf=0.95+reason erzeugt), 3 adb-Live-Screenshots verifiziert (BrainDump-Tab + Bottom-Sheet mit Verknüpft-mit + Projects-Empty-State), logcat clean. SM-LIVE-CLEANUP-001 (Test-Link DELETE → 204) durch Hauptsession-CLI erledigt vor Tag.
+- ✅ **Phase U Android (AS-CLI, Cross-CLI)** (`c468c24 feat(synaptic): Phase U Android`): SparkHistoryScreen Bottom-Sheet mit Verknüpft-mit-Block (rekursive Sheet-Nav via remember(id)+LaunchedEffect(id)), ProjectsScreen Suggestions-Banner, NexusApiClient 4 Funktionen, Link/ProjectSuggestion DTOs. Tuvok Iter-1 ⚠️ → 2 unused-imports-Mitfix → ✅. 4 Polish-Bookmarks für Folge-Sprints.
+- ✅ **Cross-CLI Tuvok-Final-Live-Gate** (AS-CLI, Iter-2): Tauri-Bundle-Frontend-Inspection 4/4 SM-Patterns, daten-gefüllter Backend-Pfad (POST /links Server-Override + Background-Task hat live einen LLM-Link mit conf=0.95+reason erzeugt), 3 adb-Live-Screenshots verifiziert (Spark-Tab + Bottom-Sheet mit Verknüpft-mit + Projects-Empty-State), logcat clean. SM-LIVE-CLEANUP-001 (Test-Link DELETE → 204) durch Hauptsession-CLI erledigt vor Tag.
 - ✅ **`v0.1.2`-Tag** + GitHub-Actions-Release-Pipeline.
 
 **Bookmarks für Folge-Sprint (Vault):**
@@ -161,8 +161,8 @@ Auslöser: Admin-Dogfooding-Findings (Refresh grau, Mobile-Task-Sync, Diag-Stand
 - ✅ **Phase A** — Frontend-Bug-Fixes: Desktop Refresh-Button + globaler Banner bei API-Fehlern + Loading-State; Android Diag-Timestamp-Roundtrip mit Server-Ack (3 Unit-Tests); Android optimistic Task-Insert + Sanity-Check
 - ✅ **Phase B** — Pairing-Sync Debug-First: Audit zeigt `local_ip_address::local_ip()`-Code in `auth.rs:89` ist sauber; LAN-IP-Logging beim Server-Start; `docs/SYNC.md` mit unterstützten Topologien, Out-of-Scope-Liste (4G/VPN/Gast-WLAN/mDNS/Cloud), Failure-Mode-Tabelle, Tunneling-Workarounds, Diagnose-Reihenfolge
 - ✅ **Phase C** — Settings & Re-Pairing-Wizard: 3 neue Bearer-pflichtige Endpoints (`/api/settings/{providers,models,provider}`), `keystore::set_model/get_model` (N-007 konsolidiert), Claude+Gemini lesen Modell aus Keystore mit Fallback, Android-LlmConfigCard (Provider+Modell-Dropdown + API-Key-Field + Save), Android-Wizard-neustarten-Button, Desktop-Settings-Modal um LLM-Block erweitert
-- ✅ **Phase D** — Braindump-Auto-Recategorize: `recategorize_unsorted_inner(pool, llm, limit)` mit Limit-Clamp [1,200] (N-006 konsolidiert), Background-Task mit watch::channel-Cancel + select! + saturating_mul-Backoff (5min→max 60min, env `NEXUS_RECATEGORIZE_INTERVAL_SECS`), Single-Core-Garant via TCP-Probe auf 127.0.0.1:port, neuer `/braindump/unsorted/count`-Endpoint, Unsorted-Badge auf Desktop-Toolbar + Android-FilterChip
-- ✅ **Phase E** — Markdown-Vault-Design-Dokument (`docs/VAULT-DESIGN.md`): MD-Source-of-Truth + FTS5-Index, Scope Braindumps+Projects+Notes, Frontmatter-Schema (ULID/type/timestamps/tags/Wikilinks), `nexus migrate-to-vault` Pseudo-Code, cytoscape.js-Graph, Crash-Safety, 7-11-Tage-Aufwandsschätzung — kein Code, Spec für Folge-Sprint
+- ✅ **Phase D** — Spark-Auto-Recategorize: `recategorize_unsorted_inner(pool, llm, limit)` mit Limit-Clamp [1,200] (N-006 konsolidiert), Background-Task mit watch::channel-Cancel + select! + saturating_mul-Backoff (5min→max 60min, env `NEXUS_RECATEGORIZE_INTERVAL_SECS`), Single-Core-Garant via TCP-Probe auf 127.0.0.1:port, neuer `/spark/unsorted/count`-Endpoint, Unsorted-Badge auf Desktop-Toolbar + Android-FilterChip
+- ✅ **Phase E** — Markdown-Vault-Design-Dokument (`docs/VAULT-DESIGN.md`): MD-Source-of-Truth + FTS5-Index, Scope Sparks+Projects+Notes, Frontmatter-Schema (ULID/type/timestamps/tags/Wikilinks), `nexus migrate-to-vault` Pseudo-Code, cytoscape.js-Graph, Crash-Safety, 7-11-Tage-Aufwandsschätzung — kein Code, Spec für Folge-Sprint
 - ✅ **Auflagen-Fixes (Phase F)**: JJ-A4-PER `silent`-Param in api() (checkConnection still); JJ-C1-Min-1 `key_updated`-Flag korrekt für leere Strings; JJ-C1-Min-2 `const DEFAULT_CLAUDE_MODEL` + `claude_model()`-Helper; 7 neue Unit-Tests (recategorize_unsorted_inner: 4 + key_updated-Flag: 4) in handlers.rs
 
 **Phase-F-Auflagen (Admin-manuell):**
@@ -186,11 +186,11 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 - ✅ Android Welcome+Pair-Screen + Release-Signing
 - ✅ GitHub Actions Release-Pipeline
 - ✅ `scripts/bump-version.sh` + README-Installation
-- ✅ End-to-End-Test durchgespielt (2026-04-30): Phone-Pair via QR + Handshake (LAN) → Wizard-Auto-Advance → Provider-Save → Voice-Capture (`/braindump`) → Ollama-Kategorisierung (Task/Tags/Summary) → Dashboard
+- ✅ End-to-End-Test durchgespielt (2026-04-30): Phone-Pair via QR + Handshake (LAN) → Wizard-Auto-Advance → Provider-Save → Voice-Capture (`/spark`) → Ollama-Kategorisierung (Task/Tags/Summary) → Dashboard
 - ✅ Wizard-Skip-Bugs gefixt: leerer API-Key zählt nicht mehr als konfiguriert; Server-State ist Single-Source-of-Truth (kein client-side `nexus_onboarded`-Flag mehr)
 - ✅ Ollama-Fallback-Bug gefixt: leerer keystore-Eintrag fällt sauber auf `qwen2.5:3b` zurück
 - ✅ **Vollreview + Pflicht-Fixes (2026-05-01, autonomer Nachtbetrieb, AUFTRAG #4)**:
-  - **N-001-SIC**: Dashboard `/` ist Bearer-pflichtig (Default-Bind 0.0.0.0 leakte vorher alle BrainDumps an LAN-Peers)
+  - **N-001-SIC**: Dashboard `/` ist Bearer-pflichtig (Default-Bind 0.0.0.0 leakte vorher alle Sparks an LAN-Peers)
   - **N-002-KOR**: Task-Done XP idempotent pro Task; `update_streak` läuft weiterhin pro Aufruf (Streak-Erhalt)
   - **N-003-SIC**: Android `allowBackup=false`, `ConnectionSettings.openPrefs` macht Hard-Fail statt Plain-Fallback (Bearer-Token landet nie in unverschlüsselten Prefs)
   - **N-004-COD**: Ktor `expectSuccess=true`, non-2xx wird konsistent zu `Result.failure`; `deleteTask` schluckt 404 nicht mehr
@@ -211,11 +211,11 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 ### Phase 0 — Projekt-Setup ✅
 ### Phase 1 — Core: DB + Migrationen ✅
 ### Phase 2 — Core: Secrets + LLM-Router ✅
-### Phase 3 — Core: BrainDump-Endpoint ✅
+### Phase 3 — Core: Spark-Endpoint ✅
 ### Phase 4 — Android: Voice-Recorder ✅
 ### Phase 5+6 — Pairing + Token-Auth ✅
 ### Phase 7 — MVP-Härtung ✅
-### Phase 8 — Projekt-Bildung aus BrainDumps ✅
+### Phase 8 — Projekt-Bildung aus Sparks ✅
 ### Phase 9 — Desktop-UI mit Tauri ✅
 ### Phase 10 — Tasks & Projekt-Management ✅
 ### Phase 11 — ProgressGlow ✅
@@ -223,12 +223,12 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 ### Phase 13 — Gamification ✅
 
 **Neue Features Phase 13:**
-- XP-System: 10 XP/BrainDump, 25 XP/Task-Abschluss, 50 XP/Projekt, 15 XP Streak-Bonus
+- XP-System: 10 XP/Spark, 25 XP/Task-Abschluss, 50 XP/Projekt, 15 XP Streak-Bonus
 - Level-System: Exponentiell (100 * level^1.5 XP pro Level)
 - Streaks: Tägliche Nutzung tracken, Streak-Bonus ab 2 Tagen
-- 14 Achievements: Meilenstein-Badges für BrainDumps, Tasks, Projekte, Streaks, Level, XP
+- 14 Achievements: Meilenstein-Badges für Sparks, Tasks, Projekte, Streaks, Level, XP
 - Dashboard: Stats-Grid (Level/XP/Streak), XP-Fortschrittsbalken, Achievement-Anzeige
-- API-Responses: BrainDump/Task/Projekt-Erstellung liefern jetzt XP + freigeschaltete Achievements mit
+- API-Responses: Spark/Task/Projekt-Erstellung liefern jetzt XP + freigeschaltete Achievements mit
 
 ---
 
@@ -246,13 +246,13 @@ Installer + Onboarding-Wizard + CI-Pipeline. 5 Artefakte gebaut: MSI (Win), DEB/
 |---|---|---|---|
 | GET | `/health` | Public | Health-Check |
 | GET | `/` | Public | Dashboard (HTML) mit Gamification |
-| POST | `/braindump` | Bearer | BrainDump erstellen (+10 XP) |
-| GET | `/braindump` | Bearer | Alle BrainDumps |
-| GET | `/braindump/{id}` | Bearer | Einzelner BrainDump |
+| POST | `/spark` | Bearer | Spark erstellen (+10 XP) |
+| GET | `/spark` | Bearer | Alle Sparks |
+| GET | `/spark/{id}` | Bearer | Einzelner Spark |
 | POST | `/projects/suggest` | Bearer | LLM-basierte Projekt-Vorschläge |
 | POST | `/projects` | Bearer | Projekt erstellen (+50 XP) |
 | GET | `/projects` | Bearer | Alle Projekte |
-| GET | `/projects/{id}/braindumps` | Bearer | BrainDumps eines Projekts |
+| GET | `/projects/{id}/sparks` | Bearer | Sparks eines Projekts |
 | GET | `/projects/{id}/progress` | Bearer | Fortschritt (Tasks done/total) |
 | POST | `/tasks` | Bearer | Task erstellen |
 | GET | `/tasks` | Bearer | Tasks (Filter: project_id, status) |

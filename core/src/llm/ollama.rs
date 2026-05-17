@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::models::BrainDumpEntry;
+use crate::models::SparkEntry;
 use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, PROJECT_SUGGEST_PROMPT, SYSTEM_PROMPT};
 
 const ENDPOINT: &str = "http://localhost:11434/api/chat";
@@ -97,7 +97,7 @@ impl LlmProvider for OllamaProvider {
             .map_err(|e| format!("JSON Parse Fehler: {e} — Antwort: {raw}"))
     }
 
-    async fn suggest_projects(&self, entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String> {
+    async fn suggest_projects(&self, entries: &[SparkEntry]) -> Result<Vec<ProjectSuggestion>, String> {
         let entries_text = entries.iter()
             .map(|e| format!("ID: {}\nText: {}", e.id, e.raw_text))
             .collect::<Vec<_>>()

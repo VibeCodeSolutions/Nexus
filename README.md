@@ -1,11 +1,11 @@
 # NEXUS — Personal ADHS-OS
 
-> Personal-OS gegen Zettelchaos. Voice-First BrainDump, KI-Kategorisierung, lokal & modular.
+> Personal-OS gegen Zettelchaos. Voice-First Spark, KI-Kategorisierung, lokal & modular.
 
 ## Vision
 
 NEXUS dient als externer Cortex für ADHS-Gehirne:
-- **RAM entlasten** — Voice-First BrainDump vom Handy
+- **RAM entlasten** — Voice-First Spark vom Handy
 - **KI-Sortierung** — Claude/Gemini kategorisiert automatisch in Idea, Task, Worry, Question, Random
 - **Local-First** — Deine Daten bleiben bei dir, kein Cloud-Zwang
 - **Modular** — Jedes Feature eigenständig lauffähig

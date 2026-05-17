@@ -56,9 +56,9 @@
 ## 6. Provider-Coverage extract_links (Phase A) — NEU
 
 - [ ] Settings → Provider auf „gemini" stellen + gültigen Gemini-API-Key eintragen + Modell speichern
-- [ ] Mind. zwei BrainDumps mit thematischer Überlappung erstellen
+- [ ] Mind. zwei Sparks mit thematischer Überlappung erstellen
 - [ ] **5–10 Min warten** (Background-Task `extract_links_for_recent` läuft alle 300s)
-- [ ] BrainDump-Detail öffnen → unter „Verknüpft mit" sollten LLM-Links auftauchen (`created_by=llm`, mit Confidence-Score)
+- [ ] Spark-Detail öffnen → unter „Verknüpft mit" sollten LLM-Links auftauchen (`created_by=llm`, mit Confidence-Score)
 - [ ] Optional Wiederholung mit Mistral/OpenRouter (deckt openai_compatible-Pfad ab)
 - [ ] Logs greppen: `nexus-core.log` zeigt `extract_links_for_recent` ohne Errors
 
@@ -66,13 +66,13 @@
 
 Restbestand aus dem CC-Final-Live-Gate, der nur via Console-clean abgedeckt war:
 
-- [ ] **Refresh-Buttons je Tab** klicken: BrainDumps, Projekte, Aufgaben, Erfolge → jeweils Reload sichtbar, keine CSP-Violation
-- [ ] **Bulk-Delete BD-Tab:** 2-3 BrainDumps per Checkbox markieren → „Ausgewählte löschen" wird aktiv → Klick löscht ohne Confirm-Dialog (oder mit, falls eingebaut)
+- [ ] **Refresh-Buttons je Tab** klicken: Sparks, Projekte, Aufgaben, Erfolge → jeweils Reload sichtbar, keine CSP-Violation
+- [ ] **Bulk-Delete BD-Tab:** 2-3 Sparks per Checkbox markieren → „Ausgewählte löschen" wird aktiv → Klick löscht ohne Confirm-Dialog (oder mit, falls eingebaut)
 - [ ] **Modals öffnen + schließen:**
   - [ ] Settings (`⚙️ Einstellungen` im Header)
   - [ ] Neue Aufgabe (`+ Neue Aufgabe` im Tasks-Tab)
   - [ ] Achievement-Detail (Klick auf Achievement-Card)
-  - [ ] BrainDump-Detail (Klick auf eine BrainDump-Tabellen-Zeile, **NICHT** auf den Lösch-Button → öffnet Detail-Modal)
+  - [ ] Spark-Detail (Klick auf eine Spark-Tabellen-Zeile, **NICHT** auf den Lösch-Button → öffnet Detail-Modal)
 - [ ] **Layout-Visualcheck:** BD-Detail-Modal-Tags-Block hat Margin-Top (`.mt-8 = 8px`), keine optischen Glitches
 
 ## 8. Obsidian-Briefkasten (Phase A–E) — NEU für v0.1.3
@@ -88,8 +88,8 @@ Restbestand aus dem CC-Final-Live-Gate, der nur via Console-clean abgedeckt war:
 - [ ] Settings-Modal zeigt Vault-Pfad jetzt prominent (Frontend liest `setup_status.vault_path`)
 
 ### 8b. Inbox-Roundtrip (Pending-Pattern)
-- [ ] BrainDump im Dashboard erstellen → Antwort `category: "Pending"`, `classification_status: "pending"`
-- [ ] In Windows-Explorer: `C:\Vaults\NexusSmoke\Nexus\Inbox\<uuid>.md` existiert mit YAML-Frontmatter (`nexus_inbox_id`, `nexus_received`, `nexus_instructions`) + dem BrainDump-Text als Body
+- [ ] Spark im Dashboard erstellen → Antwort `category: "Pending"`, `classification_status: "pending"`
+- [ ] In Windows-Explorer: `C:\Vaults\NexusSmoke\Nexus\Inbox\<uuid>.md` existiert mit YAML-Frontmatter (`nexus_inbox_id`, `nexus_received`, `nexus_instructions`) + dem Spark-Text als Body
 
 ### 8c. Outbox-Manual-Sortierung + Sync
 - [ ] Im Vault: Inbox-File kopieren nach `C:\Vaults\NexusSmoke\Nexus\Outbox\<uuid>.md`, im neuen File Frontmatter ändern auf:
@@ -104,7 +104,7 @@ Restbestand aus dem CC-Final-Live-Gate, der nur via Console-clean abgedeckt war:
 - [ ] In PowerShell: `Invoke-RestMethod -Method POST -Uri http://localhost:7777/api/obsidian/sync -Headers @{Authorization="Bearer $env:NEXUS_TOKEN"}`
 - [ ] Antwort: `{"total":1,"imported":1,"failed":0,"skipped":0}`
 - [ ] Outbox-File wurde nach `Nexus\Outbox\_processed\<uuid>.md` verschoben
-- [ ] Dashboard-BrainDump ist jetzt `Note` mit Summary „Smoke-Test-Note" und Tags `[smoke, e2e]`, `classification_status: done`
+- [ ] Dashboard-Spark ist jetzt `Note` mit Summary „Smoke-Test-Note" und Tags `[smoke, e2e]`, `classification_status: done`
 
 ### 8d. Singleflight-Lock + Dedup
 - [ ] Outbox-File mit `nexus_type: task` + `nexus_id: smoke-task-1` + `title: Test-Task` ablegen → Sync → 1 Task in DB erstellt

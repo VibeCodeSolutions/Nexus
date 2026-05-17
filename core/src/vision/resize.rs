@@ -1,4 +1,4 @@
-//! Sprint Nightvision NV-1 — Bild-Vorverarbeitung für den Foto-Braindump.
+//! Sprint Nightvision NV-1 — Bild-Vorverarbeitung für den Foto-Spark.
 //!
 //! Vision-LLMs sind in Input-Size limitiert (Groq Llama-Vision z. B. ~4 MB
 //! Base64-Payload pro Request) und teurer/langsamer mit großen Bildern. Wir

@@ -6,7 +6,7 @@
 
 Der Admin will, dass NEXUS sein eigenes "Gedächtnis" bekommt — ein vernetzter Markdown-Speicher, mit dem die LLM arbeiten kann, der von Hand editierbar ist (Obsidian-kompatibel), klein bleibt, und in der UI als Graph dargestellt werden kann.
 
-Aktuell: Braindumps + Projects + Notes liegen als Rows in SQLite mit unstrukturiertem `raw_text`-Feld. Keine `[[Wikilinks]]`, keine Volltextsuche, kein Graph.
+Aktuell: Sparks + Projects + Notes liegen als Rows in SQLite mit unstrukturiertem `raw_text`-Feld. Keine `[[Wikilinks]]`, keine Volltextsuche, kein Graph.
 
 ## Strategie-Entscheidung
 
@@ -23,8 +23,8 @@ Begründet gegen die Alternativen:
 ## Scope
 
 Migriert werden (laut Admin-Entscheidung):
-- ✅ **Braindumps** — eigene MD-Files mit Frontmatter + Body
-- ✅ **Projects** — eigene MD-Files mit Beschreibung + Wikilink-Liste auf zugeordnete Braindumps
+- ✅ **Sparks** — eigene MD-Files mit Frontmatter + Body
+- ✅ **Projects** — eigene MD-Files mit Beschreibung + Wikilink-Liste auf zugeordnete Sparks
 - ✅ **Notes** — neue Entitäts-Klasse, freier Text mit Wikilinks
 
 In SQLite bleiben (transactional, numerisch, OLTP):
@@ -36,7 +36,7 @@ In SQLite bleiben (transactional, numerisch, OLTP):
 
 ```
 ~/.nexus/vault/
-├── braindumps/
+├── sparks/
 │   └── YYYY/MM/<id>.md
 ├── projects/
 │   └── <slug>.md
@@ -46,7 +46,7 @@ In SQLite bleiben (transactional, numerisch, OLTP):
     └── fts.db          (SQLite mit FTS5, regenerierbar)
 ```
 
-Ein Braindump-Pfad ist `braindumps/2026/05/01HXY...md` — Datums-Sharding hält Verzeichnisse klein und macht Backups von Zeiträumen einfach.
+Ein Spark-Pfad ist `sparks/2026/05/01HXY...md` — Datums-Sharding hält Verzeichnisse klein und macht Backups von Zeiträumen einfach.
 
 `.index/` ist Cache, nie Source-of-Truth. Beim Server-Start wird der Index gegen die MDs validiert (Hash-Check) und bei Diff regeneriert.
 
@@ -57,10 +57,10 @@ YAML-Frontmatter, kompatibel mit Obsidian:
 ```yaml
 ---
 id: 01HXY7K8M2N3P4Q5R6S7T8U9V0    # ULID, stabil über die Lebenszeit
-type: braindump                  # braindump | project | note
+type: spark                  # spark | project | note
 created_at: 2026-05-01T12:34:56Z # ISO-8601 UTC
 updated_at: 2026-05-01T12:40:12Z
-category: Idea                   # für Braindumps; sonst leer
+category: Idea                   # für Sparks; sonst leer
 tags:
   - rust
   - sync
@@ -77,7 +77,7 @@ indiziert.
 
 **Begründung der Felder:**
 - `id` (ULID) — stabil, sortierbar, kollisionsfrei, kürzer als UUID, lexikographisch nach Zeit
-- `type` — Disambiguierung beim Laden (Braindump vs. Project vs. Note)
+- `type` — Disambiguierung beim Laden (Spark vs. Project vs. Note)
 - `created_at` / `updated_at` — Sync-Kompatibilität, Sortierung
 - `category` — Behält den Phase-D-LLM-Kategorisierer (Idea/Task/Worry/Question/Random); leer für Projects/Notes
 - `tags` — frei, vom LLM oder User gesetzt
@@ -128,17 +128,17 @@ Idempotenter CLI-Command in `core/src/cli.rs`. Pseudo-Code:
 async fn migrate_to_vault() -> Result<MigrationStats> {
     let pool = init_pool()?;
     let vault_root = home_dir().join(".nexus/vault");
-    fs::create_dir_all(&vault_root.join("braindumps"))?;
+    fs::create_dir_all(&vault_root.join("sparks"))?;
     fs::create_dir_all(&vault_root.join("projects"))?;
     fs::create_dir_all(&vault_root.join("notes"))?;
 
     let mut stats = MigrationStats::default();
 
-    // Braindumps
-    for entry in repo::list_all_braindumps(&pool).await? {
+    // Sparks
+    for entry in repo::list_all_sparks(&pool).await? {
         let id_ulid = ulid_from_legacy_id(&entry.id);
         let path = vault_root
-            .join("braindumps")
+            .join("sparks")
             .join(year_month_path(entry.created_at))
             .join(format!("{}.md", id_ulid));
         if path.exists() {
@@ -153,7 +153,7 @@ async fn migrate_to_vault() -> Result<MigrationStats> {
     }
 
     // Analog für Projects + Notes (falls Notes-Tabelle bereits existiert).
-    // M:M braindump_projects → wird als Wikilinks im jeweiligen MD-Frontmatter abgelegt.
+    // M:M spark_projects → wird als Wikilinks im jeweiligen MD-Frontmatter abgelegt.
 
     rebuild_fts_index(&vault_root).await?;
     stats.indexed = count_md_files(&vault_root);
@@ -198,7 +198,7 @@ API-Endpoint: `GET /vault/graph`
 ```json
 {
   "nodes": [
-    {"id": "01HXY...", "type": "braindump", "title": "Rust Sync ideas"},
+    {"id": "01HXY...", "type": "spark", "title": "Rust Sync ideas"},
     {"id": "01HXZ...", "type": "project", "title": "NEXUS"}
   ],
   "edges": [
@@ -256,7 +256,7 @@ JS:
 
 - [ ] `nexus migrate-to-vault` läuft idempotent auf einem realen NEXUS-Datensatz, vor/nach Counts-Diff = 0.
 - [ ] Bestehende API-Endpunkte bleiben funktional ohne Feature-Flag (Backward-Compat).
-- [ ] Mit Feature-Flag: Roundtrip Braindump-Anlegen → MD-File auf Disk → FTS5-Suche findet → Graph-UI zeigt Knoten.
+- [ ] Mit Feature-Flag: Roundtrip Spark-Anlegen → MD-File auf Disk → FTS5-Suche findet → Graph-UI zeigt Knoten.
 - [ ] Crash-Test: SIGKILL zwischen File-Write und Index-Update → nach Server-Restart ist Index konsistent.
 - [ ] Cytoscape-Graph rendert 1000 Nodes < 500ms.
 - [ ] FTS5-Query-Latenz < 50ms für typische Queries.

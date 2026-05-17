@@ -10,7 +10,7 @@
 ## 1. Vision
 
 Eine modulare, lokal laufende Anwendung, die Admins ADHS-Gehirn wie ein externer Cortex dient:
-- RAM entlasten (Voice-First BrainDump)
+- RAM entlasten (Voice-First Spark)
 - KI-gestützte Sortierung & Projektbildung
 - Fokus- und Abschlusshilfen (spätere Phasen)
 - Gamification & Dopamin-Stacking (spätere Phasen)
@@ -35,7 +35,7 @@ Eine modulare, lokal laufende Anwendung, die Admins ADHS-Gehirn wie ein externer
 │  │ HTTP/WebSocket API (axum)                  │  │
 │  ├────────────────────────────────────────────┤  │
 │  │ Domain Layer                               │  │
-│  │  - BrainDump  - Projects   - Tasks         │  │
+│  │  - Spark  - Projects   - Tasks         │  │
 │  │  - Focus      - Rewards    - Sync          │  │
 │  ├────────────────────────────────────────────┤  │
 │  │ LLM-Router (Claude / Gemini Trait)         │  │
@@ -94,16 +94,16 @@ Später optional Tailscale/ZeroTier für Remote-Zugriff.
 1. ✅ Rust-Daemon läuft als Windows-Prozess (Service-Installation Phase Spät)
 2. ✅ SQLite-DB wird angelegt & migriert beim ersten Start
 3. ✅ API-Keys (Claude/Gemini) werden sicher aus OS-Keychain geladen
-4. ✅ REST-Endpoint `POST /braindump` nimmt Text entgegen
+4. ✅ REST-Endpoint `POST /spark` nimmt Text entgegen
 5. ✅ Eingegangener Text wird per Claude-API kategorisiert in: `Idea`, `Task`, `Worry`, `Question`, `Random`
 6. ✅ Ergebnis wird in SQLite persistiert mit: id, timestamp, raw_text, category, summary, tags
-7. ✅ REST-Endpoint `GET /braindump` liefert Liste (sortiert nach Zeit/Kategorie)
+7. ✅ REST-Endpoint `GET /spark` liefert Liste (sortiert nach Zeit/Kategorie)
 8. ✅ Android-App hat einen **dicken roten Button** = Aufnahme starten
 9. ✅ Android nutzt SpeechRecognizer, zeigt Transkript
 10. ✅ Admin bestätigt/editiert Transkript → Sendet an Core per POST
 11. ✅ Android zeigt Kategorisierungsergebnis als Bestätigung
 12. ✅ Kopplung Core ↔ Android per einmaligem QR-Code-Pairing (Core-URL + Token)
-13. ✅ Minimaler Web-Dashboard unter `http://localhost:7777/` zeigt alle BrainDumps
+13. ✅ Minimaler Web-Dashboard unter `http://localhost:7777/` zeigt alle Sparks
 
 **MVP-Launch-Kriterium:** Admin benutzt NEXUS 1 Woche lang als einzigen Zettel-Ersatz und kommt ohne Notiz-Zettel aus.
 
@@ -124,12 +124,12 @@ Jede Phase ist so geschnitten, dass sie **in einer Sprint-Session (oder zwei) oh
 - `.gitignore`, Lizenz, Basis-CI-Stub (optional)
 
 ### Phase 1 — Core: DB + Migrationen
-**Ziel:** SQLite angebunden, Schema für BrainDumps steht.
+**Ziel:** SQLite angebunden, Schema für Sparks steht.
 **Dauer:** 0.5 Tag
 **DoD:**
 - sqlx + SQLite integriert
-- Migration `001_braindump.sql` erstellt Tabelle: `id, created_at, raw_text, transcript, category, summary, tags_json`
-- Rust-Types `BrainDumpEntry` + Repository-Funktionen (insert, list, get_by_id)
+- Migration `001_spark.sql` erstellt Tabelle: `id, created_at, raw_text, transcript, category, summary, tags_json`
+- Rust-Types `SparkEntry` + Repository-Funktionen (insert, list, get_by_id)
 - Unit-Test: Insert + Retrieve funktioniert
 
 ### Phase 2 — Core: Secrets + LLM-Router
@@ -144,13 +144,13 @@ Jede Phase ist so geschnitten, dass sie **in einer Sprint-Session (oder zwei) oh
 - Config-Eintrag `default_provider` (claude | gemini)
 - Integrationstest mit echtem API-Call (nur manuell triggerbar)
 
-### Phase 3 — Core: BrainDump-Endpoint
+### Phase 3 — Core: Spark-Endpoint
 **Ziel:** End-to-end Flow von Text → kategorisiertes DB-Entry.
 **Dauer:** 0.5–1 Tag
 **DoD:**
-- `POST /braindump` nimmt JSON `{text: string}` entgegen
+- `POST /spark` nimmt JSON `{text: string}` entgegen
 - Ruft LLM-Router, persistiert Ergebnis, gibt JSON-Response zurück
-- `GET /braindump` listet alle, `GET /braindump/:id` einzeln
+- `GET /spark` listet alle, `GET /spark/:id` einzeln
 - Fehlerbehandlung: LLM-Fehler → Eintrag trotzdem gespeichert mit `category=Unsorted`
 - Minimaler Web-View unter `GET /` zeigt Liste (serverseitig gerendertes HTML, kein SPA)
 - curl-Test dokumentiert
@@ -173,7 +173,7 @@ Jede Phase ist so geschnitten, dass sie **in einer Sprint-Session (oder zwei) oh
 - Settings-Screen mit QR-Scan-Knopf
 - Core liefert auf Desktop beim ersten Start QR-Code mit `{url, token}` (im Web-Dashboard oder CLI ausgegeben)
 - Android speichert Core-URL + Token in EncryptedSharedPreferences
-- Ktor-Client sendet `POST /braindump` mit Bearer-Token
+- Ktor-Client sendet `POST /spark` mit Bearer-Token
 - Response wird geparst, zeigt Kategorie + Summary als Toast/Card
 
 ### Phase 6 — Core: Token-Auth + Bonjour/mDNS
@@ -204,14 +204,14 @@ Jede Phase ist so geschnitten, dass sie **in einer Sprint-Session (oder zwei) oh
 
 Reihenfolge vorläufig — wird nach MVP neu priorisiert.
 
-### Phase 8 — Projekt-Bildung aus BrainDumps
+### Phase 8 — Projekt-Bildung aus Sparks
 KI erkennt Cluster, schlägt Projekte vor, Admin bestätigt.
 
 ### Phase 9 — Desktop-UI mit Tauri
 Richtiges Dashboard mit Suche, Filter, Kategorien-Tabs.
 
 ### Phase 10 — Tasks & Projekt-Management
-CRUD für Tasks, Verknüpfung zu BrainDumps, Kanban-Ansicht.
+CRUD für Tasks, Verknüpfung zu Sparks, Kanban-Ansicht.
 
 ### Phase 11 — ProgressGlow
 Fortschrittsbalken pro Projekt, Widget auf Android-Homescreen.
@@ -229,7 +229,7 @@ FocusPact (Body-Doubling-Timer), HyperfokusWächter, Dopamin-Dice.
 ReizRunter, Abend-Ritual, CravingSwap.
 
 ### Phase 16 — Remote-Sync
-Tailscale-Integration, Admin kann auch unterwegs per Handy Braindumps senden.
+Tailscale-Integration, Admin kann auch unterwegs per Handy Sparks senden.
 
 ---
 

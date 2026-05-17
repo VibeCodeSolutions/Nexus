@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::keystore;
-use crate::models::BrainDumpEntry;
+use crate::models::SparkEntry;
 use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, SYSTEM_PROMPT, PROJECT_SUGGEST_PROMPT};
 
 const DEFAULT_GEMINI_MODEL: &str = "gemini-1.5-flash";
@@ -112,7 +112,7 @@ impl LlmProvider for GeminiProvider {
             .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw_text}"))
     }
 
-    async fn suggest_projects(&self, entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String> {
+    async fn suggest_projects(&self, entries: &[SparkEntry]) -> Result<Vec<ProjectSuggestion>, String> {
         let entries_text: Vec<String> = entries.iter().map(|e| {
             format!("ID: {}\nText: {}\nKategorie: {}\nSummary: {}", e.id, e.raw_text, e.category, e.summary.as_deref().unwrap_or("-"))
         }).collect();

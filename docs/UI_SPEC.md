@@ -97,7 +97,7 @@ font-size: 14px; font-weight: 600; letter-spacing: 0.05em
 │  SIDEBAR 220px  │  CONTENT AREA  flex:1  overflow-y:auto       │
 │  fixed          │                                              │
 │                 │  ┌──────────────────────────────────────┐   │
-│  🧠  Braindumps │  │  ACTIVE VIEW                         │   │
+│  🧠  Sparks │  │  ACTIVE VIEW                         │   │
 │  ✅  Aufgaben   │  │  (Toolbar + List/Grid + Detail Panel) │   │
 │  📁  Projekte   │  └──────────────────────────────────────┘   │
 │                 │                                              │
@@ -138,7 +138,7 @@ Every component below is standardized. Deviations need spec approval (update thi
 
 ### 4.2 Quick Action Button (circular, icon only)
 ```html
-<button class="quick-action" aria-label="Neuer Braindump">🎙️</button>
+<button class="quick-action" aria-label="Neuer Spark">🎙️</button>
 ```
 - 40×40px, `border-radius: 50%`, `background: var(--bg-surface)`, `border: 1px solid var(--border)`
 - Hover: `background: var(--primary-tint)`, `border-color: var(--primary)`
@@ -148,7 +148,7 @@ Every component below is standardized. Deviations need spec approval (update thi
 <div class="alert-card" data-variant="warning">
   <span class="alert-icon">⚠</span>
   <div class="alert-body">
-    <strong>3 Braindumps unsortiert</strong>
+    <strong>3 Sparks unsortiert</strong>
     <span class="alert-sub">Jetzt sortieren</span>
   </div>
   <span class="alert-arrow">›</span>
@@ -173,7 +173,7 @@ Every component below is standardized. Deviations need spec approval (update thi
 
 ### 4.5 CTA Button (primary action, full-width)
 ```html
-<button class="btn btn-cta">+ Braindump</button>
+<button class="btn btn-cta">+ Spark</button>
 ```
 ```css
 .btn-cta {
@@ -200,9 +200,9 @@ Every component below is standardized. Deviations need spec approval (update thi
 - Active: `background: var(--primary)`, `color: #fff`
 - Inactive: `background: var(--bg-surface)`, `color: var(--text-dim)`, `border: 1px solid var(--border)`
 
-### 4.7 Entry Card (list items — Braindumps, Tasks)
+### 4.7 Entry Card (list items — Sparks, Tasks)
 ```html
-<div class="entry-card" role="button" tabindex="0" aria-label="Braindump öffnen">
+<div class="entry-card" role="button" tabindex="0" aria-label="Spark öffnen">
   <div class="entry-header">
     <span class="entry-badge">ARBEIT</span>
     <time class="entry-date" datetime="2026-05-16">16.05.26</time>
@@ -232,9 +232,9 @@ Every component below is standardized. Deviations need spec approval (update thi
 
 ### 4.9 Nav Item (sidebar)
 ```html
-<button class="nav-item" data-view="braindumps" aria-current="page">
+<button class="nav-item" data-view="sparks" aria-current="page">
   <span class="nav-icon" aria-hidden="true">🧠</span>
-  <span class="nav-label">Braindumps</span>
+  <span class="nav-label">Sparks</span>
   <span class="nav-badge">3</span>  <!-- optional, e.g. unsorted count -->
 </button>
 ```
@@ -260,7 +260,7 @@ const Views = {
       this._listeners = [];
     },
   },
-  braindumps: { _listeners: [], init() {}, destroy() {} },
+  sparks: { _listeners: [], init() {}, destroy() {} },
   tasks:      { _listeners: [], init() {}, destroy() {} },
   projects:   { _listeners: [], init() {}, destroy() {} },
   achievements: { _listeners: [], init() {}, destroy() {} },

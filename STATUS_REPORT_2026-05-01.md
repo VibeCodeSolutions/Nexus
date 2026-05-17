@@ -32,9 +32,9 @@ Pre-existing-Befund nebenbei aufgedeckt: das ursprüngliche Review hatte `cargo 
 - **GA-Tag gesetzt:** `v0.1.0` lokal getaggt + gepusht. GitHub Actions `release.yml` ist grün durchgelaufen, **5 Artefakte hängen als Draft-Release**: `app-release.apk` (47 MB), `nexus-desktop_0.1.0_amd64.deb` (9.6 MB), `nexus-desktop-0.1.0-1.x86_64.rpm` (9.6 MB), `nexus-desktop_0.1.0_amd64.AppImage` (85 MB), `nexus-desktop_0.1.0_x64_en-US.msi` (8.3 MB).
 - **Repo zurück auf privat:** Tag-Setting hatte den Audit aufgedeckt, dass `VibeCodeSolutions/Nexus` seit 2026-04-12 öffentlich war (kein Datenleck verifiziert: `nexus.db`, `keys.json`, `.env`, `keystore.jks` alle in `.gitignore`). Per `gh repo edit --visibility private` zurückgenommen, anonymes Curl liefert 404. Forks-Status: `leydanielley` (Daniel) hatte am 2026-04-27 einen Fork — bleibt als Snapshot bestehen, ist sein eigenständiges Repo. Stars 0, Watchers 0, Web-Views 23 (vermutlich Daniel selbst).
 - **Daniel als Collaborator eingeladen** (`leydanielley`, write-Permission). GitHub-Antwort hat verraten, dass die Einladung bereits seit 2026-04-24 unbeachtet bei ihm lag — er hat stattdessen geforked. Sollte ihm gesagt werden, dass die Einladung jetzt aktualisiert ist.
-- **Live-Pairing-Test (Reset + Wizard + Phone):** kompletter Reset (`~/.nexus_token` + `~/.nexus_paired_at` + `~/.nexus/keys.json` weg, Backup unter `keys.json.bak.20260501-reset`; Phone via `pm clear` gewipt). Tauri-Dev gestartet, Phone-App neu auf Welcome-Screen. QR-Pairing live durchgelaufen: `path=/api/pair/handshake` von `peer=192.168.178.82` → `Pairing markiert`. Anschließend hat das Phone autonom auf BrainDump-Screen genavigiert und 2 Voice-Einträge geschickt (kein Provider gesetzt → `Unsorted`). Wizard-Side hatte zu dem Zeitpunkt noch nicht den Provider-Schritt durchgeklickt.
-- **N-021-KOR aufgedeckt:** Die zwei Test-BrainDumps lagen NICHT in der erwarteten DB. Audit ergab: 6 verschiedene `nexus.db`-Files im Repo, weil `core/src/config.rs` einen relativen DB-Pfad als Default hatte (`sqlite:nexus.db`). Bug seit Phase 1 drin, wurde im Vollreview übersehen. Behoben in `c23ae5c` mit absolutem `~/.nexus/nexus.db` + einmaliger Migration aus dem CWD.
-- **Repo-Aufräumung:** alle stranded `nexus.db`-Files entfernt. `~/.nexus/nexus.db` ist jetzt die einzige Wahrheit (28 BrainDumps + 225 XP, alle historischen Einträge erhalten). Die zwei Test-BrainDumps von heute Morgen 05:37 / 05:40 sind beim Reset des Migrations-Test-Setups versehentlich mit weggeräumt worden — das war aber „Unsorted"-Test-Content ohne Provider-Categorization, kein wertvoller Daten-Verlust.
+- **Live-Pairing-Test (Reset + Wizard + Phone):** kompletter Reset (`~/.nexus_token` + `~/.nexus_paired_at` + `~/.nexus/keys.json` weg, Backup unter `keys.json.bak.20260501-reset`; Phone via `pm clear` gewipt). Tauri-Dev gestartet, Phone-App neu auf Welcome-Screen. QR-Pairing live durchgelaufen: `path=/api/pair/handshake` von `peer=192.168.178.82` → `Pairing markiert`. Anschließend hat das Phone autonom auf Spark-Screen genavigiert und 2 Voice-Einträge geschickt (kein Provider gesetzt → `Unsorted`). Wizard-Side hatte zu dem Zeitpunkt noch nicht den Provider-Schritt durchgeklickt.
+- **N-021-KOR aufgedeckt:** Die zwei Test-Sparks lagen NICHT in der erwarteten DB. Audit ergab: 6 verschiedene `nexus.db`-Files im Repo, weil `core/src/config.rs` einen relativen DB-Pfad als Default hatte (`sqlite:nexus.db`). Bug seit Phase 1 drin, wurde im Vollreview übersehen. Behoben in `c23ae5c` mit absolutem `~/.nexus/nexus.db` + einmaliger Migration aus dem CWD.
+- **Repo-Aufräumung:** alle stranded `nexus.db`-Files entfernt. `~/.nexus/nexus.db` ist jetzt die einzige Wahrheit (28 Sparks + 225 XP, alle historischen Einträge erhalten). Die zwei Test-Sparks von heute Morgen 05:37 / 05:40 sind beim Reset des Migrations-Test-Setups versehentlich mit weggeräumt worden — das war aber „Unsorted"-Test-Content ohne Provider-Categorization, kein wertvoller Daten-Verlust.
 
 ---
 
@@ -82,12 +82,12 @@ Jeder Fix ist sein eigener Commit. Gezielter Revert ist eine Zeile pro Schicht:
 
 **Was ist passiert:**
 - 1 Blocker, 3 Major, 9 Minor identifiziert. Volltext: `review.md` + `todo.md` am Repo-Root.
-- Live-E2E-Stack: Core-Diag 7/0/0 PASS, Android-Diag (Phone RFCX20J1PEX) 7/0/0 PASS, Pairing+Bearer+EncryptedPrefs verifiziert, BrainDump-Roundtrip mit Ollama-Categorize grün.
+- Live-E2E-Stack: Core-Diag 7/0/0 PASS, Android-Diag (Phone RFCX20J1PEX) 7/0/0 PASS, Pairing+Bearer+EncryptedPrefs verifiziert, Spark-Roundtrip mit Ollama-Categorize grün.
 - Builds: Alle clean.
 - Bedarfsanalyse: Bestehende Crew reicht — kein neuer Spezialist nötig.
 
 **Handlungsbedarf:** **Ja.**
-- Vor v0.1.0 GA: **N-001-SIC** fixen (Dashboard `/` ist im LAN ohne Token lesbar, Default-Bind ist `0.0.0.0:7777` → komplettes BrainDump-HTML inkl. allen Notizen ist für jeden im selben WLAN abrufbar).
+- Vor v0.1.0 GA: **N-001-SIC** fixen (Dashboard `/` ist im LAN ohne Token lesbar, Default-Bind ist `0.0.0.0:7777` → komplettes Spark-HTML inkl. allen Notizen ist für jeden im selben WLAN abrufbar).
 - Vor Public-Announcement: N-002-KOR (XP-Farming durch Task-Toggle), N-003-SIC (ConnectionSettings fällt auf unverschlüsselte SharedPreferences zurück), N-004-COD (Ktor-Client lässt HTTP-Fehler bei `deleteTask` durchgehen).
 - Backlog (post-GA): N-005..N-013, alle als kleine PRs realisierbar.
 
@@ -132,7 +132,7 @@ Jeder Fix ist sein eigener Commit. Gezielter Revert ist eine Zeile pro Schicht:
 - `cargo check` (Desktop-Tauri): EXIT=0 — `/tmp/nexus_desktop_check.log`
 - Live-Run Core (lief 30s, dann gestoppt): Health 200, Setup-Status `paired:true, provider_configured:true`, Diag 7 PASS
 - Live-Run Phone (RFCX20J1PEX, Samsung SM-S921B, sdk=36, network=wifi): Boot-Diag 7 PASS via `NEXUS_DIAG_JSON`, Diag-Report serverseitig gespeichert, Bearer-Auth funktioniert.
-- E2E POST `/braindump`: category=Task, tags=[Tuvok, QS-Sentinel, Diagnose-Test], summary korrekt, +10 XP, total=175, level=1, streak=1.
+- E2E POST `/spark`: category=Task, tags=[Tuvok, QS-Sentinel, Diagnose-Test], summary korrekt, +10 XP, total=175, level=1, streak=1.
 
 ---
 

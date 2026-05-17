@@ -3,7 +3,7 @@
 **Sprint:** Synaptic Mosaic (2026-05-01)
 **Plan-Auflage:** SM-PR-012 (Working-Doc als Single-Source für Implementer)
 
-Konvention: Eigennamen (Provider-Namen wie "Claude", "Gemini", "Ollama", Marken-Begriffe wie "BrainDump") bleiben unverändert. Nur generische UI-Strings werden übersetzt.
+Konvention: Eigennamen (Provider-Namen wie "Claude", "Gemini", "Ollama", Marken-Begriffe wie "Spark") bleiben unverändert. Nur generische UI-Strings werden übersetzt.
 
 ---
 
@@ -12,7 +12,7 @@ Konvention: Eigennamen (Provider-Namen wie "Claude", "Gemini", "Ollama", Marken-
 ### Tabs (Z. 415-418)
 | EN | DE |
 |---|---|
-| BrainDumps | BrainDumps *(Eigenname, bleibt)* |
+| Sparks | Sparks *(Eigenname, bleibt)* |
 | Projects | Projekte |
 | Tasks | Aufgaben |
 | Achievements | Erfolge |
@@ -22,10 +22,10 @@ Konvention: Eigennamen (Provider-Namen wie "Claude", "Gemini", "Ollama", Marken-
 |---|---|
 | Settings | Einstellungen |
 
-### BrainDump-Toolbar (Z. 426-432)
+### Spark-Toolbar (Z. 426-432)
 | EN | DE |
 |---|---|
-| Search braindumps... | BrainDumps suchen… |
+| Search sparks... | Sparks suchen… |
 | All Categories | Alle Kategorien |
 | Refresh | Aktualisieren |
 | Ausgewählte löschen | *(bereits deutsch)* |
@@ -90,14 +90,14 @@ Konvention: Eigennamen (Provider-Namen wie "Claude", "Gemini", "Ollama", Marken-
 ### Bottom-Nav-Labels (`MainActivity.kt` Z. 62-68)
 | EN | DE |
 |---|---|
-| BrainDump | BrainDump *(Eigenname, bleibt)* |
+| Spark | Spark *(Eigenname, bleibt)* |
 | Verlauf | *(bereits deutsch)* |
 | Tasks | Aufgaben |
 | Projekte | *(bereits deutsch)* |
 | Settings | Einstellungen |
 
 ### Vorhandene deutsche Strings
-Die Compose-Screens (`BrainDumpScreen`, `WelcomeScreen`, `PairScreen`, `SettingsScreen`, `BrainDumpHistoryScreen`, `TasksScreen`, `ProjectsScreen`) sind bereits größtenteils deutsch. Stichprobe via grep zeigt Strings wie "Zuerst mit Core koppeln", "Sprich jetzt…", "Erneut scannen", "Verbindung zum Core", "Kopplung aufheben", "Wizard neustarten" etc.
+Die Compose-Screens (`SparkScreen`, `WelcomeScreen`, `PairScreen`, `SettingsScreen`, `SparkHistoryScreen`, `TasksScreen`, `ProjectsScreen`) sind bereits größtenteils deutsch. Stichprobe via grep zeigt Strings wie "Zuerst mit Core koppeln", "Sprich jetzt…", "Erneut scannen", "Verbindung zum Core", "Kopplung aufheben", "Wizard neustarten" etc.
 
 **Was noch hardcoded und nicht in `strings.xml` ist** (Working-Liste, wird beim Implement aktualisiert):
 - Bottom-Nav-Labels (Tasks → Aufgaben, Settings → Einstellungen)
@@ -125,7 +125,7 @@ Die 14 Phase-13-Achievements (`name`+`description`-Spalten) — `UPDATE`-Stateme
 
 ```bash
 # Desktop — kein englisches UI-String mehr in index.html
-grep -nE '>(BrainDumps|Projects|Tasks|Achievements|Refresh|Settings|Cancel|Create|All Categories|New Task|Title|Priority|Low|Medium|High)' desktop/src/index.html
+grep -nE '>(Sparks|Projects|Tasks|Achievements|Refresh|Settings|Cancel|Create|All Categories|New Task|Title|Priority|Low|Medium|High)' desktop/src/index.html
 # (Tab-IDs/data-tab-Attribute sind OK, nur Text-Nodes sind UI-Strings)
 
 # Android — keine harten englischen UI-Strings in den Screens

@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::keystore;
-use crate::models::BrainDumpEntry;
+use crate::models::SparkEntry;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Classification {
@@ -19,8 +19,8 @@ pub struct Classification {
     /// Obsidian-Briefkasten Pending-Pattern (Phase B):
     /// Wenn `Some`, hat der Provider eine Inbox-Datei im Vault geschrieben
     /// und gibt nur einen Pending-Marker zurück. Der Aufrufer setzt dann
-    /// `braindumps.classification_status = 'pending'` und persistiert die
-    /// `inbox_id` in `braindumps.nexus_inbox_id`. Klassische LLM-Provider
+    /// `sparks.classification_status = 'pending'` und persistiert die
+    /// `inbox_id` in `sparks.nexus_inbox_id`. Klassische LLM-Provider
     /// lassen das Feld leer (serde-default → `None`).
     #[serde(default)]
     pub inbox_id: Option<String>,
@@ -30,7 +30,7 @@ pub struct Classification {
 pub struct ProjectSuggestion {
     pub name: String,
     pub description: String,
-    pub braindump_ids: Vec<String>,
+    pub spark_ids: Vec<String>,
     #[serde(default = "default_suggestion_confidence")]
     pub confidence: f64,
     #[serde(default)]
@@ -43,7 +43,7 @@ fn default_suggestion_confidence() -> f64 { 0.85 }
 /// Wird vom Background-Task `extract_links_for_recent` konsumiert.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinkSuggestion {
-    pub target_type: String,    // 'braindump' | 'project'
+    pub target_type: String,    // 'spark' | 'project'
     pub target_id: String,
     #[serde(default = "default_link_relation")]
     pub relation: String,       // 'related' | 'mentions'
@@ -56,15 +56,15 @@ fn default_link_relation() -> String { "related".to_string() }
 /// Knoten-Beschreibung für den LLM-extract_links-Prompt-Kontext.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeRef {
-    pub node_type: String,      // 'braindump' | 'project'
+    pub node_type: String,      // 'spark' | 'project'
     pub id: String,
-    pub label: String,          // BrainDump.summary oder Project.name
+    pub label: String,          // Spark.summary oder Project.name
 }
 
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
     async fn categorize_and_summarize(&self, text: &str) -> Result<Classification, String>;
-    async fn suggest_projects(&self, entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String>;
+    async fn suggest_projects(&self, entries: &[SparkEntry]) -> Result<Vec<ProjectSuggestion>, String>;
 
     /// SM-PR-002: Default-Impl liefert leere Liste — Provider können opt-in overriden.
     /// Pflicht-Override in claude.rs + ollama.rs (zwei Default-Provider). Andere optional.
@@ -86,14 +86,14 @@ Analysiere den folgenden Text und antworte AUSSCHLIESSLICH mit validem JSON in d
 }
 Keine zusätzliche Erklärung, nur das JSON."#;
 
-pub const PROJECT_SUGGEST_PROMPT: &str = r#"Du bist ein Projekt-Planungs-Assistent. Analysiere die folgenden BrainDump-Einträge und schlage sinnvolle Projekt-Gruppierungen vor.
+pub const PROJECT_SUGGEST_PROMPT: &str = r#"Du bist ein Projekt-Planungs-Assistent. Analysiere die folgenden Spark-Einträge und schlage sinnvolle Projekt-Gruppierungen vor.
 Fasse thematisch zusammengehörige Einträge zu Projekten zusammen.
 Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
 [
   {
     "name": "<Projektname>",
     "description": "<kurze Beschreibung des Projekts>",
-    "braindump_ids": ["<id1>", "<id2>"],
+    "spark_ids": ["<id1>", "<id2>"],
     "confidence": <0.0-1.0>,
     "reason": "<warum diese Gruppierung>"
   }
@@ -103,12 +103,12 @@ confidence sollte ehrlich 0.5-1.0 sein, je sicherer du bist desto höher.
 Keine zusätzliche Erklärung, nur das JSON-Array."#;
 
 pub const EXTRACT_LINKS_PROMPT: &str = r#"Du analysierst Verknüpfungen zwischen Notizen.
-Gegeben ist ein Quell-Text und eine Liste von Kandidaten-Knoten (BrainDumps/Projekte).
+Gegeben ist ein Quell-Text und eine Liste von Kandidaten-Knoten (Sparks/Projekte).
 Gib eine Liste von Verknüpfungen zurück, die thematisch sinnvoll sind.
 Antworte AUSSCHLIESSLICH mit validem JSON-Array:
 [
   {
-    "target_type": "braindump" | "project",
+    "target_type": "spark" | "project",
     "target_id": "<id aus Kandidatenliste>",
     "relation": "related" | "mentions",
     "confidence": <0.0-1.0>,
@@ -126,7 +126,7 @@ impl LlmProvider for NoOpProvider {
         Err("Kein LLM-Provider konfiguriert. Nutze: nexus set-key claude <key>".to_string())
     }
 
-    async fn suggest_projects(&self, _entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String> {
+    async fn suggest_projects(&self, _entries: &[SparkEntry]) -> Result<Vec<ProjectSuggestion>, String> {
         Err("Kein LLM-Provider konfiguriert. Nutze: nexus set-key claude <key>".to_string())
     }
 }

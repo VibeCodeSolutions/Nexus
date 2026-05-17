@@ -207,9 +207,9 @@ body {
 .view { display: none; padding: var(--sp-6); max-width: 1200px; margin: 0 auto; }
 .view.active { display: block; }
 
-/* ── M3: Braindump View ─────────────────────────── */
-#view-braindumps { max-width: none; }
-#view-braindumps.active {
+/* ── M3: Spark View ─────────────────────────── */
+#view-sparks { max-width: none; }
+#view-sparks.active {
   display: flex;
   gap: var(--sp-4);
   align-items: flex-start;
@@ -289,7 +289,7 @@ body {
 .bd-quick-create textarea:focus { border-color: var(--primary); outline: none; }
 .bd-quick-footer { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
 
-/* ── NV-3: Foto-Braindump-Sheet ─────────────────── */
+/* ── NV-3: Foto-Spark-Sheet ─────────────────── */
 .bd-cta-group { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); }
 .bd-cta-group .btn-cta { margin-bottom: 0; }
 .btn-cta-photo { background: var(--bg-surface); color: var(--text); border: 1px solid var(--border); flex: 0 0 auto; min-width: 140px; }
@@ -772,32 +772,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 .badge-priority-medium { background: rgba(255,152,0,0.2); color: var(--warning); }
 .badge-priority-low { background: rgba(76,175,80,0.2); color: var(--success); }
 
-/* Achievements */
-.achievement-card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card);
-  padding: 16px; display: flex; align-items: center; gap: 14px;
-  cursor: pointer; transition: transform 0.15s, border-color 0.2s;
-}
-.achievement-card:hover { transform: translateY(-2px); border-color: var(--primary); }
-.achievement-card.unlocked { border-color: var(--primary); }
-.achievement-card.locked { opacity: 0.5; }
-.achievement-card .ach-icon {
-  font-size: 28px; width: 44px; height: 44px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--bg-input); border-radius: 8px;
-}
-.achievement-card .ach-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-.achievement-card .ach-desc { font-size: 12px; color: var(--text-dim); }
-
-.modal .ach-modal-icon {
-  font-size: 48px; text-align: center; margin-bottom: 12px;
-  width: 80px; height: 80px; background: var(--bg-input);
-  border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  margin-left: auto; margin-right: auto;
-}
-.modal .ach-modal-status { margin-top: 12px; font-size: 13px; color: var(--text-dim); }
-.modal .ach-modal-status.unlocked { color: var(--primary); }
-
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
 .empty-state p { font-size: 14px; }
 
@@ -920,7 +894,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 }
 .bd-detail-strong { font-size: 12px; color: var(--text-dim); }
 .bd-detail-rueck-strong { font-size: 11px; color: var(--text-dim); }
-.ach-modal-desc { color: var(--text-dim); font-size: 13px; margin-top: 8px; }
 
 .proj-pct-text { font-size: 12px; color: var(--text-dim); margin-top: 4px; display: block; }
 .proj-ideas { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; }
@@ -1025,8 +998,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   /* Views: tighter padding */
   .view { padding: var(--sp-4) var(--sp-3); }
 
-  /* Braindump view: single column */
-  #view-braindumps.active {
+  /* Spark view: single column */
+  #view-sparks.active {
     flex-direction: column;
     padding: var(--sp-3);
     gap: var(--sp-3);
@@ -1184,10 +1157,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
       <span class="nav-icon" aria-hidden="true">🏠</span>
       <span class="nav-label">Dashboard</span>
     </button>
-    <button class="nav-item" data-view="braindumps">
+    <button class="nav-item" data-view="sparks">
       <span class="nav-icon" aria-hidden="true">🧠</span>
-      <span class="nav-label">Braindumps</span>
-      <span class="nav-badge hidden" id="navBadgeBraindumps" aria-label="Unsortierte Einträge"></span>
+      <span class="nav-label">Sparks</span>
+      <span class="nav-badge hidden" id="navBadgeSparks" aria-label="Unsortierte Einträge"></span>
     </button>
     <button class="nav-item" data-view="tasks">
       <span class="nav-icon" aria-hidden="true">✅</span>
@@ -1210,10 +1183,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
       <span class="nav-label">Suche</span>
       <span class="nav-soon">bald</span>
     </button>
-    <button class="nav-item" data-view="achievements">
-      <span class="nav-icon" aria-hidden="true">🏆</span>
-      <span class="nav-label">Erfolge</span>
-    </button>
 
     <div class="nav-divider" role="separator"></div>
 
@@ -1235,7 +1204,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   </div>
 
   <div class="quick-actions">
-    <button class="quick-action" data-action="nav-braindumps" aria-label="Braindumps öffnen" title="Braindumps">🧠</button>
+    <button class="quick-action" data-action="nav-sparks" aria-label="Sparks öffnen" title="Sparks">🧠</button>
     <button class="quick-action" data-action="task-new" aria-label="Neue Aufgabe erstellen" title="Neue Aufgabe">✏️</button>
     <button class="quick-action" data-action="nav-projects" aria-label="Projekte öffnen" title="Projekte">📁</button>
     <button class="quick-action disabled" aria-label="Suche (bald verfügbar)" title="Suche — bald verfügbar" aria-disabled="true">🔍</button>
@@ -1244,17 +1213,17 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   <div class="alert-card" id="dashAlertCard" hidden data-action="dash-alert-click">
     <span class="alert-icon" aria-hidden="true">⚠</span>
     <div class="alert-body">
-      <strong id="dashAlertText">Braindumps unsortiert</strong>
+      <strong id="dashAlertText">Sparks unsortiert</strong>
       <span class="alert-sub">Jetzt ansehen →</span>
     </div>
     <span class="alert-arrow" aria-hidden="true">›</span>
   </div>
 
   <div class="overview-grid">
-    <button class="overview-card" data-action="nav-braindumps" aria-label="Braindumps öffnen">
-      <span class="overview-count" id="dashCountBraindumps">—</span>
+    <button class="overview-card" data-action="nav-sparks" aria-label="Sparks öffnen">
+      <span class="overview-count" id="dashCountSparks">—</span>
       <span class="overview-icon" aria-hidden="true">🧠</span>
-      <span class="overview-label">Braindumps</span>
+      <span class="overview-label">Sparks</span>
     </button>
     <button class="overview-card" data-action="nav-tasks" aria-label="Aufgaben öffnen">
       <span class="overview-count" id="dashCountTasks">—</span>
@@ -1266,19 +1235,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
       <span class="overview-icon" aria-hidden="true">📁</span>
       <span class="overview-label">Projekte</span>
     </button>
-    <button class="overview-card" data-action="nav-achievements" aria-label="Erfolge öffnen">
-      <span class="overview-count" id="dashCountAchievements">—</span>
-      <span class="overview-icon" aria-hidden="true">🏆</span>
-      <span class="overview-label">Erfolge</span>
-    </button>
   </div>
 </section>
 
-<!-- Braindumps View -->
-<section class="view" id="view-braindumps">
+<!-- Sparks View -->
+<section class="view" id="view-sparks">
   <div class="view-main">
     <div class="bd-toolbar-top">
-      <input type="text" id="bdSearch" class="bd-search" placeholder="Suchen…" data-input="bd-search" aria-label="Braindumps suchen">
+      <input type="text" id="bdSearch" class="bd-search" placeholder="Suchen…" data-input="bd-search" aria-label="Sparks suchen">
       <div class="bd-toolbar-actions">
         <button class="btn btn-ghost btn-sm hidden" id="bdUnsortedBadge" data-action="bd-filter-unsorted">Unsortiert (0)</button>
         <button class="btn btn-danger btn-sm" id="bdBulkDelete" data-action="bd-bulk-delete" disabled>Löschen</button>
@@ -1288,17 +1252,17 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
       <button class="filter-pill active" role="tab" data-filter="">Alle</button>
     </div>
     <div class="bd-quick-create hidden" id="bdQuickCreate">
-      <textarea id="bdQuickText" placeholder="Gedanken, Ideen, Tasks — einfach losschreiben…" rows="3" aria-label="Neuer Braindump"></textarea>
+      <textarea id="bdQuickText" placeholder="Gedanken, Ideen, Tasks — einfach losschreiben…" rows="3" aria-label="Neuer Spark"></textarea>
       <div class="bd-quick-footer">
         <button class="btn btn-ghost btn-sm" data-action="bd-quick-cancel">Abbrechen</button>
         <button class="btn btn-primary" data-action="bd-quick-submit">Speichern</button>
       </div>
     </div>
     <div class="bd-cta-group" id="bdCtaGroup">
-      <button class="btn btn-cta" data-action="bd-quick-open" id="bdCtaBtn">+ Braindump</button>
-      <button class="btn btn-cta btn-cta-photo" data-action="bd-photo-open" id="bdCtaPhotoBtn" aria-label="Foto-Braindump aufnehmen oder hochladen">📷 Foto</button>
+      <button class="btn btn-cta" data-action="bd-quick-open" id="bdCtaBtn">+ Spark</button>
+      <button class="btn btn-cta btn-cta-photo" data-action="bd-photo-open" id="bdCtaPhotoBtn" aria-label="Foto-Spark aufnehmen oder hochladen">📷 Foto</button>
     </div>
-    <div class="bd-photo-create hidden" id="bdPhotoCreate" role="dialog" aria-modal="true" aria-label="Foto-Braindump">
+    <div class="bd-photo-create hidden" id="bdPhotoCreate" role="dialog" aria-modal="true" aria-label="Foto-Spark">
       <div class="bd-photo-grid">
         <div class="bd-photo-input">
           <label class="bd-photo-drop" id="bdPhotoDrop" tabindex="0" aria-label="Bild auswählen oder hineinziehen">
@@ -1328,7 +1292,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <div id="bdTable"></div>
   </div>
 
-  <aside class="detail-panel" id="bdDetailPanel" hidden aria-label="Braindump Detail">
+  <aside class="detail-panel" id="bdDetailPanel" hidden aria-label="Spark Detail">
     <div class="panel-header">
       <div class="panel-header-left">
         <span class="entry-badge" id="panelBdCategory">—</span>
@@ -1410,14 +1374,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
   <div id="taskList"></div>
 </section>
 
-<!-- Achievements View -->
-<section class="view" id="view-achievements">
-  <div class="toolbar">
-    <button class="btn btn-primary" data-action="ach-refresh">Aktualisieren</button>
-  </div>
-  <div class="card-grid" id="achievementGrid"></div>
-</section>
-
 </main>
 
 <!-- Settings Modal -->
@@ -1464,30 +1420,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 <!-- New Task Modal -->
 <!-- newTaskModal removed M4 — inline quick-create in #view-tasks -->
 
-<!-- Achievement Detail Modal -->
-<div class="modal-overlay hidden" id="achievementModal">
-  <div class="modal">
-    <div class="ach-modal-icon" id="achModalIcon"></div>
-    <h2 id="achModalName" class="center-text"></h2>
-    <p id="achModalDesc" class="center-text ach-modal-desc"></p>
-    <div class="ach-modal-status center-text" id="achModalStatus"></div>
-    <div class="actions">
-      <button class="btn btn-primary" data-action="ach-close">Schließen</button>
-    </div>
-  </div>
-</div>
-
-<!-- bdDetailModal removed in M3 — replaced by #bdDetailPanel inside #view-braindumps -->
+<!-- bdDetailModal removed in M3 — replaced by #bdDetailPanel inside #view-sparks -->
 
 <script>
 // --- State ---
 let coreUrl = localStorage.getItem('nexus_url') || 'http://127.0.0.1:7777';
 let token = localStorage.getItem('nexus_token') || '';
 let currentTheme = localStorage.getItem('nexus_theme') || 'system';
-let braindumps = [];
+let sparks = [];
 let projects = [];
 let tasks = [];
-let achievements = [];
 
 // --- Theme ---
 function applyTheme(t) {
@@ -1579,7 +1521,7 @@ const Views = {
     init() { refreshDashboard(); },
     destroy() {},
   },
-  braindumps:   { init() { refreshBraindumps(); },   destroy() {} },
+  sparks:   { init() { refreshSparks(); },   destroy() {} },
   tasks: {
     _listeners: [],
     init() {
@@ -1603,7 +1545,6 @@ const Views = {
     },
   },
   projects:     { init() { refreshProjects(); },      destroy() {} },
-  achievements: { init() { refreshAchievements(); },  destroy() {} },
 };
 
 let _activeView = null;
@@ -1627,31 +1568,31 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item => {
   item.addEventListener('click', () => navigate(item.dataset.view));
 });
 
-// --- BrainDumps ---
+// --- Sparks ---
 let _searchDebounceTimer = null;
 let _activeSearchQuery = '';
 let _refreshSeq = 0;
 
-async function refreshBraindumps() {
+async function refreshSparks() {
   const q = _activeSearchQuery.trim();
-  const path = q ? `/braindump?q=${encodeURIComponent(q)}` : '/braindump';
+  const path = q ? `/spark?q=${encodeURIComponent(q)}` : '/spark';
   const seq = ++_refreshSeq;
   try {
     const result = await api(path);
     if (seq !== _refreshSeq) return; // veraltete Antwort verwerfen
-    braindumps = Array.isArray(result) ? result : (result?.data || result?.items || []);
+    sparks = Array.isArray(result) ? result : (result?.data || result?.items || []);
     populateCategoryFilter();
-    renderBraindumps(braindumps);
+    renderSparks(sparks);
     refreshUnsortedBadge();
     if (_pendingDetailId) {
       const id = _pendingDetailId;
       _pendingDetailId = null;
-      openBraindumpDetail(id);
+      openSparkDetail(id);
     }
   } catch (e) {
     if (seq !== _refreshSeq) return;
     document.getElementById('bdTable').innerHTML =
-      '<div class="empty-state"><p>BrainDumps konnten nicht geladen werden: ' + e.message + '</p></div>';
+      '<div class="empty-state"><p>Sparks konnten nicht geladen werden: ' + e.message + '</p></div>';
   }
 }
 
@@ -1663,15 +1604,15 @@ function scheduleSearchRefresh() {
     _searchDebounceTimer = null;
     if (next === _activeSearchQuery) return;
     _activeSearchQuery = next;
-    refreshBraindumps();
+    refreshSparks();
   }, 250);
 }
 
 async function refreshUnsortedBadge() {
   const btn = document.getElementById('bdUnsortedBadge');
-  const navBadge = document.getElementById('navBadgeBraindumps');
+  const navBadge = document.getElementById('navBadgeSparks');
   try {
-    const data = await api('/braindump/unsorted/count');
+    const data = await api('/spark/unsorted/count');
     const n = data.count || 0;
     if (btn) { btn.textContent = `Unsortiert (${n})`; btn.classList.toggle('hidden', n === 0); }
     if (navBadge) { navBadge.textContent = n > 0 ? n : ''; navBadge.classList.toggle('hidden', n === 0); }
@@ -1695,16 +1636,16 @@ function filterUnsorted() {
     pill.addEventListener('click', () => {
       container.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
-      filterBraindumps();
+      filterSparks();
     });
     container.appendChild(pill);
   }
   pill.classList.add('active');
-  filterBraindumps();
+  filterSparks();
 }
 
 function populateCategoryFilter() {
-  const cats = [...new Set(braindumps.map(b => b.category).filter(Boolean))];
+  const cats = [...new Set(sparks.map(b => b.category).filter(Boolean))];
   const container = document.getElementById('bdFilterPills');
   if (!container) return;
   const currentFilter = container.querySelector('.filter-pill.active')?.dataset.filter ?? '';
@@ -1715,28 +1656,28 @@ function populateCategoryFilter() {
     pill.addEventListener('click', () => {
       container.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
-      filterBraindumps();
+      filterSparks();
     });
   });
 }
 
-function filterBraindumps() {
-  // Text-Suche läuft serverseitig (refreshBraindumps mit ?q=). Hier nur Kategorie-Filter
+function filterSparks() {
+  // Text-Suche läuft serverseitig (refreshSparks mit ?q=). Hier nur Kategorie-Filter
   // plus "Unsorted"-Sonderfall.
   const activePill = document.querySelector('#bdFilterPills .filter-pill.active');
   const cat = activePill?.dataset.filter || '';
-  const filtered = braindumps.filter(b => {
+  const filtered = sparks.filter(b => {
     if (cat === 'Unsorted') return !b.category || b.classification_status === 'unsorted';
     if (cat && b.category !== cat) return false;
     return true;
   });
-  renderBraindumps(filtered);
+  renderSparks(filtered);
 }
 
-function renderBraindumps(items) {
+function renderSparks(items) {
   const container = document.getElementById('bdTable');
   if (!items.length) {
-    container.innerHTML = '<div class="empty-state"><p>Keine Braindumps gefunden.</p></div>';
+    container.innerHTML = '<div class="empty-state"><p>Keine Sparks gefunden.</p></div>';
     return;
   }
   const cards = items.map(b => {
@@ -1750,7 +1691,7 @@ function renderBraindumps(items) {
       : '<span class="entry-badge entry-badge-empty">—</span>';
     return `<div class="entry-card" role="button" tabindex="0"
         data-action="bd-card-open" data-bd-id="${esc(b.id)}"
-        aria-label="Braindump öffnen">
+        aria-label="Spark öffnen">
       <div class="entry-header">
         ${badge}
         <time class="entry-date" datetime="${esc(isoDate)}">${esc(dateStr)}</time>
@@ -1767,21 +1708,21 @@ function updateBulkButtonState() {
   if (btn) btn.disabled = true;
 }
 
-async function deleteBraindump(id) {
-  if (!confirm('Diesen BrainDump löschen?')) return;
+async function deleteSpark(id) {
+  if (!confirm('Diesen Spark löschen?')) return;
   try {
-    await api(`/braindump/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    refreshBraindumps();
+    await api(`/spark/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    refreshSparks();
   } catch (e) { alert('Error: ' + e.message); }
 }
 
-async function deleteSelectedBraindumps() {
+async function deleteSelectedSparks() {
   const ids = [...document.querySelectorAll('.bd-select:checked')].map(cb => cb.dataset.id);
   if (!ids.length) return;
-  if (!confirm(`${ids.length} BrainDump(s) löschen?`)) return;
+  if (!confirm(`${ids.length} Spark(s) löschen?`)) return;
   try {
-    await Promise.all(ids.map(id => api(`/braindump/${encodeURIComponent(id)}`, { method: 'DELETE' })));
-    refreshBraindumps();
+    await Promise.all(ids.map(id => api(`/spark/${encodeURIComponent(id)}`, { method: 'DELETE' })));
+    refreshSparks();
   } catch (e) { alert('Error: ' + e.message); }
 }
 
@@ -1792,7 +1733,7 @@ async function refreshProjects() {
   try {
     [projects, _ideas] = await Promise.all([
       api('/projects').then(r => Array.isArray(r) ? r : (r.data || r.items || [])),
-      api('/braindump/ideas', {}, { silent: true }).then(r => Array.isArray(r) ? r : []).catch(() => []),
+      api('/spark/ideas', {}, { silent: true }).then(r => Array.isArray(r) ? r : []).catch(() => []),
     ]);
     renderProjects();
     populateProjectSelects();
@@ -1898,7 +1839,7 @@ async function submitNewProject() {
   const desc = (document.getElementById('projNewDesc')?.value || '').trim();
   if (!name) { document.getElementById('projNewName')?.focus(); return; }
   try {
-    await api('/projects', { method: 'POST', body: JSON.stringify({ name, description: desc, braindump_ids: [] }) });
+    await api('/projects', { method: 'POST', body: JSON.stringify({ name, description: desc, spark_ids: [] }) });
     closeNewProject();
     refreshProjects();
   } catch (e) { alert('Fehler: ' + e.message); }
@@ -2077,55 +2018,6 @@ async function createTask() {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
-// --- Achievements ---
-async function refreshAchievements() {
-  try {
-    achievements = await api('/achievements');
-    if (!Array.isArray(achievements)) achievements = achievements.data || achievements.items || [];
-    renderAchievements();
-  } catch (e) {
-    document.getElementById('achievementGrid').innerHTML =
-      '<div class="empty-state"><p>Achievements konnten nicht geladen werden: ' + e.message + '</p></div>';
-  }
-}
-
-function renderAchievements() {
-  if (!achievements.length) {
-    document.getElementById('achievementGrid').innerHTML = '<div class="empty-state"><p>Keine Achievements definiert.</p></div>';
-    return;
-  }
-  const cards = achievements.map(a => {
-    const unlocked = !!a.unlocked_at;
-    return `<div class="achievement-card ${unlocked ? 'unlocked' : 'locked'}" data-action="ach-open" data-ach-id="${esc(a.id)}">
-      <div class="ach-icon">${unlocked ? esc(a.icon || '★') : '?'}</div>
-      <div>
-        <div class="ach-name">${esc(a.name || '')}</div>
-        <div class="ach-desc">${esc(a.description || '')}</div>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('achievementGrid').innerHTML = cards;
-}
-
-function openAchievement(id) {
-  const a = achievements.find(x => x.id === id);
-  if (!a) return;
-  const unlocked = !!a.unlocked_at;
-  document.getElementById('achModalIcon').textContent = unlocked ? (a.icon || '★') : '?';
-  document.getElementById('achModalName').textContent = a.name || '';
-  document.getElementById('achModalDesc').textContent = a.description || '';
-  const status = document.getElementById('achModalStatus');
-  if (unlocked) {
-    status.textContent = 'Freigeschaltet am ' + new Date(a.unlocked_at).toLocaleDateString();
-    status.classList.add('unlocked');
-  } else {
-    status.textContent = 'Noch nicht erreicht';
-    status.classList.remove('unlocked');
-  }
-  document.getElementById('achievementModal').classList.remove('hidden');
-}
-function closeAchievement() { document.getElementById('achievementModal').classList.add('hidden'); }
-
 // --- Settings ---
 const PREF_DEFAULTS = {
   camera_analysis_enabled: 'true',
@@ -2240,17 +2132,16 @@ async function refreshDashboard() {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
   // Load all counts in parallel
-  const [bds, ts, ps, as, unsorted] = await Promise.allSettled([
-    api('/braindump',                  {}, { silent: true }),
+  const [bds, ts, ps, unsorted] = await Promise.allSettled([
+    api('/spark',                  {}, { silent: true }),
     api('/tasks',                      {}, { silent: true }),
     api('/projects',                   {}, { silent: true }),
-    api('/achievements',               {}, { silent: true }),
-    api('/braindump/unsorted/count',   {}, { silent: true }),
+    api('/spark/unsorted/count',   {}, { silent: true }),
   ]);
 
   if (bds.status === 'fulfilled') {
     const arr = Array.isArray(bds.value) ? bds.value : (bds.value?.data || []);
-    set('dashCountBraindumps', arr.length);
+    set('dashCountSparks', arr.length);
   }
   if (ts.status === 'fulfilled') {
     const arr = Array.isArray(ts.value) ? ts.value : (ts.value?.data || []);
@@ -2261,20 +2152,15 @@ async function refreshDashboard() {
     const arr = Array.isArray(ps.value) ? ps.value : (ps.value?.data || []);
     set('dashCountProjects', arr.length);
   }
-  if (as.status === 'fulfilled') {
-    const arr = Array.isArray(as.value) ? as.value : (as.value?.data || []);
-    const unlocked = arr.filter(a => !!a.unlocked_at).length;
-    set('dashCountAchievements', unlocked + '/' + arr.length);
-  }
 
   // Alert card + nav badge
   const n = unsorted.status === 'fulfilled' ? (unsorted.value?.count || 0) : 0;
   const alertCard = document.getElementById('dashAlertCard');
   const alertText = document.getElementById('dashAlertText');
-  const navBadge  = document.getElementById('navBadgeBraindumps');
+  const navBadge  = document.getElementById('navBadgeSparks');
   if (alertCard) {
     if (n > 0) {
-      if (alertText) alertText.textContent = `${n} Braindump${n === 1 ? '' : 's'} unsortiert`;
+      if (alertText) alertText.textContent = `${n} Spark${n === 1 ? '' : 's'} unsortiert`;
       alertCard.removeAttribute('hidden');
     } else {
       alertCard.setAttribute('hidden', '');
@@ -2578,10 +2464,10 @@ function renderProviderDetail() {
     const currentVault = (setupStatus && setupStatus.vault_path) || '';
     detail.innerHTML = `
       <p><strong>Obsidian-Briefkasten</strong></p>
-      <p>Nexus schreibt deine BrainDumps als Markdown-Dateien in <code>&lt;Vault&gt;/Nexus/Inbox/</code>. Ein Vault-seitiges Sortier-Skill (z.&nbsp;B. <code>kepano/obsidian-skills</code>) erzeugt Outbox-Dateien — beim nächsten Sync (manuell via <code>POST /api/obsidian/sync</code>) zieht Nexus die Ergebnisse zurück in seine Datenbank.</p>
+      <p>Nexus schreibt deine Sparks als Markdown-Dateien in <code>&lt;Vault&gt;/Nexus/Inbox/</code>. Ein Vault-seitiges Sortier-Skill (z.&nbsp;B. <code>kepano/obsidian-skills</code>) erzeugt Outbox-Dateien — beim nächsten Sync (manuell via <code>POST /api/obsidian/sync</code>) zieht Nexus die Ergebnisse zurück in seine Datenbank.</p>
       <input type="text" placeholder="Absoluter Pfad, z.B. /home/du/Vaults/MeinVault" id="vaultPath" autocomplete="off" value="${esc(currentVault)}" />
       <button class="btn-secondary" data-action="pick-vault" type="button">Ordner wählen…</button>
-      <p class="subtle">Der Pfad muss bereits existieren und ein Verzeichnis sein. Die <code>Nexus/Inbox</code>-Hierarchie wird beim ersten BrainDump automatisch angelegt.</p>
+      <p class="subtle">Der Pfad muss bereits existieren und ein Verzeichnis sein. Die <code>Nexus/Inbox</code>-Hierarchie wird beim ersten Spark automatisch angelegt.</p>
     `;
     const input = document.getElementById('vaultPath');
     const updateBtn = () => { nextBtn.disabled = !input.value.trim(); };
@@ -2680,7 +2566,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================
-// Synaptic Mosaic Phase U — BrainDump-Detail-Modal + Links-Block + Project-Suggestions-Banner
+// Synaptic Mosaic Phase U — Spark-Detail-Modal + Links-Block + Project-Suggestions-Banner
 // ============================================================
 
 let currentBdDetailId = null;
@@ -2711,24 +2597,24 @@ function renderDetailTags(bd) {
 
 async function removeDetailTag(tag) {
   if (!currentBdDetailId || !tag) return;
-  const bd = braindumps.find(b => b.id === currentBdDetailId);
+  const bd = sparks.find(b => b.id === currentBdDetailId);
   if (!bd) return;
   let tags = [];
   try { tags = JSON.parse(bd.tags_json || '[]'); } catch {}
   const next = tags.filter(t => t !== tag);
   try {
-    await api(`/braindump/${encodeURIComponent(currentBdDetailId)}/tags`, {
+    await api(`/spark/${encodeURIComponent(currentBdDetailId)}/tags`, {
       method: 'POST', body: JSON.stringify({ tags: next }),
     });
     bd.tags_json = JSON.stringify(next);
     renderDetailTags(bd);
-    renderBraindumps(braindumps);
+    renderSparks(sparks);
   } catch (e) { alert('Tag-Update fehlgeschlagen: ' + e.message); }
 }
 
-async function openBraindumpDetail(id) {
+async function openSparkDetail(id) {
   currentBdDetailId = id;
-  const bd = braindumps.find(b => b.id === id);
+  const bd = sparks.find(b => b.id === id);
   if (!bd) return;
 
   // Mark the selected card
@@ -2766,7 +2652,7 @@ async function openBraindumpDetail(id) {
 
   // Tags (NV-4: removable). Eine eigene "vorgeschlagen vs. übernommen"-Distinction
   // braucht eine Schema-Erweiterung (suggested_tags_json) — wird in Post-Phase-A
-  // separat angegangen. Hier reicht "Tag entfernen" via POST /braindump/:id/tags.
+  // separat angegangen. Hier reicht "Tag entfernen" via POST /spark/:id/tags.
   renderDetailTags(bd);
 
   // Links placeholder
@@ -2779,7 +2665,7 @@ async function openBraindumpDetail(id) {
 
   // Fetch links (race-guard: SM-U-001)
   try {
-    const data = await api(`/braindump/${encodeURIComponent(id)}/links`, {}, { silent: true });
+    const data = await api(`/spark/${encodeURIComponent(id)}/links`, {}, { silent: true });
     if (currentBdDetailId !== id) return;
     if (linksEl) renderLinks(linksEl, data);
   } catch {
@@ -2818,34 +2704,34 @@ function wikiLabelFor(type, id) {
     const p = projects.find(x => x.id === id);
     return p ? '📁 ' + (p.name || p.title || id) : '📁 ' + id;
   }
-  const bd = braindumps.find(x => x.id === id);
+  const bd = sparks.find(x => x.id === id);
   if (bd) return '📝 ' + (bd.summary || (bd.raw_text || '').substring(0, 60));
   return '📝 ' + id;
 }
 
 function openLinkTarget(type, id) {
   if (type === 'project') {
-    closeBraindumpDetail();
+    closeSparkDetail();
     navigate('projects');
     return;
   }
-  openBraindumpDetail(id);
+  openSparkDetail(id);
 }
 
-function closeBraindumpDetail() {
+function closeSparkDetail() {
   const panel = document.getElementById('bdDetailPanel');
   if (panel) panel.setAttribute('hidden', '');
   document.querySelectorAll('.entry-card.selected').forEach(c => c.classList.remove('selected'));
   currentBdDetailId = null;
 }
 
-async function deleteBraindumpFromDetail() {
+async function deleteSparkFromDetail() {
   if (!currentBdDetailId) return;
-  if (!confirm('BrainDump löschen?')) return;
+  if (!confirm('Spark löschen?')) return;
   try {
-    await api(`/braindump/${encodeURIComponent(currentBdDetailId)}`, { method: 'DELETE' });
-    closeBraindumpDetail();
-    refreshBraindumps();
+    await api(`/spark/${encodeURIComponent(currentBdDetailId)}`, { method: 'DELETE' });
+    closeSparkDetail();
+    refreshSparks();
   } catch (e) { alert('Fehler: ' + e.message); }
 }
 
@@ -2867,7 +2753,7 @@ async function refreshSuggestionsBanner() {
   }
   const cards = pending.map(s => {
     const conf = s.confidence != null ? Math.round(s.confidence * 100) + '%' : '';
-    const memberCount = (s.member_braindump_ids || []).length;
+    const memberCount = (s.member_spark_ids || []).length;
     const reason = s.reason ? '<p>' + esc(s.reason) + '</p>' : '';
     return `<div class="suggestion-card">
       <div class="meta">
@@ -2894,7 +2780,7 @@ async function acceptSuggestion(id) {
     const res = await api(`/projects/suggestions/${encodeURIComponent(id)}/accept`, { method: 'POST' });
     // SM-U-003: partial-Flag → suggestion-Banner mit Auto-Hide statt blocking-alert.
     if (res && res.partial) {
-      showBanner(`Projekt erstellt — ${res.linked_braindumps} von ${res.requested_braindumps} Notizen verknüpft.`, 'suggestion', 6000);
+      showBanner(`Projekt erstellt — ${res.linked_sparks} von ${res.requested_sparks} Notizen verknüpft.`, 'suggestion', 6000);
     }
     refreshProjects();
   } catch (e) {
@@ -2914,7 +2800,7 @@ async function dismissSuggestion(id) {
 // ============================================================
 // Phase C — CSP-Compliant Event Delegation (Crystalline Crab)
 // ============================================================
-// --- Quick-Create (Braindump) ---
+// --- Quick-Create (Spark) ---
 function openQuickCreate() {
   const box = document.getElementById('bdQuickCreate');
   const btn = document.getElementById('bdCtaBtn');
@@ -2934,25 +2820,25 @@ function closeQuickCreate() {
   if (ta) ta.value = '';
 }
 
-async function submitQuickBraindump() {
+async function submitQuickSpark() {
   const ta = document.getElementById('bdQuickText');
   const text = (ta?.value || '').trim();
   if (!text) return;
   try {
-    await api('/braindump', { method: 'POST', body: JSON.stringify({ raw_text: text }) });
+    await api('/spark', { method: 'POST', body: JSON.stringify({ raw_text: text }) });
     closeQuickCreate();
-    refreshBraindumps();
+    refreshSparks();
   } catch (e) { alert('Fehler: ' + e.message); }
 }
 
-/* ── NV-3: Foto-Braindump ───────────────────────── */
+/* ── NV-3: Foto-Spark ───────────────────────── */
 const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 const photoState = {
   file: null,
   abortController: null,
   suggestedTags: [],
   acceptedTags: new Set(),
-  braindumpId: null,
+  sparkId: null,
 };
 
 function openPhotoCreate() {
@@ -2984,7 +2870,7 @@ function resetPhotoSheet() {
   photoState.abortController = null;
   photoState.suggestedTags = [];
   photoState.acceptedTags = new Set();
-  photoState.braindumpId = null;
+  photoState.sparkId = null;
   const drop = document.getElementById('bdPhotoDrop');
   const empty = document.getElementById('bdPhotoDropEmpty');
   const preview = document.getElementById('bdPhotoPreview');
@@ -3046,10 +2932,10 @@ function setPhotoFile(file) {
   }
   if (empty) empty.classList.add('hidden');
   setPhotoStatus('Bereit — Analyse läuft …', 'streaming');
-  submitPhotoBraindump();
+  submitPhotoSpark();
 }
 
-async function submitPhotoBraindump() {
+async function submitPhotoSpark() {
   if (!photoState.file) return;
   const ocr = document.getElementById('bdPhotoOcr');
   const drop = document.getElementById('bdPhotoDrop');
@@ -3075,7 +2961,7 @@ async function submitPhotoBraindump() {
 
   let res;
   try {
-    res = await fetch(coreUrl + '/braindump/from_image', {
+    res = await fetch(coreUrl + '/spark/from_image', {
       method: 'POST', body: fd, headers, signal: controller.signal,
     });
   } catch (e) {
@@ -3167,11 +3053,11 @@ function handlePhotoFrame(frame) {
       break;
     }
     case 'done': {
-      photoState.braindumpId = frame.data && frame.data.braindump_id;
+      photoState.sparkId = frame.data && frame.data.spark_id;
       setPhotoStatus('✓ Gespeichert', 'success');
       const openDetail = document.getElementById('bdPhotoOpenDetailBtn');
-      if (openDetail && photoState.braindumpId) openDetail.classList.remove('hidden');
-      refreshBraindumps();
+      if (openDetail && photoState.sparkId) openDetail.classList.remove('hidden');
+      refreshSparks();
       break;
     }
     case 'error': {
@@ -3226,16 +3112,16 @@ function togglePhotoTag(el) {
 
 async function persistPhotoAcceptedTags() {
   // NV-3 trackt Accept/Reject nur clientseitig in photoState.acceptedTags.
-  // Backend-Endpoint (POST /braindump/:id/tags) folgt in NV-4 (Auto-Tag-UI).
+  // Backend-Endpoint (POST /spark/:id/tags) folgt in NV-4 (Auto-Tag-UI).
   // Bis dahin werden die vom Core bereits persistierten suggested_tags
   // unverändert mit dem Eintrag gespeichert.
 }
 
-function openPhotoBraindumpDetail() {
-  if (!photoState.braindumpId) return;
-  const id = photoState.braindumpId;
+function openPhotoSparkDetail() {
+  if (!photoState.sparkId) return;
+  const id = photoState.sparkId;
   closePhotoCreate();
-  openBraindumpDetail(id);
+  openSparkDetail(id);
 }
 
 function bindPhotoSheetEvents() {
@@ -3278,7 +3164,7 @@ function bindPhotoSheetEvents() {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (currentBdDetailId) { closeBraindumpDetail(); return; }
+    if (currentBdDetailId) { closeSparkDetail(); return; }
     const photoSheet = document.getElementById('bdPhotoCreate');
     if (photoSheet && !photoSheet.classList.contains('hidden')) { closePhotoCreate(); return; }
     closeQuickCreate();
@@ -3292,39 +3178,38 @@ document.addEventListener('click', (e) => {
   const action = el.dataset.action;
   if (action === 'bd-card-open') {
     if (e.target.closest('button, [data-action="bd-card-menu"]')) return;
-    openBraindumpDetail(el.dataset.bdId);
+    openSparkDetail(el.dataset.bdId);
     return;
   }
   switch (action) {
-    case 'nav-braindumps':   navigate('braindumps'); break;
+    case 'nav-sparks':   navigate('sparks'); break;
     case 'nav-tasks':        navigate('tasks'); break;
     case 'nav-projects':     navigate('projects'); break;
-    case 'nav-achievements': navigate('achievements'); break;
-    case 'dash-alert-click': navigate('braindumps'); filterUnsorted(); break;
+    case 'dash-alert-click': navigate('sparks'); filterUnsorted(); break;
     case 'theme-cycle': cycleTheme(); break;
     case 'settings-open': openSettings(); break;
     case 'settings-close': closeSettings(); break;
     case 'settings-save': saveSettings(); break;
     case 'llm-save': saveLlmConfig(); break;
-    case 'bd-refresh': refreshBraindumps(); break;
+    case 'bd-refresh': refreshSparks(); break;
     case 'bd-filter-unsorted': filterUnsorted(); break;
-    case 'bd-bulk-delete': deleteSelectedBraindumps(); break;
-    case 'bd-delete': e.stopPropagation(); deleteBraindump(el.dataset.bdId); break;
-    case 'bd-card-menu': e.stopPropagation(); deleteBraindump(el.dataset.bdId); break;
-    case 'bd-detail-delete': deleteBraindumpFromDetail(); break;
-    case 'bd-detail-close': closeBraindumpDetail(); break;
+    case 'bd-bulk-delete': deleteSelectedSparks(); break;
+    case 'bd-delete': e.stopPropagation(); deleteSpark(el.dataset.bdId); break;
+    case 'bd-card-menu': e.stopPropagation(); deleteSpark(el.dataset.bdId); break;
+    case 'bd-detail-delete': deleteSparkFromDetail(); break;
+    case 'bd-detail-close': closeSparkDetail(); break;
     case 'bd-quick-open': openQuickCreate(); break;
     case 'bd-quick-cancel': closeQuickCreate(); break;
-    case 'bd-quick-submit': submitQuickBraindump(); break;
+    case 'bd-quick-submit': submitQuickSpark(); break;
     case 'bd-photo-open': openPhotoCreate(); break;
     case 'bd-photo-cancel': closePhotoCreate(); break;
-    case 'bd-photo-retry': submitPhotoBraindump(); break;
+    case 'bd-photo-retry': submitPhotoSpark(); break;
     case 'bd-photo-tag-toggle': togglePhotoTag(el); break;
-    case 'bd-photo-open-detail': openPhotoBraindumpDetail(); break;
+    case 'bd-photo-open-detail': openPhotoSparkDetail(); break;
     case 'bd-detail-tag-remove': e.stopPropagation(); removeDetailTag(el.dataset.tag); break;
     case 'idea-open':
       _pendingDetailId = el.dataset.bdId;
-      navigate('braindumps');
+      navigate('sparks');
       break;
     case 'proj-new': openNewProject(); break;
     case 'proj-quick-cancel': closeNewProject(); break;
@@ -3337,9 +3222,6 @@ document.addEventListener('click', (e) => {
     case 'task-create': createTask(); break;
     case 'task-toggle': toggleTask(el.dataset.taskId, el.dataset.taskDone === 'true'); break;
     case 'task-delete': deleteTask(el.dataset.taskId); break;
-    case 'ach-refresh': refreshAchievements(); break;
-    case 'ach-open': openAchievement(el.dataset.achId); break;
-    case 'ach-close': closeAchievement(); break;
     case 'link-open': openLinkTarget(el.dataset.linkType, el.dataset.linkId); break;
     case 'sugg-accept': acceptSuggestion(el.dataset.suggId); break;
     case 'sugg-dismiss': dismissSuggestion(el.dataset.suggId); break;
@@ -3382,7 +3264,7 @@ document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-change]');
   if (!el) return;
   switch (el.dataset.change) {
-    case 'bd-filter': filterBraindumps(); break;
+    case 'bd-filter': filterSparks(); break;
     case 'bd-select-toggle': updateBulkButtonState(); break;
     case 'task-render': renderTasks(); break;
     case 'pref-select': {

@@ -17,7 +17,7 @@ data class Link(
 )
 
 @Serializable
-data class BrainDumpLinks(
+data class SparkLinks(
     val outgoing: List<Link> = emptyList(),
     val incoming: List<Link> = emptyList(),
 )

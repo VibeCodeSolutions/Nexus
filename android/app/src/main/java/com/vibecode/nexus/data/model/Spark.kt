@@ -3,12 +3,12 @@ package com.vibecode.nexus.data.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class BrainDumpRequest(
+data class SparkRequest(
     val text: String
 )
 
 @Serializable
-data class BrainDumpResponse(
+data class SparkResponse(
     val id: String,
     val raw_text: String,
     val category: String? = null,

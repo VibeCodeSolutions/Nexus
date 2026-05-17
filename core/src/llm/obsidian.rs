@@ -1,13 +1,13 @@
 //! Obsidian-„Provider" — kein echter LLM, sondern eine File-basierte Bridge.
 //!
 //! Pending-Pattern (R1):
-//! 1. `categorize_and_summarize` schreibt den BrainDump als Markdown-Datei in
+//! 1. `categorize_and_summarize` schreibt den Spark als Markdown-Datei in
 //!    `<vault>/Nexus/Inbox/<inbox_id>.md`.
 //! 2. Gibt sofort eine `Classification` mit `category: "Pending"` und
 //!    `inbox_id: Some(<uuid>)` zurück.
-//! 3. Der Aufrufer (handlers::post_braindump) erkennt `inbox_id.is_some()`
-//!    und setzt `braindumps.classification_status = 'pending'` plus
-//!    `braindumps.nexus_inbox_id = <inbox_id>`.
+//! 3. Der Aufrufer (handlers::post_spark) erkennt `inbox_id.is_some()`
+//!    und setzt `sparks.classification_status = 'pending'` plus
+//!    `sparks.nexus_inbox_id = <inbox_id>`.
 //! 4. Phase C (Outbox-Importer) aktualisiert die Row, sobald das
 //!    Vault-seitige Sortier-Skill eine Outbox-Datei produziert hat.
 //!
@@ -18,7 +18,7 @@
 use async_trait::async_trait;
 use std::path::PathBuf;
 
-use crate::models::BrainDumpEntry;
+use crate::models::SparkEntry;
 use crate::obsidian;
 
 use super::{Classification, LlmProvider, ProjectSuggestion};
@@ -34,7 +34,7 @@ impl ObsidianProvider {
     /// Konstruiert den Provider mit dem konfigurierten Vault-Pfad. Prüft
     /// nur, dass der Pfad nicht leer ist — Existenz wird beim ersten
     /// `write_inbox` validiert (Vault könnte zwischen Start und erstem
-    /// BrainDump erst gemountet werden, Stichwort externe Festplatte).
+    /// Spark erst gemountet werden, Stichwort externe Festplatte).
     pub fn new(vault_path: PathBuf) -> Result<Self, String> {
         if vault_path.as_os_str().is_empty() {
             return Err("Obsidian-Provider: Vault-Pfad ist leer".to_string());
@@ -60,7 +60,7 @@ impl LlmProvider for ObsidianProvider {
 
     async fn suggest_projects(
         &self,
-        _entries: &[BrainDumpEntry],
+        _entries: &[SparkEntry],
     ) -> Result<Vec<ProjectSuggestion>, String> {
         Err(
             "Obsidian-Provider: Projekt-Vorschläge laufen über die Outbox (Phase C). \

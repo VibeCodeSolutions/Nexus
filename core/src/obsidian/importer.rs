@@ -6,7 +6,7 @@
 //! Files atomar nach `<vault>/Nexus/Outbox/_processed/`.
 //!
 //! Wenn das Outbox-File `nexus_source_inbox` referenziert, wird zusätzlich
-//! die zugehörige BrainDump-Row von `classification_status='pending'` auf
+//! die zugehörige Spark-Row von `classification_status='pending'` auf
 //! `'done'` gesetzt — und gleichzeitig Category/Summary/Tags aus dem
 //! Outbox-Frontmatter übernommen, damit das Vault-Skill als Source of Truth
 //! für die Klassifikation gilt.
@@ -206,13 +206,13 @@ async fn dispatch(pool: &SqlitePool, parsed: OutboxParsed) -> ImportOutcome {
         Err(e) => return ImportOutcome::Failed { reason: e },
     };
 
-    // Source-BrainDump-Status-Flip ist für jeden Typ relevant, der eine
-    // pending BrainDump-Row hat. Wenn der Vault-Skill ohne Source-Inbox
+    // Source-Spark-Status-Flip ist für jeden Typ relevant, der eine
+    // pending Spark-Row hat. Wenn der Vault-Skill ohne Source-Inbox
     // arbeitet (User legt direkt im Vault an), entfällt der Flip stillschweigend.
-    let flip_result = flip_source_braindump(pool, &parsed.frontmatter).await;
+    let flip_result = flip_source_spark(pool, &parsed.frontmatter).await;
     if let Err(e) = flip_result {
         return ImportOutcome::Failed {
-            reason: format!("BrainDump-Status-Flip fehlgeschlagen: {e}"),
+            reason: format!("Spark-Status-Flip fehlgeschlagen: {e}"),
         };
     }
 
@@ -221,7 +221,7 @@ async fn dispatch(pool: &SqlitePool, parsed: OutboxParsed) -> ImportOutcome {
         NexusType::Project => dispatch_project(pool, &parsed.frontmatter, &parsed.body).await,
         NexusType::Note => {
             // OB-C-MIN-7: Eine Note ohne nexus_source_inbox hat keine
-            // BrainDump-Zuordnung in Nexus — der Status-Flip oben ist
+            // Spark-Zuordnung in Nexus — der Status-Flip oben ist
             // No-Op, der Importer würde das File sonst stillschweigend
             // ins _processed/ verschieben. Klarere Semantik: Skipped
             // mit explizitem Hinweis, das File bleibt im Outbox sichtbar.
@@ -230,7 +230,7 @@ async fn dispatch(pool: &SqlitePool, parsed: OutboxParsed) -> ImportOutcome {
             // den erfolgreichen Roundtrip.
             if parsed.frontmatter.nexus_source_inbox.is_none() {
                 ImportOutcome::Skipped {
-                    reason: "nexus_type=note ohne nexus_source_inbox — Vault-only Note, in Nexus existiert kein passendes BrainDump zum Status-Flip. File bleibt im Outbox liegen.".to_string(),
+                    reason: "nexus_type=note ohne nexus_source_inbox — Vault-only Note, in Nexus existiert kein passendes Spark zum Status-Flip. File bleibt im Outbox liegen.".to_string(),
                 }
             } else {
                 ImportOutcome::Imported {
@@ -365,10 +365,10 @@ async fn dispatch_project(
     }
 }
 
-/// Setzt `braindumps.classification_status='done'` und übernimmt
+/// Setzt `sparks.classification_status='done'` und übernimmt
 /// Category/Summary/Tags aus dem Outbox-Frontmatter, sofern eine
 /// `nexus_source_inbox`-Referenz vorliegt und die Row pending ist.
-async fn flip_source_braindump(
+async fn flip_source_spark(
     pool: &SqlitePool,
     fm: &OutboxFrontmatter,
 ) -> Result<(), sqlx::Error> {
@@ -394,12 +394,12 @@ async fn flip_source_braindump(
     };
 
     // Title als kompakten Summary übernehmen (Outbox-Title ist die
-    // verdichtete Form des BrainDumps); Tags als JSON.
+    // verdichtete Form des Sparks); Tags als JSON.
     let summary: Option<&str> = fm.title.as_deref();
     let tags_json = serde_json::to_string(&fm.tags).unwrap_or_else(|_| "[]".to_string());
 
     sqlx::query(
-        "UPDATE braindumps SET classification_status = ?, category = ?, summary = ?, tags_json = ? \
+        "UPDATE sparks SET classification_status = ?, category = ?, summary = ?, tags_json = ? \
          WHERE nexus_inbox_id = ? AND classification_status = ?",
     )
     .bind(crate::models::classification_status::DONE)
@@ -577,7 +577,7 @@ priority: high
 
     #[tokio::test]
     async fn import_file_skips_note_without_source_inbox() {
-        // OB-C-MIN-7: Vault-only Notes ohne BrainDump-Quelle bleiben
+        // OB-C-MIN-7: Vault-only Notes ohne Spark-Quelle bleiben
         // sichtbar im Outbox liegen, statt stumm archiviert zu werden.
         let tmp = TempDir::new().unwrap();
         let pool = fresh_pool().await;
@@ -618,13 +618,13 @@ priority: high
     }
 
     #[tokio::test]
-    async fn import_file_flips_source_braindump_status_to_done() {
+    async fn import_file_flips_source_spark_status_to_done() {
         let tmp = TempDir::new().unwrap();
         let pool = fresh_pool().await;
-        let bd = crate::repo::insert(&pool, "Roher BrainDump-Text").await.unwrap();
+        let bd = crate::repo::insert(&pool, "Roher Spark-Text").await.unwrap();
         let inbox_id = "01HZTESTINBOX";
         sqlx::query(
-            "UPDATE braindumps SET classification_status = ?, nexus_inbox_id = ? WHERE id = ?",
+            "UPDATE sparks SET classification_status = ?, nexus_inbox_id = ? WHERE id = ?",
         )
         .bind(crate::models::classification_status::PENDING)
         .bind(inbox_id)

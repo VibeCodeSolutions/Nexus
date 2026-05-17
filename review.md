@@ -26,7 +26,7 @@
 | `cargo check` (desktop) | ✅ EXIT=0 | `/tmp/nexus_desktop_check.log` |
 | Build-Artefakte vorhanden | ✅ Core 15 MB, Desktop 12 MB, APK 64 MB | `ls -la` in CURRENT_STATE-Layout |
 | Live: `/health`, `/api/setup-status` | ✅ 200 OK | Live-Curl |
-| Live: `POST /braindump` mit Ollama-Categorize | ✅ category="Task", tags ok, +10 XP, total_xp=175 | Live-Run |
+| Live: `POST /spark` mit Ollama-Categorize | ✅ category="Task", tags ok, +10 XP, total_xp=175 | Live-Run |
 | Live: `POST /api/diag/run` (core self-test) | ✅ 7 pass, 0 warn, 0 fail | Live-Run |
 | Live: Phone `am start` → Boot-Diag → Submit | ✅ 7 pass auf Phone, Report serverseitig gespeichert | Logcat + `GET /api/diag/reports` |
 | Live: Phone-LAN-Reachability | ✅ Ping 21ms, HTTP 200 via App | Logcat + Report |
@@ -44,7 +44,7 @@
 - **Schweregrad:** 🔴 Blocker
 - **Kategorie:** Sicherheit
 - **Prüfgegenstand:** `core/src/main.rs:139` (`route("/", get(handlers::dashboard))`), `core/src/auth.rs:180` (`is_public`-Liste enthält `"/"`), `core/src/config.rs:30` (default bind `0.0.0.0:7777`).
-- **Befund:** Der Dashboard-Handler liefert das vollständige Personal-OS-HTML — alle BrainDumps inkl. Volltext, alle Projekte, Stats, Achievements — und ist gleichzeitig in `is_public` markiert. Bind-Default ist `0.0.0.0`, also auf allen Interfaces. Damit kann jedes Gerät im selben LAN/WLAN ohne Token unter `http://<host-ip>:7777/` Kais komplette private Notizen einsehen. Live-verifiziert: `curl http://127.0.0.1:7777/` (kein Header) liefert das HTML mit allen Daten.
+- **Befund:** Der Dashboard-Handler liefert das vollständige Personal-OS-HTML — alle Sparks inkl. Volltext, alle Projekte, Stats, Achievements — und ist gleichzeitig in `is_public` markiert. Bind-Default ist `0.0.0.0`, also auf allen Interfaces. Damit kann jedes Gerät im selben LAN/WLAN ohne Token unter `http://<host-ip>:7777/` Kais komplette private Notizen einsehen. Live-verifiziert: `curl http://127.0.0.1:7777/` (kein Header) liefert das HTML mit allen Daten.
 - **Korrekturvorschlag:**
   - Variante A (sicherheits-bevorzugt): Dashboard `/` aus `is_public` streichen — Bearer-Auth pflicht. Tauri-Frontend hat den Token sowieso (siehe `desktop/src-tauri/src/main.rs::get_core_token`), kann ihn als Header mitschicken (oder das HTML wird via Tauri-Command serviert).
   - Variante B (kompromiss): Default-Bind auf `127.0.0.1:7777` ändern, LAN-Bind nur explizit per `NEXUS_BIND_ADDR=0.0.0.0:7777` opt-in. Phone-Pairing braucht dann eine eigene Lösung (z.B. ADB-Reverse oder Tailscale, was Phase 16 ist).
@@ -153,7 +153,7 @@
 ## Nicht im Scope dieses Reviews
 
 - Windows-spezifisches Verhalten (Barclay-Sprint, separate Findings-Klasse `WIN-XXX`)
-- Performance-Profiling unter Last (z.B. 10k BrainDumps Dashboard-Render)
+- Performance-Profiling unter Last (z.B. 10k Sparks Dashboard-Render)
 - Penetration-Test der Bearer-Token-Generierung (`rand::rng()` ist `OsRng`, daher OK, aber kein Audit erfolgt)
 - Phasen 14/15/16 (Fokus, Wellbeing, Remote-Sync)
 

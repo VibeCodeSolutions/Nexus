@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::keystore::{self, OAuthTokens};
-use crate::models::BrainDumpEntry;
+use crate::models::SparkEntry;
 use crate::oauth;
 use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, PROJECT_SUGGEST_PROMPT, SYSTEM_PROMPT};
 
@@ -130,7 +130,7 @@ impl LlmProvider for ClaudeProvider {
             .map_err(|e| format!("JSON-Parse Fehler: {e}\nRaw: {raw}"))
     }
 
-    async fn suggest_projects(&self, entries: &[BrainDumpEntry]) -> Result<Vec<ProjectSuggestion>, String> {
+    async fn suggest_projects(&self, entries: &[SparkEntry]) -> Result<Vec<ProjectSuggestion>, String> {
         let entries_text: Vec<String> = entries.iter().map(|e| {
             format!("ID: {}\nText: {}\nKategorie: {}\nSummary: {}",
                 e.id, e.raw_text, e.category, e.summary.as_deref().unwrap_or("-"))

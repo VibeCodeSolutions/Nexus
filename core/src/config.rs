@@ -7,18 +7,18 @@ pub struct Config {
     pub bind_addr: String,
     pub log_dir: PathBuf,
     /// Optionaler Obsidian-Vault-Pfad. Wenn gesetzt, schreibt Nexus
-    /// BrainDumps in `<vault>/Nexus/Inbox/` und liest sortierte Files
+    /// Sparks in `<vault>/Nexus/Inbox/` und liest sortierte Files
     /// aus `<vault>/Nexus/Outbox/`. Präzedenz: NEXUS_VAULT_PATH > Keystore.
     pub vault_path: Option<PathBuf>,
-    /// Sprint Nightvision (NV-1): Foto-Braindump-Konfiguration.
+    /// Sprint Nightvision (NV-1): Foto-Spark-Konfiguration.
     /// Konsument folgt in NV-2 (HTTP-Endpoint) — bis dahin dead_code.
     #[allow(dead_code)]
     pub vision: VisionConfig,
-    /// Verzeichnis für persistierte Foto-Braindump-Bilder. Default:
-    /// `<home>/.nexus/braindump_images/`. Override via NEXUS_BRAINDUMP_IMAGES_DIR.
+    /// Verzeichnis für persistierte Foto-Spark-Bilder. Default:
+    /// `<home>/.nexus/spark_images/`. Override via NEXUS_SPARK_IMAGES_DIR.
     /// Konsument folgt in NV-2 — bis dahin dead_code.
     #[allow(dead_code)]
-    pub braindump_images_dir: PathBuf,
+    pub spark_images_dir: PathBuf,
 }
 
 /// Konfiguration für Vision-LLM + OCR-Fallback (Sprint Nightvision NV-1).
@@ -137,13 +137,13 @@ impl Config {
             tesseract_enabled: env_bool("NEXUS_OCR_TESSERACT_ENABLED", true),
         };
 
-        let braindump_images_dir = env::var("NEXUS_BRAINDUMP_IMAGES_DIR")
+        let spark_images_dir = env::var("NEXUS_SPARK_IMAGES_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
                 home_dir()
                     .unwrap_or_else(|| PathBuf::from("."))
                     .join(".nexus")
-                    .join("braindump_images")
+                    .join("spark_images")
             });
 
         Self {
@@ -154,7 +154,7 @@ impl Config {
             log_dir,
             vault_path,
             vision,
-            braindump_images_dir,
+            spark_images_dir,
         }
     }
 }

@@ -3,20 +3,20 @@
 > Synaptic Mosaic Phase B — Datenmodell, Endpoints, LLM-Integration, Background-Task.
 > Stand: 2026-05-02 (v0.1.2)
 
-NEXUS verknüpft BrainDumps und Projekte zu einem persönlichen Knowledge-Graph. Verknüpfungen entstehen entweder manuell (User-`POST /links`) oder automatisch durch einen Hintergrund-Task, der den konfigurierten LLM-Provider befragt.
+NEXUS verknüpft Sparks und Projekte zu einem persönlichen Knowledge-Graph. Verknüpfungen entstehen entweder manuell (User-`POST /links`) oder automatisch durch einen Hintergrund-Task, der den konfigurierten LLM-Provider befragt.
 
 ## Datenmodell
 
 ### `links`-Tabelle (Migration `20260501_001_links.sql`)
 
-Polymorpher Verknüpfungs-Knoten zwischen BrainDumps und Projekten. Kein Foreign-Key, weil das Source/Target-Type variieren kann (`braindump | project`).
+Polymorpher Verknüpfungs-Knoten zwischen Sparks und Projekten. Kein Foreign-Key, weil das Source/Target-Type variieren kann (`spark | project`).
 
 | Spalte | Typ | Beschreibung |
 |---|---|---|
 | `id` | TEXT PK | UUID-v4 oder zufälliger 32-hex-String |
-| `source_type` | TEXT | `braindump` oder `project` |
+| `source_type` | TEXT | `spark` oder `project` |
 | `source_id` | TEXT | ID des Quell-Knotens |
-| `target_type` | TEXT | `braindump` oder `project` |
+| `target_type` | TEXT | `spark` oder `project` |
 | `target_id` | TEXT | ID des Ziel-Knotens |
 | `relation` | TEXT | `related` (default), `mentions`, `parent`, `child`, `noop-marker` (Sentinel) |
 | `confidence` | REAL | `1.0` bei manuellem Insert, sonst LLM-Confidence im Bereich `0.0–1.0` |
@@ -35,7 +35,7 @@ Pending Auto-Projekt-Vorschläge mit mittlerer LLM-Confidence (`[NEXUS_LINK_CONF
 | `id` | TEXT PK | UUID |
 | `name` | TEXT | LLM-vorgeschlagener Projektname |
 | `description` | TEXT | LLM-Beschreibung |
-| `member_braindump_ids` | TEXT | JSON-Array von BrainDump-IDs |
+| `member_spark_ids` | TEXT | JSON-Array von Spark-IDs |
 | `confidence` | REAL | LLM-Confidence |
 | `reason` | TEXT NULLABLE | LLM-Begründung |
 | `created_at` | TEXT | ISO-8601 |
@@ -47,15 +47,15 @@ Pending Auto-Projekt-Vorschläge mit mittlerer LLM-Confidence (`[NEXUS_LINK_CONF
 |---|---|---|
 | `POST` | `/links` | Manuelle Verknüpfung anlegen. `created_by` wird **Server-seitig auf `"user"` gezwungen** (SM-B-002). |
 | `DELETE` | `/links/{id}` | Verknüpfung löschen. Returns 204. |
-| `GET` | `/braindump/{id}/links` | `{outgoing: [Link...], incoming: [Link...]}` für einen BrainDump. |
+| `GET` | `/spark/{id}/links` | `{outgoing: [Link...], incoming: [Link...]}` für einen Spark. |
 | `GET` | `/projects/{id}/links` | Dito für ein Projekt. |
-| `GET` | `/projects/suggestions` | Pending Auto-Vorschläge mit Members als Array von BrainDump-IDs. |
-| `POST` | `/projects/suggestions/{id}/accept` | Erstellt Projekt + verknüpft Member-BrainDumps. Response enthält `linked_braindumps`, `requested_braindumps`, `partial` (true bei assign-Failures). |
+| `GET` | `/projects/suggestions` | Pending Auto-Vorschläge mit Members als Array von Spark-IDs. |
+| `POST` | `/projects/suggestions/{id}/accept` | Erstellt Projekt + verknüpft Member-Sparks. Response enthält `linked_sparks`, `requested_sparks`, `partial` (true bei assign-Failures). |
 | `POST` | `/projects/suggestions/{id}/dismiss` | Setzt Status auf `dismissed`. Returns 204. |
 
 ### Validierung
 
-- `source_type`/`target_type` müssen `'braindump'` oder `'project'` sein → 400 "source_type/target_type muss 'braindump' oder 'project' sein".
+- `source_type`/`target_type` müssen `'spark'` oder `'project'` sein → 400 "source_type/target_type muss 'spark' oder 'project' sein".
 - `accept` bei nicht-pendenter Suggestion → 400 "Suggestion ist nicht mehr pending".
 - Suggestion nicht gefunden → 404 "suggestion nicht gefunden".
 
@@ -83,12 +83,12 @@ Andere 7 Provider (gemini, openai, mistral, groq, deepseek, openrouter, zai) erb
 
 ```
 Du analysierst Verknüpfungen zwischen Notizen.
-Gegeben ist ein Quell-Text und eine Liste von Kandidaten-Knoten (BrainDumps/Projekte).
+Gegeben ist ein Quell-Text und eine Liste von Kandidaten-Knoten (Sparks/Projekte).
 Gib eine Liste von Verknüpfungen zurück, die thematisch sinnvoll sind.
 Antworte AUSSCHLIESSLICH mit validem JSON-Array:
 [
   {
-    "target_type": "braindump" | "project",
+    "target_type": "spark" | "project",
     "target_id": "<id aus Kandidatenliste>",
     "relation": "related" | "mentions",
     "confidence": <0.0-1.0>,
@@ -108,19 +108,19 @@ Der existierende Recategorize-Task in `core/src/main.rs` führt jeden Cycle (def
 
 ### Schritt 1 — `extract_links_for_recent`
 
-- Lädt die `n=10` neuesten BrainDumps **ohne LLM-Source-Link** (`WHERE NOT EXISTS l.created_by='llm'`).
-- Sammelt Kontext: alle Projekte (max. 50) + die letzten 30 BrainDumps als `NodeRef`-Kandidaten.
-- Ruft `llm.extract_links(source_text, candidates)` pro BrainDump.
+- Lädt die `n=10` neuesten Sparks **ohne LLM-Source-Link** (`WHERE NOT EXISTS l.created_by='llm'`).
+- Sammelt Kontext: alle Projekte (max. 50) + die letzten 30 Sparks als `NodeRef`-Kandidaten.
+- Ruft `llm.extract_links(source_text, candidates)` pro Spark.
 - Persistiert nur Suggestions mit `confidence >= NEXUS_LINK_CONFIDENCE_MIN` (default 0.7).
-- **Sentinel-Marker (SM-B-001):** Bei `Ok(...)` mit 0 geschriebenen Links wird ein Selbst-Link `(source_id=target_id=bd.id, relation='noop-marker', confidence=0.0, created_by='llm')` geschrieben. Damit greift der NOT-EXISTS-Filter beim nächsten Cycle und der BrainDump wird nicht endlos re-queried (Cost-Schutz bei Claude-API). Bei `Err(...)` wird **kein** Sentinel geschrieben — temporäre LLM-Fehler dürfen retryen.
+- **Sentinel-Marker (SM-B-001):** Bei `Ok(...)` mit 0 geschriebenen Links wird ein Selbst-Link `(source_id=target_id=bd.id, relation='noop-marker', confidence=0.0, created_by='llm')` geschrieben. Damit greift der NOT-EXISTS-Filter beim nächsten Cycle und der Spark wird nicht endlos re-queried (Cost-Schutz bei Claude-API). Bei `Err(...)` wird **kein** Sentinel geschrieben — temporäre LLM-Fehler dürfen retryen.
 
 ### Schritt 2 — `suggest_auto_projects` (alle N Cycles)
 
 - Default `N=6` (~30 Min, env `NEXUS_AUTO_PROJECT_INTERVAL_CYCLES`).
-- Lädt die 20 neuesten BrainDumps mit Category `Random|Unsorted|NULL`.
+- Lädt die 20 neuesten Sparks mit Category `Random|Unsorted|NULL`.
 - Wenn ≥ 3 Einträge: `llm.suggest_projects(entries)` für Cluster-Vorschläge.
 - Confidence-Branching:
-  - `>= NEXUS_AUTO_PROJECT_CONFIDENCE_MIN` (default 0.8) → **direkt** Projekt erstellen + Member-BrainDumps assignen
+  - `>= NEXUS_AUTO_PROJECT_CONFIDENCE_MIN` (default 0.8) → **direkt** Projekt erstellen + Member-Sparks assignen
   - `>= NEXUS_LINK_CONFIDENCE_MIN` (in diesem Code-Pfad default 0.5) und `< auto_min` → in `project_suggestions` persistieren (User-Approval via Banner)
   - darunter → silent gedropt mit `tracing::debug!`-Trace + `stats.dropped += 1`
 
@@ -135,8 +135,8 @@ TCP-Probe auf `127.0.0.1:port` vor Server-Start verhindert Doppelstart (JJ-Sprin
 ## Frontend (Phase U Desktop)
 
 `desktop/src/index.html`:
-- BrainDump-Tabelle: Zeile clickable → `bdDetailModal` mit Volltext, Tags, Summary, **"Verknüpft mit"-Section**.
-- Wikilinks 📁 für Projects, 📝 für BrainDumps; Klick navigiert (Modal re-open bei BrainDump, Tab-Switch bei Project).
+- Spark-Tabelle: Zeile clickable → `bdDetailModal` mit Volltext, Tags, Summary, **"Verknüpft mit"-Section**.
+- Wikilinks 📁 für Projects, 📝 für Sparks; Klick navigiert (Modal re-open bei Spark, Tab-Switch bei Project).
 - Sentinel-Marker werden im Filter `(relation === 'noop-marker' && created_by === 'llm')` aus der UI entfernt.
 - Projects-Tab: `#suggestionsBanner` über der Card-Grid mit pro Suggestion Confidence-Badge, Member-Count, Übernehmen/Verwerfen-Buttons.
 - `partial`-Response-Flag wird im suggestion-Variant-Banner mit 6s Auto-Hide kommuniziert.
@@ -151,7 +151,7 @@ TCP-Probe auf `127.0.0.1:port` vor Server-Start verhindert Doppelstart (JJ-Sprin
 - Cascade in dieselbe Transaktion einbauen (`delete_for_node_in_tx(tx)` als parallele Funktion in `links.rs`)
 - Background-Cleanup-Task für Orphans (separat scheduled)
 
-`delete_braindump` hat dieselbe Charakteristik (kein TX überhaupt).
+`delete_spark` hat dieselbe Charakteristik (kein TX überhaupt).
 
 ### Provider-Coverage
 
@@ -159,7 +159,7 @@ TCP-Probe auf `127.0.0.1:port` vor Server-Start verhindert Doppelstart (JJ-Sprin
 
 ### Performance
 
-`wikiLabelFor` im Frontend macht O(n) `Array.find` pro Link. Bei aktueller Skala (< 100 BrainDumps) vernachlässigbar; ab Vault-Sprint mit größerem Datenvolumen Map-Caching einbauen.
+`wikiLabelFor` im Frontend macht O(n) `Array.find` pro Link. Bei aktueller Skala (< 100 Sparks) vernachlässigbar; ab Vault-Sprint mit größerem Datenvolumen Map-Caching einbauen.
 
 ## env-Variablen
 

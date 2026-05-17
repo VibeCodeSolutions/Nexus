@@ -59,7 +59,7 @@ UI_SPEC §3 Shell ist desktop-spezifisch (Sidebar 220px). Mobile soll laut UI_SP
 | Quick-Action-Button (40×40 rund) | `FilledTonalIconButton` mit `CircleShape` |
 | Alert-Card | `Card` mit `colors=warning-tinted`, Icon + Text + TrailingIcon, `Modifier.clickable` |
 | Overview-Card (2×2-Grid) | `LazyVerticalGrid(columns=Fixed(2))` mit `Card`s, Count groß + Icon + uppercase Label |
-| Entry-Card (Braindump/Task) | `Card` mit Header (Badge + Date + ⋮), Body, Footer-Link |
+| Entry-Card (Spark/Task) | `Card` mit Header (Badge + Date + ⋮), Body, Footer-Link |
 | Filter-Pill (segmented) | `FilterChip` row, `selected=primary-bg/white-text` |
 | Detail-Panel (Bottom-Sheet) | `ModalBottomSheet` — UI_SPEC §4.8: max-height 68vh |
 | CTA → FAB | `ExtendedFloatingActionButton` bottom-end, `shape=Pill` |
@@ -69,13 +69,13 @@ UI_SPEC §3 Shell ist desktop-spezifisch (Sidebar 220px). Mobile soll laut UI_SP
 Aus M2 (Dashboard) — gibt es auf Android bisher nicht:
 - **DashboardScreen** als Startroute statt der bisherigen Default-Route
   - Greeting + Status
-  - Alert-Card für Unsorted-Braindumps (Endpoint `GET /braindump/unsorted/count`)
-  - 4 Quick-Actions (Braindumps / Neue Aufgabe / Projekte / Suche[disabled])
-  - Overview-Grid 2×2: Braindumps / Tasks (offen) / Projekte / Achievements
-- **NavBadge** auf Bottom-Nav-Item „Braindumps" mit Unsorted-Count
+  - Alert-Card für Unsorted-Sparks (Endpoint `GET /spark/unsorted/count`)
+  - 4 Quick-Actions (Sparks / Neue Aufgabe / Projekte / Suche[disabled])
+  - Overview-Grid 2×2: Sparks / Tasks (offen) / Projekte / Achievements
+- **NavBadge** auf Bottom-Nav-Item „Sparks" mit Unsorted-Count
 
-Aus M3 (Braindumps):
-- Filter-Pills oben in `BrainDumpHistoryScreen` (Alle/Arbeit/Privat/Unsortiert)
+Aus M3 (Sparks):
+- Filter-Pills oben in `SparkHistoryScreen` (Alle/Arbeit/Privat/Unsortiert)
 - Detail-View als `ModalBottomSheet` statt eigener Screen (Spec §4.8)
 
 Aus M4 (Tasks):
@@ -85,18 +85,18 @@ Aus M4 (Tasks):
 
 ## Neuer Core-Endpoint (Backend ist schon merged)
 
-`GET /braindump/ideas` — liefert alle Braindumps mit `category='Idea'` + ihre `project_id` (Nullable). Wird auf Desktop für die Ideen-Chips auf Projektkarten genutzt. Android kann optional die Ideen-Liste auf `ProjectsScreen` einbauen.
+`GET /spark/ideas` — liefert alle Sparks mit `category='Idea'` + ihre `project_id` (Nullable). Wird auf Desktop für die Ideen-Chips auf Projektkarten genutzt. Android kann optional die Ideen-Liste auf `ProjectsScreen` einbauen.
 
-Außerdem: **Auto-Task-Erstellung läuft jetzt Core-seitig**. Wenn Android via `POST /braindump` einen Task-klassifizierten Eintrag schickt, legt der Core automatisch einen Task an (idempotent via `nexus_external_id=bd:{id}`). Heißt: Android muss nicht selbst nach Klassifizierung einen `POST /tasks` nachfeuern.
+Außerdem: **Auto-Task-Erstellung läuft jetzt Core-seitig**. Wenn Android via `POST /spark` einen Task-klassifizierten Eintrag schickt, legt der Core automatisch einen Task an (idempotent via `nexus_external_id=bd:{id}`). Heißt: Android muss nicht selbst nach Klassifizierung einen `POST /tasks` nachfeuern.
 
 ## DoD-Vorschlag für AS-CLI-Sprint „Nightvision Android"
 
 - [ ] Theme.kt: Drift-Farben auf UI_SPEC Dark-Werte gezogen
 - [ ] `DashboardScreen` neu, als Start-Route in `MainActivity`
 - [ ] `NavigationBar` (Bottom) ersetzt bisherige Navigation
-- [ ] `BrainDumpHistoryScreen` mit Filter-Pills + Bottom-Sheet-Detail
+- [ ] `SparkHistoryScreen` mit Filter-Pills + Bottom-Sheet-Detail
 - [ ] `TasksScreen` mit Priority-Bar-Cards + Status-Pills + Inline-Create
-- [ ] `ProjectsScreen` mit optionalen Idea-Chips (Endpoint `/braindump/ideas`)
+- [ ] `ProjectsScreen` mit optionalen Idea-Chips (Endpoint `/spark/ideas`)
 - [ ] APK build grün (`./gradlew assembleDebug`)
 - [ ] Smoke: APK installiert, Pairing klappt, Dashboard zeigt Counts, Navigation funktioniert
 - [ ] Unsorted-Badge in Bottom-Nav korrekt

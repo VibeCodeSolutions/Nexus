@@ -47,7 +47,7 @@ pub struct AppState {
     /// Sprint Nightvision NV-2: Vision-Config + Foto-Storage-Dir + Default-
     /// Provider-Name (letzterer für die Tag-Generation im Tesseract-Pfad).
     pub vision_config: Arc<config::VisionConfig>,
-    pub braindump_images_dir: Arc<std::path::PathBuf>,
+    pub spark_images_dir: Arc<std::path::PathBuf>,
     pub default_provider_name: Arc<String>,
 }
 
@@ -152,13 +152,13 @@ async fn main() {
                 started_at: std::time::Instant::now(),
                 obsidian_sync_lock: Arc::new(tokio::sync::Mutex::new(())),
                 vision_config: Arc::new(config.vision.clone()),
-                braindump_images_dir: Arc::new(config.braindump_images_dir.clone()),
+                spark_images_dir: Arc::new(config.spark_images_dir.clone()),
                 default_provider_name: Arc::new(config.default_provider.clone()),
             };
 
-            // Einmalig: Tasks aus Braindumps mit category='Task' nachträglich anlegen.
-            if let Ok(n) = repo::backfill_tasks_from_braindumps(&state.pool).await {
-                if n > 0 { tracing::info!("Backfill: {n} Task(s) aus Braindumps migriert."); }
+            // Einmalig: Tasks aus Sparks mit category='Task' nachträglich anlegen.
+            if let Ok(n) = repo::backfill_tasks_from_sparks(&state.pool).await {
+                if n > 0 { tracing::info!("Backfill: {n} Task(s) aus Sparks migriert."); }
             }
 
             // Clone für Background-Recategorize-Task (Phase D / JJ-D2) — VOR with_state(state)
@@ -168,29 +168,26 @@ async fn main() {
             let app = Router::new()
                 .route("/", get(handlers::dashboard))
                 .route("/health", get(health_check))
-                .route("/braindump", post(handlers::post_braindump))
-                .route("/braindump", get(handlers::list_braindumps))
-                .route("/braindump/ideas", get(handlers::list_ideas))
-                .route("/braindump/{id}", get(handlers::get_braindump))
-                .route("/braindump/{id}", delete(handlers::delete_braindump))
-                .route("/braindump/{id}/tags", post(handlers::update_braindump_tags))
-                .route("/braindump/recategorize", post(handlers::recategorize_unsorted))
+                .route("/spark", post(handlers::post_spark))
+                .route("/spark", get(handlers::list_sparks))
+                .route("/spark/ideas", get(handlers::list_ideas))
+                .route("/spark/{id}", get(handlers::get_spark))
+                .route("/spark/{id}", delete(handlers::delete_spark))
+                .route("/spark/{id}/tags", post(handlers::update_spark_tags))
+                .route("/spark/recategorize", post(handlers::recategorize_unsorted))
                 .route("/api/user_prefs", get(handlers::list_user_prefs))
                 .route("/api/user_prefs/{key}", post(handlers::set_user_pref))
-                .route("/braindump/unsorted/count", get(handlers::unsorted_count))
+                .route("/spark/unsorted/count", get(handlers::unsorted_count))
                 .route("/projects/suggest", post(handlers::suggest_projects))
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))
                 .route("/projects/{id}", delete(handlers::delete_project))
-                .route("/projects/{id}/braindumps", get(handlers::get_project_braindumps))
+                .route("/projects/{id}/sparks", get(handlers::get_project_sparks))
                 .route("/projects/{id}/progress", get(handlers::get_project_progress))
                 .route("/tasks", post(handlers::create_task))
                 .route("/tasks", get(handlers::list_tasks))
                 .route("/tasks/{id}", put(handlers::update_task))
                 .route("/tasks/{id}", delete(handlers::delete_task))
-                .route("/stats", get(handlers::get_stats))
-                .route("/achievements", get(handlers::get_achievements))
-                .route("/xp/history", get(handlers::get_xp_history))
                 .route("/api/setup-status", get(handlers::setup_status))
                 .route("/api/onboard/set-provider", post(handlers::onboard_set_provider))
                 .route("/api/onboard/oauth", post(handlers::onboard_oauth))
@@ -205,23 +202,23 @@ async fn main() {
                 // Synaptic Mosaic Phase B
                 .route("/links", post(handlers::create_link))
                 .route("/links/{id}", delete(handlers::delete_link))
-                .route("/braindump/{id}/links", get(handlers::get_braindump_links))
+                .route("/spark/{id}/links", get(handlers::get_spark_links))
                 .route("/projects/{id}/links", get(handlers::get_project_links))
                 .route("/projects/suggestions", get(handlers::list_project_suggestions))
                 .route("/projects/suggestions/{id}/accept", post(handlers::accept_project_suggestion))
                 .route("/projects/suggestions/{id}/dismiss", post(handlers::dismiss_project_suggestion))
                 // Obsidian-Briefkasten Phase C
                 .route("/api/obsidian/sync", post(handlers::obsidian_sync))
-                // Sprint Nightvision NV-2 — Foto-Braindump (Singular-Konvention
-                // analog zu den anderen /braindump/...-Routes).
+                // Sprint Nightvision NV-2 — Foto-Spark (Singular-Konvention
+                // analog zu den anderen /spark/...-Routes).
                 .route(
-                    "/braindump/from_image",
-                    post(handlers::post_braindump_from_image)
+                    "/spark/from_image",
+                    post(handlers::post_spark_from_image)
                         .layer(axum::extract::DefaultBodyLimit::max(
                             handlers::NV_IMAGE_MAX_BYTES + 64 * 1024,
                         )),
                 )
-                .route("/api/images/{filename}", get(handlers::serve_braindump_image))
+                .route("/api/images/{filename}", get(handlers::serve_spark_image))
                 .layer(middleware::from_fn(auth::require_token))
                 .layer(
                     CorsLayer::new()
@@ -421,7 +418,7 @@ async fn run_onboard() -> Result<(), String> {
 
     if provider == "obsidian" {
         println!(
-            "ℹ️  Obsidian-Briefkasten: Nexus schreibt BrainDumps als Markdown-Dateien\n   in <Vault>/Nexus/Inbox/. Ein Vault-seitiges Sortier-Skill erzeugt\n   Outbox-Dateien, die Nexus per `POST /api/obsidian/sync` zurückzieht.\n"
+            "ℹ️  Obsidian-Briefkasten: Nexus schreibt Sparks als Markdown-Dateien\n   in <Vault>/Nexus/Inbox/. Ein Vault-seitiges Sortier-Skill erzeugt\n   Outbox-Dateien, die Nexus per `POST /api/obsidian/sync` zurückzieht.\n"
         );
         let vault_input: String = Input::with_theme(&ColorfulTheme::default())
             .with_prompt("Absoluter Pfad zum Obsidian-Vault")

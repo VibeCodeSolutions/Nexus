@@ -1,6 +1,6 @@
 //! Inbox-Writer für den Obsidian-Briefkasten.
 //!
-//! Schreibt eine BrainDump-Aufzeichnung als Markdown-Datei in
+//! Schreibt eine Spark-Aufzeichnung als Markdown-Datei in
 //! `<vault>/Nexus/Inbox/<inbox_id>.md`. Atomic (tmp-File + rename), legt
 //! das Ziel-Verzeichnis mit `mkdir -p`-Semantik an.
 //!
@@ -14,7 +14,7 @@ use uuid::Uuid;
 use super::frontmatter::{build_inbox_file, InboxFrontmatter, DEFAULT_INBOX_INSTRUCTIONS};
 
 /// Erfolgreiches Write-Ergebnis. `inbox_id` landet in der DB-Spalte
-/// `braindumps.nexus_inbox_id`, `path` ist der absolute Pfad zur Datei
+/// `sparks.nexus_inbox_id`, `path` ist der absolute Pfad zur Datei
 /// (für Tests/Debug-Logs).
 #[derive(Debug, Clone)]
 pub struct InboxWrite {
@@ -26,14 +26,14 @@ pub struct InboxWrite {
     pub path: PathBuf,
 }
 
-/// Schreibt einen BrainDump in die Inbox des angegebenen Vaults.
+/// Schreibt einen Spark in die Inbox des angegebenen Vaults.
 ///
 /// `vault_path` muss der Vault-Root sein (NICHT das Inbox-Subverzeichnis) —
 /// die `Nexus/Inbox`-Hierarchie wird hier erzeugt.
 ///
 /// Die `inbox_id` wird hier generiert (UUID v4). Sie muss vom Aufrufer in
-/// der DB-Row `braindumps.nexus_inbox_id` persistiert werden, damit Phase C
-/// Outbox-Files dem ursprünglichen BrainDump zuordnen kann.
+/// der DB-Row `sparks.nexus_inbox_id` persistiert werden, damit Phase C
+/// Outbox-Files dem ursprünglichen Spark zuordnen kann.
 pub fn write_inbox(vault_path: &Path, body: &str) -> Result<InboxWrite, String> {
     let inbox_dir = vault_path.join(crate::config::Config::INBOX_SUBDIR);
     std::fs::create_dir_all(&inbox_dir)
@@ -82,12 +82,12 @@ mod tests {
     #[test]
     fn write_inbox_creates_inbox_dir_and_file() {
         let tmp = TempDir::new().unwrap();
-        let result = write_inbox(tmp.path(), "BrainDump-Inhalt").expect("write must succeed");
+        let result = write_inbox(tmp.path(), "Spark-Inhalt").expect("write must succeed");
         assert!(result.path.exists(), "file must exist on disk");
         assert!(result.path.starts_with(tmp.path().join("Nexus/Inbox")));
         let content = fs::read_to_string(&result.path).unwrap();
         assert!(content.contains(&format!("nexus_inbox_id: {}", result.inbox_id)));
-        assert!(content.contains("BrainDump-Inhalt"));
+        assert!(content.contains("Spark-Inhalt"));
     }
 
     #[test]

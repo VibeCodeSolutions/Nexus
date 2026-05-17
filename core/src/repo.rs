@@ -285,12 +285,36 @@ pub async fn delete_task(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error>
 }
 
 pub async fn delete_braindump(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
+    // Sprint Nightvision NV2-001: Bei Foto-Braindumps das zugehörige Image-File
+    // mitlöschen, damit `braindump_images_dir` nicht mit Waisen vollläuft.
+    // image_path *vor* dem DB-Delete lesen — danach ist die Row weg.
+    let image_path: Option<String> = sqlx::query_scalar(
+        "SELECT image_path FROM braindumps WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .flatten();
+
     sqlx::query("DELETE FROM braindumps WHERE id = ?")
         .bind(id)
         .execute(pool)
         .await?;
     // SM-PR-005: polymorphe Links cleanup nach Delete (kein FK in SQLite)
     let _ = crate::links::delete_for_node(pool, "braindump", id).await?;
+
+    // File-Unlink ist Best-Effort: Fehler werden nur geloggt, weil die
+    // DB-Konsistenz (Row weg) wichtiger ist als der Filesystem-Cleanup.
+    // Spätestens ein Sweep-Job kann Restwaisen aufräumen.
+    if let Some(path) = image_path {
+        if !path.is_empty() {
+            if let Err(e) = tokio::fs::remove_file(&path).await {
+                tracing::warn!(
+                    "delete_braindump {id}: image_path={path} konnte nicht entfernt werden: {e}"
+                );
+            }
+        }
+    }
     Ok(())
 }
 

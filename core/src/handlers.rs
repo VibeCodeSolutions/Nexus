@@ -1,14 +1,17 @@
-use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
-use axum::response::{Html, Json};
+use axum::extract::{Multipart, Path, Query, State};
+use axum::http::{header, StatusCode};
+use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::{Html, IntoResponse, Json, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::convert::Infallible;
 
 use crate::config::Config;
 use crate::links::{self, LinkInput};
 use crate::llm::{LlmProvider, NodeRef, ProjectSuggestion};
 use crate::repo;
 use crate::suggestions::{self, ProjectSuggestionInput};
+use crate::vision;
 use crate::AppState;
 use sqlx::SqlitePool;
 
@@ -1106,6 +1109,589 @@ pub async fn diag_list(
     Ok(Json(reports))
 }
 
+// =============================================================================
+// Sprint Nightvision NV-2 — Foto-Braindump-Endpoint
+// =============================================================================
+
+/// Hard limit für Multipart-Bildgröße (10 MB). Größere Uploads werden mit
+/// 413 PAYLOAD_TOO_LARGE abgewiesen, bevor der Resize-Step überhaupt startet.
+/// `pub`, weil `main.rs` denselben Wert als axum-`DefaultBodyLimit`-Argument
+/// braucht — die zwei Limits müssen synchron bleiben, sonst sieht der User
+/// einen Framework-Fehler statt unserer Begrüßungs-Meldung.
+pub const NV_IMAGE_MAX_BYTES: usize = 10 * 1024 * 1024;
+
+/// Pause zwischen synthetischen OCR-Zeilen-Frames (visueller „Streaming"-
+/// Effekt im UI, da die LLM-Antwort als Block zurückkommt). 80 ms entspricht
+/// einer ruhigen Lese-Kadenz — schnell genug, um beim Smartphone-OCR-Flow
+/// nicht zu nerven, langsam genug, um den Streaming-Effekt sichtbar zu machen.
+const NV_LINE_FRAME_PAUSE_MS: u64 = 80;
+
+/// Internes Frame-Format zwischen Pipeline-Task und SSE-Stream. Wir benutzen
+/// kein direktes [`axum::response::sse::Event`], damit Tests die Frames
+/// inspizieren können — `Event` ist intern opaque.
+#[derive(Debug, Clone)]
+pub(crate) enum PipelineFrame {
+    Line(String),
+    Tags(Vec<String>),
+    Done {
+        braindump_id: String,
+        image_url: String,
+        text_line_count: usize,
+        tag_count: usize,
+    },
+    Error {
+        stage: &'static str,
+        message: String,
+    },
+}
+
+impl PipelineFrame {
+    fn to_sse_event(&self) -> Event {
+        match self {
+            PipelineFrame::Line(text) => Event::default()
+                .event("line")
+                .json_data(json!({ "text": text }))
+                .unwrap_or_else(|_| Event::default().event("line").data(text.clone())),
+            PipelineFrame::Tags(tags) => Event::default()
+                .event("tags")
+                .json_data(json!({ "tags": tags }))
+                .unwrap_or_else(|_| Event::default().event("tags").data("[]")),
+            PipelineFrame::Done {
+                braindump_id,
+                image_url,
+                text_line_count,
+                tag_count,
+            } => Event::default()
+                .event("done")
+                .json_data(json!({
+                    "braindump_id": braindump_id,
+                    "image_url": image_url,
+                    "text_line_count": text_line_count,
+                    "tag_count": tag_count,
+                }))
+                .unwrap_or_else(|_| Event::default().event("done").data(braindump_id.clone())),
+            PipelineFrame::Error { stage, message } => Event::default()
+                .event("error")
+                .json_data(json!({ "stage": stage, "message": message }))
+                .unwrap_or_else(|_| Event::default().event("error").data(message.clone())),
+        }
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn event_name(&self) -> &'static str {
+        match self {
+            PipelineFrame::Line(_) => "line",
+            PipelineFrame::Tags(_) => "tags",
+            PipelineFrame::Done { .. } => "done",
+            PipelineFrame::Error { .. } => "error",
+        }
+    }
+}
+
+/// `POST /braindump/from_image` — Multipart-Upload eines Fotos, das durch
+/// die Vision-Pipeline (Groq → Tesseract-Fallback) gejagt wird. Antwortet
+/// als Server-Sent-Events-Stream mit Frame-Sequenz:
+///
+/// * `event: line, data: {"text": "<Zeile>"}` — pro OCR-Zeile
+/// * `event: tags, data: {"tags": ["<TAG>", ...]}` — KI-Vorschläge
+/// * `event: done, data: {"braindump_id": "...", "image_url": "/api/images/..."}` — persistiert
+/// * `event: error, data: {"message": "<grund>"}` — Pipeline gescheitert
+///
+/// Multipart-Felder:
+/// * `image` (pflicht): Bild-Bytes (jpeg/png), max [`NV_IMAGE_MAX_BYTES`]
+/// * `note`  (optional): zusätzliche Textnotiz, wird dem `raw_text` vorangestellt
+pub async fn post_braindump_from_image(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<Response, (StatusCode, String)> {
+    if !state.vision_config.enabled {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Vision-Analyse ist deaktiviert. Aktivieren via Settings (Kamera-Analyse).".into(),
+        ));
+    }
+
+    let mut image_bytes: Option<Vec<u8>> = None;
+    let mut note: Option<String> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Multipart-Fehler: {e}")))?
+    {
+        match field.name().unwrap_or("") {
+            "image" => {
+                let bytes = field
+                    .bytes()
+                    .await
+                    .map_err(|e| (StatusCode::BAD_REQUEST, format!("Bild-Read-Fehler: {e}")))?;
+                if bytes.len() > NV_IMAGE_MAX_BYTES {
+                    return Err((
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        format!(
+                            "Bild zu groß: {} Bytes (Limit {} Bytes).",
+                            bytes.len(),
+                            NV_IMAGE_MAX_BYTES
+                        ),
+                    ));
+                }
+                image_bytes = Some(bytes.to_vec());
+            }
+            "note" => {
+                note = field
+                    .text()
+                    .await
+                    .map_err(|e| (StatusCode::BAD_REQUEST, format!("Note-Read-Fehler: {e}")))
+                    .ok()
+                    .filter(|s| !s.trim().is_empty());
+            }
+            _ => {
+                // Unbekannte Felder ignorieren — Forward-Compat.
+            }
+        }
+    }
+
+    let image_bytes = image_bytes.ok_or((
+        StatusCode::BAD_REQUEST,
+        "Feld `image` fehlt im Multipart-Body.".to_string(),
+    ))?;
+
+    // Resize + Re-Encoding synchron (CPU-bound, aber für 10 MB Bilder < 200 ms
+    // auf typischem Laptop — kein spawn_blocking nötig).
+    let prepared = vision::resize::prepare_image(&image_bytes)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+
+    // Bild persistieren, *bevor* Vision-Call startet — damit das Bild auch dann
+    // verfügbar ist, wenn der Provider-Call fehlschlägt und der User es manuell
+    // erneut probieren will.
+    let image_id = uuid::Uuid::new_v4().to_string();
+    let images_dir = (*state.braindump_images_dir).clone();
+    tokio::fs::create_dir_all(&images_dir).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("braindump_images-Dir nicht anlegbar: {e}"),
+        )
+    })?;
+    let image_filename = format!("{image_id}.jpg");
+    let image_path = images_dir.join(&image_filename);
+    tokio::fs::write(&image_path, &prepared.bytes)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Bild konnte nicht persistiert werden: {e}"),
+            )
+        })?;
+
+    // Channel für PipelineFrames. Buffer 16 reicht für eine Zeile-pro-Tick-
+    // Kadenz, ohne dem analyze-Task einen Backpressure-Stall einzuhandeln.
+    let (tx, rx) = tokio::sync::mpsc::channel::<PipelineFrame>(16);
+
+    // Vision-Provider beim Request-Handling instanziieren (nicht im
+    // Background-Task), damit der Test-Pfad einen Mock injizieren kann.
+    let (vision_provider, vision_err) =
+        match vision::create_vision_provider(&state.vision_config) {
+            Ok(p) => (Some(p), None),
+            Err(reason) => (None, Some(reason)),
+        };
+
+    let state_for_task = state.clone();
+    let image_path_for_task = image_path.clone();
+    let image_filename_for_task = image_filename.clone();
+    let prepared_mime = prepared.mime.to_string();
+    let prepared_bytes = prepared.bytes;
+
+    tokio::spawn(async move {
+        run_photo_braindump_pipeline(
+            state_for_task,
+            prepared_bytes,
+            prepared_mime,
+            image_path_for_task,
+            image_filename_for_task,
+            note,
+            vision_provider,
+            vision_err,
+            tx,
+        )
+        .await;
+    });
+
+    use tokio_stream::{wrappers::ReceiverStream, StreamExt};
+    let stream = ReceiverStream::new(rx)
+        .map(|frame| Ok::<Event, Infallible>(frame.to_sse_event()));
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()).into_response())
+}
+
+/// Background-Task: ruft die Vision-Pipeline auf, streamt Frames in den
+/// Channel, und persistiert den fertigen Braindump in der DB. Fehler werden
+/// als `error`-Frame durchgereicht (kein Panic — der Stream-Reader sieht
+/// den Frame und kann die UI entsprechend updaten).
+async fn run_photo_braindump_pipeline(
+    state: AppState,
+    image_bytes: Vec<u8>,
+    mime: String,
+    image_path: std::path::PathBuf,
+    image_filename: String,
+    note: Option<String>,
+    vision_provider: Option<Box<dyn vision::VisionProvider>>,
+    vision_err: Option<String>,
+    tx: tokio::sync::mpsc::Sender<PipelineFrame>,
+) {
+    let analysis_result = vision::analyze_with_provider(
+        vision_provider.as_deref(),
+        vision_err,
+        state.vision_config.tesseract_enabled,
+        &image_bytes,
+        &mime,
+        &state.default_provider_name,
+    )
+    .await;
+
+    match analysis_result {
+        Ok(analysis) => {
+            for line in &analysis.text_lines {
+                if tx.send(PipelineFrame::Line(line.clone())).await.is_err() {
+                    return; // Client hat disconnected — Task einstellen.
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(NV_LINE_FRAME_PAUSE_MS))
+                    .await;
+            }
+
+            let _ = tx
+                .send(PipelineFrame::Tags(analysis.suggested_tags.clone()))
+                .await;
+
+            // Braindump persistieren. `raw_text` = optionale Note + OCR-Zeilen
+            // (zwei Zeilenumbrüche dazwischen, falls beides vorhanden). Tags als
+            // JSON-Array, Source = 'photo', image_path = absoluter Pfad zur
+            // gespeicherten JPEG.
+            let body = match (note.as_deref(), analysis.text_lines.is_empty()) {
+                (Some(n), false) => format!("{n}\n\n{}", analysis.text_lines.join("\n")),
+                (Some(n), true) => n.to_string(),
+                (None, _) => analysis.text_lines.join("\n"),
+            };
+            let braindump_id = uuid::Uuid::new_v4().to_string();
+            let tags_json = serde_json::to_string(&analysis.suggested_tags)
+                .unwrap_or_else(|_| "[]".to_string());
+
+            let insert = sqlx::query(
+                "INSERT INTO braindumps (id, raw_text, source, image_path, tags_json) \
+                 VALUES (?, ?, 'photo', ?, ?)",
+            )
+            .bind(&braindump_id)
+            .bind(&body)
+            .bind(image_path.to_string_lossy().as_ref())
+            .bind(&tags_json)
+            .execute(&state.pool)
+            .await;
+
+            match insert {
+                Ok(_) => {
+                    let _ = tx
+                        .send(PipelineFrame::Done {
+                            braindump_id,
+                            image_url: format!("/api/images/{image_filename}"),
+                            text_line_count: analysis.text_lines.len(),
+                            tag_count: analysis.suggested_tags.len(),
+                        })
+                        .await;
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(PipelineFrame::Error {
+                            stage: "persist",
+                            message: format!("DB-Insert fehlgeschlagen: {e}"),
+                        })
+                        .await;
+                }
+            }
+        }
+        Err(e) => {
+            let _ = tx
+                .send(PipelineFrame::Error {
+                    stage: "analyze",
+                    message: e.to_string(),
+                })
+                .await;
+        }
+    }
+}
+
+/// `GET /api/images/:filename` — statisches Routing für gespeicherte
+/// Foto-Braindump-Bilder. Whitelist erlaubt nur reine `<uuid>.jpg`-Filenames,
+/// damit Path-Traversal-Versuche (`../`, absolute Pfade, alternative Mime-
+/// Endungen) im Bound landen.
+pub async fn serve_braindump_image(
+    State(state): State<AppState>,
+    Path(filename): Path<String>,
+) -> Result<Response, (StatusCode, String)> {
+    if !is_safe_image_filename(&filename) {
+        return Err((StatusCode::BAD_REQUEST, "Ungültiger Dateiname.".into()));
+    }
+    let path = state.braindump_images_dir.join(&filename);
+    let bytes = tokio::fs::read(&path).await.map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => (StatusCode::NOT_FOUND, "Bild nicht gefunden.".into()),
+        _ => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Bild-Read-Fehler: {e}"),
+        ),
+    })?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, "image/jpeg"),
+            // Foto-Braindumps sind unveränderlich (UUID-Filename), daher
+            // dürfen Clients großzügig cachen. 1 h reicht für UI-Refreshs
+            // ohne Risiko eines stale Bildes.
+            (header::CACHE_CONTROL, "public, max-age=3600"),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+/// Pflicht-Filter für [`serve_braindump_image`]: nur `<hex/uuid>.jpg`-Namen
+/// (`a-z0-9-`) in Lower-Case mit fester Extension durchlassen.
+fn is_safe_image_filename(name: &str) -> bool {
+    let Some((stem, ext)) = name.rsplit_once('.') else {
+        return false;
+    };
+    if ext != "jpg" {
+        return false;
+    }
+    if stem.is_empty() || stem.len() > 64 {
+        return false;
+    }
+    stem.chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+#[cfg(test)]
+mod nv_photo_braindump_tests {
+    use super::*;
+    use crate::db;
+    use crate::llm::NoOpProvider;
+    use crate::vision::{VisionAnalysis, VisionProvider};
+    use async_trait::async_trait;
+    use std::sync::Arc;
+
+    #[test]
+    fn safe_filename_accepts_uuids() {
+        assert!(is_safe_image_filename(
+            "00112233-4455-6677-8899-aabbccddeeff.jpg"
+        ));
+        assert!(is_safe_image_filename("abcdef0123.jpg"));
+    }
+
+    #[test]
+    fn safe_filename_rejects_traversal_and_alt_ext() {
+        assert!(!is_safe_image_filename("../etc/passwd"));
+        assert!(!is_safe_image_filename("foo.png"));
+        assert!(!is_safe_image_filename("foo.jpg.exe"));
+        assert!(!is_safe_image_filename("FOO.jpg")); // upper-case raus
+        assert!(!is_safe_image_filename("foo/bar.jpg"));
+        assert!(!is_safe_image_filename(""));
+        assert!(!is_safe_image_filename(".jpg"));
+    }
+
+    /// Mock-VisionProvider mit injizierbarer Antwort. Repliziert das Pattern
+    /// aus `vision::tests::MockVisionProvider`, weil mod-private Items nicht
+    /// hierhin sichtbar sind.
+    struct MockVision {
+        analysis: VisionAnalysis,
+    }
+
+    #[async_trait]
+    impl VisionProvider for MockVision {
+        async fn analyze_image(
+            &self,
+            _image_bytes: &[u8],
+            _mime: &str,
+        ) -> Result<VisionAnalysis, String> {
+            Ok(self.analysis.clone())
+        }
+    }
+
+    fn make_state_with_images_dir(pool: SqlitePool, images_dir: std::path::PathBuf) -> AppState {
+        AppState {
+            pool,
+            llm: Arc::new(NoOpProvider) as Arc<dyn LlmProvider>,
+            started_at: std::time::Instant::now(),
+            obsidian_sync_lock: Arc::new(tokio::sync::Mutex::new(())),
+            vision_config: Arc::new(crate::config::VisionConfig {
+                enabled: true,
+                provider: "groq".into(),
+                model: None,
+                tesseract_enabled: false,
+            }),
+            braindump_images_dir: Arc::new(images_dir),
+            default_provider_name: Arc::new("noop".into()),
+        }
+    }
+
+    /// Konsumiert alle Frames aus dem Channel bis zum natürlichen Ende
+    /// (Sender gedroppt) oder bis nach einem `done`/`error`-Frame.
+    async fn drain_frames(
+        mut rx: tokio::sync::mpsc::Receiver<PipelineFrame>,
+    ) -> Vec<PipelineFrame> {
+        let mut out = Vec::new();
+        while let Some(frame) = rx.recv().await {
+            let terminal = matches!(
+                frame,
+                PipelineFrame::Done { .. } | PipelineFrame::Error { .. }
+            );
+            out.push(frame);
+            if terminal {
+                break;
+            }
+        }
+        out
+    }
+
+    #[tokio::test]
+    async fn pipeline_streams_lines_tags_done_and_persists_braindump() {
+        let pool = db::init_in_memory().await.expect("in-memory db");
+        let tmp_images = tempfile::tempdir().expect("tempdir");
+        let state = make_state_with_images_dir(pool.clone(), tmp_images.path().to_path_buf());
+
+        let mock = MockVision {
+            analysis: VisionAnalysis {
+                text_lines: vec![
+                    "Sprint Planning".into(),
+                    "Mustafa → USB-Stick".into(),
+                    "Demo Freitag 14h".into(),
+                ],
+                suggested_tags: vec!["MEETING".into(), "USB".into()],
+            },
+        };
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<PipelineFrame>(16);
+
+        let images_dir = (*state.braindump_images_dir).clone();
+        let image_filename = "test-photo.jpg".to_string();
+        let image_path = images_dir.join(&image_filename);
+        std::fs::create_dir_all(&images_dir).expect("mkdir images");
+        std::fs::write(&image_path, b"fake-jpeg-bytes").expect("write image");
+
+        let task = tokio::spawn(run_photo_braindump_pipeline(
+            state.clone(),
+            b"fake-jpeg-bytes".to_vec(),
+            "image/jpeg".to_string(),
+            image_path,
+            image_filename.clone(),
+            Some("Sprint-Notiz".into()),
+            Some(Box::new(mock) as Box<dyn VisionProvider>),
+            None,
+            tx,
+        ));
+
+        let frames = drain_frames(rx).await;
+        task.await.expect("pipeline-task done");
+
+        // Sequenz: 3× line, 1× tags, 1× done.
+        let names: Vec<&str> = frames.iter().map(|f| f.event_name()).collect();
+        assert_eq!(names, vec!["line", "line", "line", "tags", "done"]);
+
+        match &frames[0] {
+            PipelineFrame::Line(t) => assert_eq!(t, "Sprint Planning"),
+            _ => panic!("frame 0 should be line"),
+        }
+        match &frames[3] {
+            PipelineFrame::Tags(t) => assert_eq!(t, &vec!["MEETING".to_string(), "USB".into()]),
+            _ => panic!("frame 3 should be tags"),
+        }
+        match &frames[4] {
+            PipelineFrame::Done {
+                braindump_id,
+                image_url,
+                text_line_count,
+                tag_count,
+            } => {
+                assert!(!braindump_id.is_empty());
+                assert!(image_url.ends_with(&image_filename));
+                assert_eq!(*text_line_count, 3);
+                assert_eq!(*tag_count, 2);
+            }
+            _ => panic!("frame 4 should be done"),
+        }
+
+        // DB-Persistierung verifizieren.
+        let row: (String, String, Option<String>, String) = sqlx::query_as(
+            "SELECT raw_text, source, image_path, tags_json FROM braindumps LIMIT 1",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("braindump row");
+        assert_eq!(row.1, "photo");
+        assert!(row.0.starts_with("Sprint-Notiz"));
+        assert!(row.0.contains("Sprint Planning"));
+        assert!(row.2.unwrap().ends_with(".jpg"));
+        assert!(row.3.contains("MEETING"));
+    }
+
+    #[tokio::test]
+    async fn pipeline_emits_error_frame_when_provider_unavailable_and_no_fallback() {
+        let pool = db::init_in_memory().await.expect("in-memory db");
+        let tmp_images = tempfile::tempdir().expect("tempdir");
+        let state = make_state_with_images_dir(pool.clone(), tmp_images.path().to_path_buf());
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<PipelineFrame>(8);
+
+        let task = tokio::spawn(run_photo_braindump_pipeline(
+            state.clone(),
+            b"x".to_vec(),
+            "image/jpeg".to_string(),
+            tmp_images.path().join("nope.jpg"),
+            "nope.jpg".to_string(),
+            None,
+            None,
+            Some("kein API-Key konfiguriert".into()),
+            tx,
+        ));
+
+        let frames = drain_frames(rx).await;
+        task.await.expect("pipeline done");
+
+        assert_eq!(frames.len(), 1);
+        match &frames[0] {
+            PipelineFrame::Error { stage, message } => {
+                assert_eq!(*stage, "analyze");
+                assert!(message.contains("kein API-Key"));
+            }
+            other => panic!("expected error frame, got {other:?}"),
+        }
+
+        // Keine Braindump-Persistenz bei Vision-Fehler.
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM braindumps")
+            .fetch_one(&pool)
+            .await
+            .expect("count");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn frame_to_sse_event_does_not_panic_for_any_variant() {
+        // Verifiziert, dass alle Varianten serialisierbar sind (auch wenn
+        // json_data theoretisch fail könnte — Fallback-Pfad wird angesprochen).
+        let frames = vec![
+            PipelineFrame::Line("hello".into()),
+            PipelineFrame::Tags(vec!["A".into()]),
+            PipelineFrame::Done {
+                braindump_id: "bd-1".into(),
+                image_url: "/api/images/x.jpg".into(),
+                text_line_count: 1,
+                tag_count: 1,
+            },
+            PipelineFrame::Error {
+                stage: "test",
+                message: "boom".into(),
+            },
+        ];
+        for f in &frames {
+            let _evt = f.to_sse_event();
+        }
+    }
+}
+
 #[cfg(test)]
 mod recategorize_tests {
     use super::*;
@@ -1617,6 +2203,9 @@ mod synaptic_phase_b_tests {
             llm,
             started_at: std::time::Instant::now(),
             obsidian_sync_lock: std::sync::Arc::new(tokio::sync::Mutex::new(())),
+            vision_config: std::sync::Arc::new(crate::config::VisionConfig::default()),
+            braindump_images_dir: std::sync::Arc::new(std::env::temp_dir().join("nexus-test-images")),
+            default_provider_name: std::sync::Arc::new("noop".to_string()),
         }
     }
 

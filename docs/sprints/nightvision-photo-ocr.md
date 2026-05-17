@@ -48,12 +48,12 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
 
 ---
 
-### Sprint NV-2 — Core: Streaming-Endpoint `POST /braindumps/from_image`
+### Sprint NV-2 — Core: Streaming-Endpoint `POST /braindump/from_image`
 
 **Scope:** HTTP-Endpoint, der NV-1 ans Frontend ausliefert.
 
 **Deliverables:**
-- Handler in `core/src/handlers.rs`: `POST /braindumps/from_image` mit `multipart/form-data` (Felder: `image`, optional `note`).
+- Handler in `core/src/handlers.rs`: `POST /braindump/from_image` mit `multipart/form-data` (Felder: `image`, optional `note`).
 - Response: `text/event-stream` (SSE) mit Frame-Sequenz:
   ```
   event: line\ndata: {"text": "Sprint Planning"}
@@ -67,7 +67,7 @@ Sprints sind so geschnitten, dass ein Agent jeweils komplett durchziehen kann (I
 - Auth: bestehendes Pattern aus anderen Endpoints übernehmen.
 - Integration-Tests in `core/tests/`: Mock-Vision-Provider, vollständiger Flow, SSE-Parser-Roundtrip.
 
-**DoD:** `curl -F image=@test.jpg /braindumps/from_image` liefert SSE-Stream + persistierten Braindump. Bild abrufbar. Tuvok ✓.
+**DoD:** `curl -F image=@test.jpg /braindump/from_image` liefert SSE-Stream + persistierten Braindump. Bild abrufbar. Tuvok ✓.
 
 **Context-Schätzung:** ~30 %. Durchgängig machbar.
 

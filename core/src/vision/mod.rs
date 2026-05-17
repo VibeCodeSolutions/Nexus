@@ -1,7 +1,8 @@
-// NV-1 verdrahtet noch keine HTTP-Routen — das passiert in NV-2. Bis dahin
-// ist das gesamte Vision-Modul „API ohne Konsumenten", weshalb wir die
-// Dead-Code-Warnings auf Modul-Ebene unterdrücken.
-#![allow(dead_code, unused_assignments)]
+// Einige Symbole (resize::PreparedImage::mime-Konstante, VisionError-Varianten
+// im Test-Pfad) werden erst durch den HTTP-Handler in NV-2 voll konsumiert —
+// daher lokale Dead-Code-Toleranz. `unused_assignments` ist mit dem
+// `analyze_with_provider`-Refactor (NV1-003) nicht mehr nötig.
+#![allow(dead_code)]
 
 //! Sprint Nightvision NV-1 — Vision-LLM + OCR-Fallback für Foto-Braindumps.
 //!
@@ -93,9 +94,9 @@ impl std::error::Error for VisionError {}
 /// 3. Tesseract-Output durch [`tag_text`] für Tag-Vorschläge via bestehendem
 ///    `LlmProvider` (default-provider aus der Hauptkonfig).
 ///
-/// Der `default_llm_provider`-Param ist der Name des Text-LLMs, das für die
-/// Tag-Generation bei Tesseract-Output benutzt wird (z. B. `cfg.default_provider`
-/// aus der Hauptkonfig). Bei reinem Vision-Pfad ungenutzt.
+/// Production-Wrapper um [`analyze_with_provider`]: lädt den Vision-Provider
+/// aus der Config (Keystore-Read). Für Tests existiert [`analyze_with_provider`]
+/// als Direkt-Einstieg mit injizierbarem `&dyn VisionProvider` (NV1-001-VOL).
 pub async fn analyze(
     cfg: &VisionConfig,
     image_bytes: &[u8],
@@ -106,11 +107,47 @@ pub async fn analyze(
         return Err(VisionError::Disabled);
     }
 
-    let mut vision_err: Option<String> = None;
-
-    // 1. Vision-Provider.
     match create_vision_provider(cfg) {
-        Ok(provider) => match provider.analyze_image(image_bytes, mime).await {
+        Ok(provider) => {
+            analyze_with_provider(
+                Some(provider.as_ref()),
+                None,
+                cfg.tesseract_enabled,
+                image_bytes,
+                mime,
+                default_llm_provider,
+            )
+            .await
+        }
+        Err(reason) => {
+            analyze_with_provider(
+                None,
+                Some(reason),
+                cfg.tesseract_enabled,
+                image_bytes,
+                mime,
+                default_llm_provider,
+            )
+            .await
+        }
+    }
+}
+
+/// Trait-Injizierbarer Einstieg für Tests + interne Wiederverwendung. Wenn
+/// `provider` `Some` ist, läuft der Vision-Pfad zuerst; sonst (`None`) wird
+/// `provider_unavailable_reason` als Vision-Fehler dokumentiert und direkt
+/// in den Tesseract-Fallback gesprungen.
+pub async fn analyze_with_provider(
+    provider: Option<&dyn VisionProvider>,
+    provider_unavailable_reason: Option<String>,
+    tesseract_enabled: bool,
+    image_bytes: &[u8],
+    mime: &str,
+    default_llm_provider: &str,
+) -> Result<VisionAnalysis, VisionError> {
+    // 1. Vision-Provider — sofern verfügbar.
+    let vision_err: Option<String> = match provider {
+        Some(p) => match p.analyze_image(image_bytes, mime).await {
             Ok(analysis) if !analysis.text_lines.is_empty() => return Ok(analysis),
             Ok(empty) => {
                 // Erfolgreich aber leer — kein Sinn, jetzt Tesseract zu probieren,
@@ -118,13 +155,13 @@ pub async fn analyze(
                 // Result zurück (Aufrufer entscheidet).
                 return Ok(empty);
             }
-            Err(e) => vision_err = Some(e),
+            Err(e) => Some(e),
         },
-        Err(e) => vision_err = Some(e),
-    }
+        None => provider_unavailable_reason,
+    };
 
     // 2. Tesseract-Fallback.
-    if cfg.tesseract_enabled {
+    if tesseract_enabled {
         match tesseract::ocr(image_bytes).await {
             Ok(text_lines) if !text_lines.is_empty() => {
                 // 3. Tag-Generation über den Standard-LLM-Provider.
@@ -214,5 +251,122 @@ mod tests {
         let s = format!("{e}");
         assert!(s.contains("groq 401"));
         assert!(s.contains("tesseract missing"));
+    }
+
+    // ---- Mock-VisionProvider (NV1-001-VOL Auflage) -----------------------------
+
+    /// Test-Stub mit injizierbarer Antwort. Wenn `result` `Some` ist, liefert
+    /// `analyze_image` diese Analyse; ist `result` `None`, kommt ein Error.
+    struct MockVisionProvider {
+        result: Option<VisionAnalysis>,
+        error_msg: Option<String>,
+    }
+
+    #[async_trait]
+    impl VisionProvider for MockVisionProvider {
+        async fn analyze_image(
+            &self,
+            _image_bytes: &[u8],
+            _mime: &str,
+        ) -> Result<VisionAnalysis, String> {
+            if let Some(a) = &self.result {
+                Ok(a.clone())
+            } else {
+                Err(self
+                    .error_msg
+                    .clone()
+                    .unwrap_or_else(|| "mock vision failure".into()))
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_pipeline_happy_path() {
+        let mock = MockVisionProvider {
+            result: Some(VisionAnalysis {
+                text_lines: vec!["Sprint Planning".into(), "Mustafa → USB-Stick".into()],
+                suggested_tags: vec!["BRAIN DUMP".into(), "MEETING".into()],
+            }),
+            error_msg: None,
+        };
+        let out = analyze_with_provider(
+            Some(&mock),
+            None,
+            /*tesseract_enabled=*/ false,
+            b"dummy-bytes",
+            "image/jpeg",
+            "noop",
+        )
+        .await
+        .expect("vision-pfad muss erfolgreich liefern");
+        assert_eq!(out.text_lines.len(), 2);
+        assert_eq!(out.suggested_tags[0], "BRAIN DUMP");
+    }
+
+    #[tokio::test]
+    async fn mock_provider_failure_without_tesseract_returns_allfailed() {
+        let mock = MockVisionProvider {
+            result: None,
+            error_msg: Some("mock 503".into()),
+        };
+        let err = analyze_with_provider(
+            Some(&mock),
+            None,
+            /*tesseract_enabled=*/ false,
+            b"dummy",
+            "image/jpeg",
+            "noop",
+        )
+        .await
+        .expect_err("ohne tesseract muss provider-fail propagieren");
+        match err {
+            VisionError::AllFailed { vision, fallback } => {
+                assert_eq!(vision.as_deref(), Some("mock 503"));
+                assert!(fallback.as_deref().unwrap().contains("deaktiviert"));
+            }
+            other => panic!("unerwarteter error: {other}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_provider_reports_unavailable_reason() {
+        let err = analyze_with_provider(
+            None,
+            Some("kein API-Key konfiguriert".into()),
+            /*tesseract_enabled=*/ false,
+            b"dummy",
+            "image/jpeg",
+            "noop",
+        )
+        .await
+        .expect_err("kein provider + kein fallback → AllFailed");
+        match err {
+            VisionError::AllFailed { vision, .. } => {
+                assert_eq!(vision.as_deref(), Some("kein API-Key konfiguriert"));
+            }
+            other => panic!("unerwarteter error: {other}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_provider_empty_result_short_circuits() {
+        // Ein Bild ohne Text liefert leere Listen — Pipeline soll *nicht*
+        // den Tesseract-Fallback bemühen, sondern das leere Ergebnis durchreichen.
+        let mock = MockVisionProvider {
+            result: Some(VisionAnalysis::default()),
+            error_msg: None,
+        };
+        let out = analyze_with_provider(
+            Some(&mock),
+            None,
+            /*tesseract_enabled=*/ true,
+            b"dummy",
+            "image/jpeg",
+            "noop",
+        )
+        .await
+        .expect("leerer vision-erfolg propagiert");
+        assert!(out.text_lines.is_empty());
+        assert!(out.suggested_tags.is_empty());
     }
 }

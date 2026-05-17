@@ -44,6 +44,11 @@ pub struct AppState {
     /// (würde Doppel-Inserts erzeugen, weil aktuell kein nexus_id-Dedup
     /// auf Task/Project-Inserts existiert — siehe OB-C-MIN-4 für Phase E).
     pub obsidian_sync_lock: Arc<tokio::sync::Mutex<()>>,
+    /// Sprint Nightvision NV-2: Vision-Config + Foto-Storage-Dir + Default-
+    /// Provider-Name (letzterer für die Tag-Generation im Tesseract-Pfad).
+    pub vision_config: Arc<config::VisionConfig>,
+    pub braindump_images_dir: Arc<std::path::PathBuf>,
+    pub default_provider_name: Arc<String>,
 }
 
 #[tokio::main]
@@ -146,6 +151,9 @@ async fn main() {
                 llm: llm_provider,
                 started_at: std::time::Instant::now(),
                 obsidian_sync_lock: Arc::new(tokio::sync::Mutex::new(())),
+                vision_config: Arc::new(config.vision.clone()),
+                braindump_images_dir: Arc::new(config.braindump_images_dir.clone()),
+                default_provider_name: Arc::new(config.default_provider.clone()),
             };
 
             // Einmalig: Tasks aus Braindumps mit category='Task' nachträglich anlegen.
@@ -201,6 +209,16 @@ async fn main() {
                 .route("/projects/suggestions/{id}/dismiss", post(handlers::dismiss_project_suggestion))
                 // Obsidian-Briefkasten Phase C
                 .route("/api/obsidian/sync", post(handlers::obsidian_sync))
+                // Sprint Nightvision NV-2 — Foto-Braindump (Singular-Konvention
+                // analog zu den anderen /braindump/...-Routes).
+                .route(
+                    "/braindump/from_image",
+                    post(handlers::post_braindump_from_image)
+                        .layer(axum::extract::DefaultBodyLimit::max(
+                            handlers::NV_IMAGE_MAX_BYTES + 64 * 1024,
+                        )),
+                )
+                .route("/api/images/{filename}", get(handlers::serve_braindump_image))
                 .layer(middleware::from_fn(auth::require_token))
                 .layer(
                     CorsLayer::new()

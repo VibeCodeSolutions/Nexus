@@ -1,5 +1,66 @@
 # QS Findings — NEXUS v0.1.0 Release
 
+## Sprint Nightvision NV-2 — Streaming-Endpoint + Static-Image — 2026-05-17
+**Status: ⚠️ RÜCKGABE MIT AUFLAGEN** (0 Blocker / 3 Major / 0 Minor)
+
+Prüfung durchgeführt von: QS — VibeCoding
+WORKLOG-Ref: `~/.claude/projects/-home-kaik-Projekte-Apps-Nexus/worklogs/vc.md` qs-20260517-004
+Sprint-Ref: `docs/sprints/nightvision-photo-ocr.md` (Sprint NV-2)
+
+### Was geprüft wurde
+- `core/Cargo.toml` — axum-`multipart`-Feature, `tokio-stream`, `tokio fs`+`io-util`+`process`
+- `core/src/vision/mod.rs` — `analyze_with_provider`-Trait-Injection-Refactor (erfüllt NV1-001-Auflage)
+- `core/src/main.rs` — `AppState` um `vision_config`/`braindump_images_dir`/`default_provider_name`; zwei neue Routes
+- `core/src/handlers.rs` — `post_braindump_from_image`-Multipart-Handler, `serve_braindump_image`-Static-Route, `PipelineFrame`-Enum, `run_photo_braindump_pipeline`-Task
+- Tests: `cargo test -p nexus-core` 82 passed / 1 ignored / 0 failed (+9 vs NV-1: 4 Mock-Pipeline-vision, 2 safe-filename, 2 Pipeline-End-to-End, 1 Frame-Serialisierung)
+- NV-1-Auflagen-Tracking
+
+### Findings
+
+#### NV2-001-KOR — ✅ Erledigt (Re-Check qs-20260517-005)
+> `repo::delete_braindump` Z.287-319 liest image_path vor DB-DELETE, löscht Datei best-effort via `tokio::fs::remove_file`, `tracing::warn` bei Fehler. SM-PR-005-Links-Cleanup-Reihenfolge erhalten.
+
+#### NV2-001-KOR (ursprünglich) — 🟡 Major — `delete_braindump` löscht Foto-File nicht (Disk-Leak)
+- **Prüfgegenstand:** `core/src/repo.rs:287-288` und `core/src/handlers.rs:189`
+- **Befund:** `delete_braindump` führt `DELETE FROM braindumps WHERE id = ?` aus, ohne vorher `image_path` zu lesen und die zugehörige JPEG aus `braindump_images_dir` zu löschen. Bei jedem Löschen eines Foto-Braindumps verwaist eine Datei im Filesystem — über die Zeit füllt sich das Verzeichnis ohne Bezug zu DB-Einträgen.
+- **Korrekturvorschlag:** Vor dem DELETE per `repo::get_by_id` (oder direkt im Repo) das `image_path` lesen; nach erfolgreichem DB-DELETE die Datei via `tokio::fs::remove_file` löschen (Best-Effort, Fehler als WARN loggen — kein Rollback). Konsequente Sub-Routine-Kapselung in `repo::delete_braindump`, damit auch Background-Cleanup (Obsidian-Sync etc.) den Pfad mitnutzt.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### NV2-002-KON — ✅ Erledigt (Re-Check qs-20260517-005)
+> Route umbenannt auf `/braindump/from_image` (Singular). Sprintplan-Wortlaut in 3 Stellen mitgeführt. Doc-Kommentar in `handlers.rs::post_braindump_from_image` (Z.1191) hängt mit altem Plural-Pfad noch hinterher — Lead-Direktarbeit, kein Re-QS.
+
+#### NV2-002-KON (ursprünglich) — 🟡 Major — Route-Path-Pluralisierung-Drift
+- **Prüfgegenstand:** `core/src/main.rs:213` (`/braindumps/from_image`) vs `core/src/main.rs:171-177, 205` (`/braindump`, `/braindump/{id}`, `/braindump/ideas`, `/braindump/recategorize`, `/braindump/unsorted/count`, `/braindump/{id}/links`)
+- **Befund:** Alle sieben bestehenden Top-Level-Braindump-Routes nutzen Singular `/braindump/...`. Die neue NV-2-Route nutzt Plural `/braindumps/from_image`. Sprintplan schreibt zwar `/braindumps/from_image` vor — Konvention-Check-Lesson „Vorbild gewinnt" bei API-Pfaden ist hier dennoch eindeutig: Top-Level-Resource ist im Repo Singular. (`/projects/{id}/braindumps` Plural ist legitime Sub-Resource-Liste, kein Gegenbeispiel.)
+- **Korrekturvorschlag:** Route auf `/braindump/from_image` umbenennen. Bonus: Sprintplan-Wortlaut in `docs/sprints/nightvision-photo-ocr.md` mitziehen, damit NV-3 + NV-5 (Android-Handoff) den korrigierten Pfad verwenden — Konvention bleibt Single-Source.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+#### NV2-003-SIC — ✅ Erledigt (Re-Check qs-20260517-005)
+> Per-Route `axum::extract::DefaultBodyLimit::max(NV_IMAGE_MAX_BYTES + 64 KiB)`-Layer auf `/braindump/from_image`. `NV_IMAGE_MAX_BYTES` jetzt `pub` für Single-Source. 3-MB-Body-Test optional als Folgepflege (kein Re-Block).
+
+#### NV2-003-SIC (ursprünglich) — 🟡 Major — `DefaultBodyLimit` für Multipart-Upload nicht angehoben
+- **Prüfgegenstand:** `core/src/handlers.rs:NV_IMAGE_MAX_BYTES` (10 MB) vs axum-0.8-Default-Body-Limit (2 MB)
+- **Befund:** Der Handler enforced ein 10-MB-Limit, indem er nach `field.bytes().await` die Größe prüft. axum's `DefaultBodyLimit` ist standardmäßig auf 2 MiB für das gesamte Request-Body gesetzt und wird vor dem Handler greifen, sobald die Multipart-Extraktion versucht den Body zu lesen. Folge: Fotos zwischen 2 und 10 MB scheitern mit 413 PAYLOAD_TOO_LARGE, bevor der eigene Limit-Check überhaupt zum Tragen kommt. 12-MP-Smartphone-Fotos haben typisch 3–6 MB — das wäre ein häufiger Failure-Pfad ohne klaren Fehler-Hinweis.
+- **Korrekturvorschlag:** Per-Route `DefaultBodyLimit::max(NV_IMAGE_MAX_BYTES + slack)` als Layer auf die Foto-Route legen (z. B. `.route(...).layer(DefaultBodyLimit::max(NV_IMAGE_MAX_BYTES + 64 * 1024))` — kleiner Slack für Multipart-Boundary-Overhead). Test ergänzen, der einen ~3 MB großen Multipart-Body durchschiebt und prüft, dass kein 413 vom Framework kommt.
+- **Status:** offen
+- **Korrektur-Zyklen:** 0/2
+
+### Erledigte Auflagen aus NV-1
+- ✅ **NV1-001-VOL** Mock-Provider-Pipeline-Test: erfüllt durch `analyze_with_provider`-Refactor + 4 Mock-Pipeline-Tests in `vision/mod.rs::tests` + 2 End-to-End-Pipeline-Tests in `handlers.rs::nv_photo_braindump_tests`.
+- ✅ **NV1-003-COD** `unused_assignments`-allow: behoben — `vision_err` wird nur noch im Fallback-Zweig erzeugt, `#![allow(unused_assignments)]` entfernt.
+- ⏳ **NV1-002-COD** `clean_json`-Duplikat: bleibt offen, war Backlog ohne Re-QS-Pflicht. Kein neues Finding.
+
+### Beobachtung (nicht Finding)
+- Bewusste Designentscheidung „Bild persistieren *vor* Vision-Call" macht Sinn (Retry-Use-Case), erzeugt aber Waisen-Files, wenn die Pipeline scheitert und der User es nicht erneut probiert. Mit NV2-001-Fix solltest du diesen Pfad mitabdecken (Cleanup im Error-Frame-Zweig oder periodischer Sweep).
+- Static-Image-Route liegt hinter `require_token`-Auth (durch Router-Layer). Frontend muss Bilder per `fetch` mit Authorization-Header laden — `<img src>`-Tags reichen kein Token mit. Klären in NV-3 für Desktop und in NV-5 für Android.
+
+### Empfehlung
+⚠️ **Rückgabe mit Auflagen** — drei Major-Fixes sind alle in wenigen Minuten umsetzbar (Image-Cleanup in repo + handlers, Route-Rename in main.rs + Sprintplan, DefaultBodyLimit-Layer). Nach Fix Re-QS-Lauf (qs-20260517-005), dann Commit. NV-3 erst nach diesen Fixes starten, weil Desktop-UI sonst auf nicht-final fixierte URL und Limit baut.
+
+---
+
 ## Sprint Nightvision NV-1 — Foto-Braindump-Pipeline (Core-Foundation) — 2026-05-17
 **Status: ⚠️ FREIGABE MIT AUFLAGEN** (0 Blocker / 0 Major / 3 Minor)
 

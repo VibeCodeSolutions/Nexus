@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::models::SparkEntry;
-use super::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_LINKS_PROMPT, PROJECT_SUGGEST_PROMPT, SYSTEM_PROMPT};
+use super::{ActionItem, Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion, EXTRACT_ACTION_ITEMS_PROMPT, EXTRACT_LINKS_PROMPT, PROJECT_SUGGEST_PROMPT, SYSTEM_PROMPT};
 
 const ENDPOINT: &str = "http://localhost:11434/api/chat";
 
@@ -128,6 +128,16 @@ impl LlmProvider for OllamaProvider {
             source_text, candidates_text
         );
         let raw = chat(&self.client, &self.model, EXTRACT_LINKS_PROMPT, &user).await?;
+        let json = extract_json_array(&raw);
+        serde_json::from_str(json)
+            .map_err(|e| format!("JSON Parse Fehler: {e} — Antwort: {raw}"))
+    }
+
+    async fn extract_action_items(&self, text: &str) -> Result<Vec<ActionItem>, String> {
+        if text.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let raw = chat(&self.client, &self.model, EXTRACT_ACTION_ITEMS_PROMPT, text).await?;
         let json = extract_json_array(&raw);
         serde_json::from_str(json)
             .map_err(|e| format!("JSON Parse Fehler: {e} — Antwort: {raw}"))

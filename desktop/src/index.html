@@ -1308,7 +1308,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
         <h3>Verknüpft mit</h3>
         <div id="panelBdLinks"></div>
       </div>
+      <div class="panel-section" id="panelBdExtractStatus" hidden role="status" aria-live="polite"></div>
       <div class="panel-footer-actions">
+        <button class="btn btn-ghost btn-sm" data-action="bd-detail-extract-tasks" id="bdDetailExtractBtn">📋 Tasks extrahieren</button>
         <button class="btn btn-danger btn-sm" data-action="bd-detail-delete">Löschen</button>
       </div>
     </div>
@@ -2659,6 +2661,12 @@ async function openSparkDetail(id) {
   const linksEl = document.getElementById('panelBdLinks');
   if (linksEl) linksEl.innerHTML = '<span class="text-dim">Lade…</span>';
 
+  // FEAT-001: extract-status pro Detail-Open zurücksetzen
+  const extractStatus = document.getElementById('panelBdExtractStatus');
+  if (extractStatus) { extractStatus.hidden = true; extractStatus.textContent = ''; }
+  const extractBtn = document.getElementById('bdDetailExtractBtn');
+  if (extractBtn) extractBtn.disabled = false;
+
   // Open panel
   const panel = document.getElementById('bdDetailPanel');
   if (panel) panel.removeAttribute('hidden');
@@ -2733,6 +2741,38 @@ async function deleteSparkFromDetail() {
     closeSparkDetail();
     refreshSparks();
   } catch (e) { alert('Fehler: ' + e.message); }
+}
+
+// FEAT-001 Schicht D: Tasks aus aktuellem Spark via LLM extrahieren.
+// Backend ist idempotent — Doppelklick erzeugt keine Duplikate.
+async function extractTasksFromDetail() {
+  if (!currentBdDetailId) return;
+  const btn = document.getElementById('bdDetailExtractBtn');
+  const status = document.getElementById('panelBdExtractStatus');
+  if (btn) btn.disabled = true;
+  if (status) {
+    status.hidden = false;
+    status.textContent = 'Analysiere Spark …';
+    status.className = 'panel-section';
+  }
+  try {
+    const res = await api(`/spark/${encodeURIComponent(currentBdDetailId)}/extract-tasks`, { method: 'POST' });
+    const created = res.count || 0;
+    const skipped = res.skipped || 0;
+    if (status) {
+      if (created === 0 && skipped === 0) {
+        status.textContent = 'Keine umsetzbaren Tasks im Spark gefunden.';
+      } else if (created === 0) {
+        status.textContent = `Bereits ${skipped} Task${skipped === 1 ? '' : 's'} aus diesem Spark extrahiert (keine neuen).`;
+      } else {
+        status.textContent = `✓ ${created} Task${created === 1 ? '' : 's'} angelegt${skipped > 0 ? ` (${skipped} bereits vorhanden)` : ''}.`;
+      }
+    }
+  } catch (e) {
+    if (status) status.textContent = 'Fehler: ' + (e.message || 'unbekannt');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function refreshSuggestionsBanner() {
@@ -3236,6 +3276,7 @@ document.addEventListener('click', (e) => {
     case 'bd-delete': e.stopPropagation(); deleteSpark(el.dataset.bdId); break;
     case 'bd-card-menu': e.stopPropagation(); deleteSpark(el.dataset.bdId); break;
     case 'bd-detail-delete': deleteSparkFromDetail(); break;
+    case 'bd-detail-extract-tasks': extractTasksFromDetail(); break;
     case 'bd-detail-close': closeSparkDetail(); break;
     case 'bd-quick-open': openQuickCreate(); break;
     case 'bd-quick-cancel': closeQuickCreate(); break;

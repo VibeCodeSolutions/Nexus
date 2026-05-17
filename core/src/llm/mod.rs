@@ -61,6 +61,21 @@ pub struct NodeRef {
     pub label: String,          // Spark.summary oder Project.name
 }
 
+/// FEAT-001: Ein durch den LLM aus einem Spark extrahiertes Action-Item.
+/// Wird in der Tasks-Tabelle als individueller Task persistiert.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionItem {
+    pub title: String,
+    #[serde(default = "default_action_priority")]
+    pub priority: String,           // 'low' | 'medium' | 'high'
+    #[serde(default)]
+    pub due_date: Option<String>,   // ISO-8601 (YYYY-MM-DD), optional
+    #[serde(default)]
+    pub category: Option<String>,   // freier Tag, optional
+}
+
+fn default_action_priority() -> String { "medium".to_string() }
+
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
     async fn categorize_and_summarize(&self, text: &str) -> Result<Classification, String>;
@@ -73,6 +88,16 @@ pub trait LlmProvider: Send + Sync {
         _source_text: &str,
         _candidates: &[NodeRef],
     ) -> Result<Vec<LinkSuggestion>, String> {
+        Ok(Vec::new())
+    }
+
+    /// FEAT-001: Extrahiert einzelne Action-Items (Tasks) aus einem Spark-Text.
+    /// Default-Impl liefert leere Liste (analog extract_links). Pflicht-Override
+    /// in claude.rs + ollama.rs (zwei Default-Provider).
+    async fn extract_action_items(
+        &self,
+        _text: &str,
+    ) -> Result<Vec<ActionItem>, String> {
         Ok(Vec::new())
     }
 }
@@ -100,6 +125,25 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
 ]
 Nur Einträge gruppieren, die wirklich zusammengehören. Nicht jeder Eintrag muss einem Projekt zugeordnet werden.
 confidence sollte ehrlich 0.5-1.0 sein, je sicherer du bist desto höher.
+Keine zusätzliche Erklärung, nur das JSON-Array."#;
+
+pub const EXTRACT_ACTION_ITEMS_PROMPT: &str = r#"Du analysierst einen Spark-Eintrag (Sprach-Notiz, Gedankendump) und extrahierst daraus konkrete Action-Items, die als Tasks abgearbeitet werden können.
+Wenn der Text mehrere Themen enthält ("Kauf Milch, ruf Kai an, Todo-App fixen bis Freitag"), gib für jedes ein Item zurück.
+Wenn der Text gar keine umsetzbare Aufgabe enthält (reine Gedanken, Fragen, Sorgen), gib ein leeres Array zurück.
+Antworte AUSSCHLIESSLICH mit validem JSON-Array:
+[
+  {
+    "title": "<kurzer, klarer Task-Titel im Imperativ, max 80 Zeichen>",
+    "priority": "low" | "medium" | "high",
+    "due_date": "<YYYY-MM-DD oder null>",
+    "category": "<optionaler Tag wie 'Arbeit', 'Privat', 'Einkauf' oder null>"
+  }
+]
+Regeln:
+- title ist Pflicht und immer aussagekräftig (kein "Milch" sondern "Milch kaufen")
+- priority ist medium wenn keine Dringlichkeits-Hinweise im Text
+- due_date nur setzen wenn explizit ein Datum/Tag genannt ist (z.B. "bis Freitag", "morgen") — sonst null
+- category nur wenn klar erkennbarer Kontext — sonst null
 Keine zusätzliche Erklärung, nur das JSON-Array."#;
 
 pub const EXTRACT_LINKS_PROMPT: &str = r#"Du analysierst Verknüpfungen zwischen Notizen.

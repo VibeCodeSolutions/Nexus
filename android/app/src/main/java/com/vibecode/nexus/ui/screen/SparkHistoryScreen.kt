@@ -180,6 +180,11 @@ private fun SparkDetailSheet(
     var linksError by remember(entry.id) { mutableStateOf<String?>(null) }
     var linksLoading by remember(entry.id) { mutableStateOf(true) }
 
+    // FEAT-001 Schicht D: Tasks aus Spark extrahieren.
+    val scope = rememberCoroutineScope()
+    var extractBusy by remember(entry.id) { mutableStateOf(false) }
+    var extractStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+
     LaunchedEffect(entry.id) {
         linksLoading = true
         linksError = null
@@ -245,6 +250,41 @@ private fun SparkDetailSheet(
                         AssistChip(onClick = {}, enabled = false, label = { Text(tag) })
                     }
                 }
+            }
+
+            // FEAT-001 Schicht D: Tasks extrahieren — idempotenter Endpoint,
+            // Doppelklick erzeugt keine Duplikate.
+            OutlinedButton(
+                onClick = {
+                    extractBusy = true
+                    extractStatus = "Analysiere Spark …"
+                    scope.launch {
+                        apiClient.extractTasksFromSpark(entry.id)
+                            .onSuccess { res ->
+                                extractStatus = when {
+                                    res.count == 0L && res.skipped == 0L ->
+                                        "Keine umsetzbaren Tasks im Spark gefunden."
+                                    res.count == 0L ->
+                                        "Bereits ${res.skipped} Task${if (res.skipped == 1L) "" else "s"} aus diesem Spark extrahiert (keine neuen)."
+                                    else -> "✓ ${res.count} Task${if (res.count == 1L) "" else "s"} angelegt" +
+                                        if (res.skipped > 0) " (${res.skipped} bereits vorhanden)." else "."
+                                }
+                            }
+                            .onFailure { extractStatus = "Fehler: ${it.message ?: "unbekannt"}" }
+                        extractBusy = false
+                    }
+                },
+                enabled = !extractBusy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (extractBusy) "Extrahiere …" else "📋 Tasks extrahieren")
+            }
+            extractStatus?.let { msg ->
+                Text(
+                    msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             HorizontalDivider()

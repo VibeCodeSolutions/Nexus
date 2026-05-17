@@ -122,6 +122,31 @@ pub async fn post_spark(
         }
     }
 
+    // FEAT-001 Schicht C: Auto-Extract Action-Items wenn user_pref aktiv.
+    // Läuft als Background-Task — blockt die Spark-Response nicht.
+    // Bewusst auch im Task-Branch aktiv (Multi-Item-Sparks die als "Task"
+    // klassifiziert werden, sollten zusätzlich gesplittet werden).
+    let auto_extract = repo::user_pref_bool(&state.pool, "auto_extract_tasks_enabled")
+        .await
+        .unwrap_or(false);
+    if auto_extract {
+        let pool = state.pool.clone();
+        let llm = state.llm.clone();
+        let spark_id = entry.id.clone();
+        let text = payload.text.clone();
+        tokio::spawn(async move {
+            match extract_tasks_for_spark_inner(&pool, llm.as_ref(), &spark_id, &text).await {
+                Ok((created, skipped)) => {
+                    tracing::debug!(
+                        spark = %spark_id, created = created.len(), skipped,
+                        "auto-extract done"
+                    );
+                }
+                Err(e) => tracing::warn!(spark = %spark_id, "auto-extract failed: {e}"),
+            }
+        });
+    }
+
     Ok(Json(json!(updated)))
 }
 
@@ -252,6 +277,80 @@ pub async fn delete_spark(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// FEAT-001 Schicht B/C-Helper: Inner-Logik für Action-Item-Extraktion + Task-Persistierung.
+/// Idempotent über `nexus_external_id` nach Schema `spark-extract:<spark_id>:<index>`.
+/// Wiederholte Aufrufe legen keine Duplikate an.
+///
+/// Genutzt vom Endpoint [`extract_tasks_from_spark`] sowie vom Auto-Extract-
+/// Background-Spawn in [`post_spark`].
+pub async fn extract_tasks_for_spark_inner(
+    pool: &sqlx::SqlitePool,
+    llm: &dyn crate::llm::LlmProvider,
+    spark_id: &str,
+    source_text: &str,
+) -> Result<(Vec<String>, usize), String> {
+    let items = llm.extract_action_items(source_text).await?;
+
+    let mut created: Vec<String> = Vec::new();
+    let mut skipped: usize = 0;
+
+    for (idx, item) in items.iter().enumerate() {
+        let title = item.title.trim();
+        if title.is_empty() {
+            skipped += 1;
+            continue;
+        }
+        let ext_id = format!("spark-extract:{}:{}", spark_id, idx);
+        let exists = repo::find_task_by_external_id(pool, &ext_id)
+            .await
+            .unwrap_or(None);
+        if exists.is_some() {
+            skipped += 1;
+            continue;
+        }
+        match repo::create_task_full(
+            pool,
+            title,
+            None,
+            Some(item.priority.as_str()),
+            Some(&ext_id),
+            item.due_date.as_deref(),
+        ).await {
+            Ok(task) => created.push(task.id),
+            Err(e) => {
+                tracing::warn!("create_task_full fehlgeschlagen für '{}': {e}", title);
+                skipped += 1;
+            }
+        }
+    }
+    Ok((created, skipped))
+}
+
+/// FEAT-001 Schicht B: Endpoint `POST /spark/{id}/extract-tasks`.
+/// Response: `{ "created": [<task_id>, …], "skipped": <usize>, "count": <usize> }`
+pub async fn extract_tasks_from_spark(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let spark = repo::get_by_id(&state.pool, &id)
+        .await
+        .map_err(|e| (StatusCode::NOT_FOUND, Json(json!({"error": format!("Spark nicht gefunden: {e}")}))))?;
+
+    let source_text = spark.transcript.as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(spark.raw_text.as_str());
+
+    let (created, skipped) = extract_tasks_for_spark_inner(&state.pool, state.llm.as_ref(), &id, source_text)
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, Json(json!({"error": format!("LLM-Extraktion fehlgeschlagen: {e}")}))))?;
+
+    Ok(Json(json!({
+        "created": created,
+        "skipped": skipped,
+        "count": created.len(),
+    })))
 }
 
 pub async fn suggest_projects(
@@ -2024,15 +2123,28 @@ mod settings_tests {
 #[cfg(test)]
 mod synaptic_phase_b_tests {
     use super::*;
-    use crate::llm::{Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion};
+    use crate::llm::{ActionItem, Classification, LinkSuggestion, LlmProvider, NodeRef, ProjectSuggestion};
     use crate::models::SparkEntry;
     use std::sync::Arc;
 
     struct MockLlm {
         suggestions: Vec<LinkSuggestion>,
         proposals: Vec<ProjectSuggestion>,
+        action_items: Vec<ActionItem>,
         fail_links: bool,
         fail_projects: bool,
+    }
+
+    impl MockLlm {
+        fn with_action_items(items: Vec<ActionItem>) -> Self {
+            Self {
+                suggestions: vec![],
+                proposals: vec![],
+                action_items: items,
+                fail_links: false,
+                fail_projects: false,
+            }
+        }
     }
 
     #[async_trait::async_trait]
@@ -2045,6 +2157,9 @@ mod synaptic_phase_b_tests {
         }
         async fn extract_links(&self, _src: &str, _cands: &[NodeRef]) -> Result<Vec<LinkSuggestion>, String> {
             if self.fail_links { Err("mock-fail-links".into()) } else { Ok(self.suggestions.clone()) }
+        }
+        async fn extract_action_items(&self, _text: &str) -> Result<Vec<ActionItem>, String> {
+            Ok(self.action_items.clone())
         }
     }
 
@@ -2115,6 +2230,19 @@ mod synaptic_phase_b_tests {
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )",
         ).execute(&pool).await.unwrap();
+        sqlx::query(
+            "CREATE TABLE tasks (
+                id TEXT PRIMARY KEY NOT NULL,
+                title TEXT NOT NULL,
+                project_id TEXT,
+                priority TEXT NOT NULL DEFAULT 'medium',
+                status TEXT NOT NULL DEFAULT 'open',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                nexus_external_id TEXT,
+                due_date TEXT
+            )",
+        ).execute(&pool).await.unwrap();
         pool
     }
 
@@ -2143,7 +2271,7 @@ mod synaptic_phase_b_tests {
         let pool = setup_pool().await;
         insert_bd(&pool, "src", "source", "Random").await;
         insert_bd(&pool, "tgt", "target", "Random").await;
-        let llm = Arc::new(MockLlm { suggestions: vec![], proposals: vec![], fail_links: false, fail_projects: false });
+        let llm = Arc::new(MockLlm { suggestions: vec![], proposals: vec![], action_items: vec![], fail_links: false, fail_projects: false });
         let state = make_state(pool.clone(), llm);
         let input = LinkInput {
             source_type: "spark".into(),
@@ -2181,6 +2309,7 @@ mod synaptic_phase_b_tests {
             ],
             proposals: vec![],
             fail_links: false,
+            action_items: vec![],
             fail_projects: false,
         };
         let stats = extract_links_for_recent(&pool, &llm, 10).await.unwrap();
@@ -2203,6 +2332,7 @@ mod synaptic_phase_b_tests {
             suggestions: vec![],
             proposals: vec![],
             fail_links: false,
+            action_items: vec![],
             fail_projects: false,
         };
         let stats = extract_links_for_recent(&pool, &llm, 10).await.unwrap();
@@ -2228,6 +2358,7 @@ mod synaptic_phase_b_tests {
             suggestions: vec![],
             proposals: vec![],
             fail_links: true,
+            action_items: vec![],
             fail_projects: false,
         };
         let stats = extract_links_for_recent(&pool, &llm, 10).await.unwrap();
@@ -2256,6 +2387,7 @@ mod synaptic_phase_b_tests {
                 reason: Some("Mock".into()),
             }],
             fail_links: false,
+            action_items: vec![],
             fail_projects: false,
         };
         let stats = suggest_auto_projects(&pool, &llm).await.unwrap();
@@ -2288,6 +2420,7 @@ mod synaptic_phase_b_tests {
                 reason: Some("Mock".into()),
             }],
             fail_links: false,
+            action_items: vec![],
             fail_projects: false,
         };
         let stats = suggest_auto_projects(&pool, &llm).await.unwrap();
@@ -2301,5 +2434,48 @@ mod synaptic_phase_b_tests {
         assert_eq!(row.1, 0.65);
         let projects: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM projects").fetch_one(&pool).await.unwrap();
         assert_eq!(projects.0, 0, "kein Auto-Project bei conf<0.8");
+    }
+
+    /// FEAT-001: extract_tasks_for_spark_inner legt N Tasks an und ist idempotent
+    /// — wiederholter Aufruf mit gleicher spark_id + gleicher Item-Reihenfolge
+    /// erzeugt keine Duplikate.
+    #[tokio::test]
+    async fn test_extract_tasks_inner_creates_and_is_idempotent() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "spark-feat1", "Kauf Milch und ruf Kai an bis Freitag", "Random").await;
+        let llm = MockLlm::with_action_items(vec![
+            ActionItem { title: "Milch kaufen".into(), priority: "low".into(), due_date: None, category: Some("Einkauf".into()) },
+            ActionItem { title: "Kai anrufen".into(), priority: "medium".into(), due_date: Some("2026-05-22".into()), category: None },
+        ]);
+
+        let (created1, skipped1) = extract_tasks_for_spark_inner(&pool, &llm, "spark-feat1", "text").await.unwrap();
+        assert_eq!(created1.len(), 2, "beide Items angelegt");
+        assert_eq!(skipped1, 0);
+
+        // Re-Run → alle skipped (idempotenter Re-Lauf)
+        let (created2, skipped2) = extract_tasks_for_spark_inner(&pool, &llm, "spark-feat1", "text").await.unwrap();
+        assert_eq!(created2.len(), 0, "kein Doppel-Insert");
+        assert_eq!(skipped2, 2);
+
+        // due_date persistiert
+        let due: Option<String> = sqlx::query_scalar(
+            "SELECT due_date FROM tasks WHERE nexus_external_id = ?"
+        ).bind("spark-extract:spark-feat1:1").fetch_one(&pool).await.unwrap();
+        assert_eq!(due, Some("2026-05-22".into()));
+    }
+
+    /// FEAT-001: Leerer Title wird gesplippt, nicht angelegt.
+    #[tokio::test]
+    async fn test_extract_tasks_skips_empty_titles() {
+        let pool = setup_pool().await;
+        insert_bd(&pool, "spark-empty", "nur ein Gedanke", "Random").await;
+        let llm = MockLlm::with_action_items(vec![
+            ActionItem { title: "  ".into(), priority: "medium".into(), due_date: None, category: None },
+            ActionItem { title: "Valider Task".into(), priority: "medium".into(), due_date: None, category: None },
+        ]);
+
+        let (created, skipped) = extract_tasks_for_spark_inner(&pool, &llm, "spark-empty", "t").await.unwrap();
+        assert_eq!(created.len(), 1);
+        assert_eq!(skipped, 1);
     }
 }

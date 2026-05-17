@@ -70,4 +70,9 @@ pub struct Task {
     /// Phase E (OB-C-MIN-4): siehe `Project::nexus_external_id`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nexus_external_id: Option<String>,
+    /// FEAT-001: Fälligkeitsdatum (ISO-8601 YYYY-MM-DD), optional.
+    /// Wird vom LLM-Action-Item-Extractor gesetzt wenn der Spark ein Datum
+    /// nennt ("bis Freitag", "morgen"); sonst NULL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
 }

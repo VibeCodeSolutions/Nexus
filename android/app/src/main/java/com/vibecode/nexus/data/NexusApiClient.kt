@@ -14,6 +14,7 @@ import com.vibecode.nexus.data.model.SetProviderRequest
 import com.vibecode.nexus.data.model.TaskCreateRequest
 import com.vibecode.nexus.data.model.TaskResponse
 import com.vibecode.nexus.data.model.TaskUpdateRequest
+import com.vibecode.nexus.data.model.ExtractTasksResponse
 import com.vibecode.nexus.data.model.UnsortedCountResponse
 import com.vibecode.nexus.data.model.UpdateSparkTagsRequest
 import com.vibecode.nexus.diagnostics.DiagReport
@@ -123,6 +124,16 @@ class NexusApiClient(private val settings: ConnectionSettings) {
             bearerAuth(token!!)
         }.body()
         response.count
+    }
+
+    /**
+     * FEAT-001: Extrahiert Action-Items aus dem Spark via LLM und legt sie als
+     * Tasks an. Idempotent — wiederholter Aufruf erzeugt keine Duplikate.
+     */
+    suspend fun extractTasksFromSpark(sparkId: String): Result<ExtractTasksResponse> = authedRequest {
+        client.post("$baseUrl/spark/$sparkId/extract-tasks") {
+            bearerAuth(token!!)
+        }.body()
     }
 
     suspend fun updateSparkTags(id: String, tags: List<String>): Result<Unit> = authedRequest {

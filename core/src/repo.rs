@@ -84,6 +84,19 @@ pub async fn user_pref_list(
     Ok(rows)
 }
 
+/// FEAT-001: Liest einen einzelnen User-Pref-Value als bool.
+/// Akzeptiert "true"/"1" als true, alles andere (auch None) als false.
+pub async fn user_pref_bool(
+    pool: &SqlitePool,
+    key: &str,
+) -> Result<bool, sqlx::Error> {
+    let value: Option<String> = sqlx::query_scalar("SELECT value FROM user_prefs WHERE key = ?")
+        .bind(key)
+        .fetch_optional(pool)
+        .await?;
+    Ok(matches!(value.as_deref(), Some("true") | Some("1")))
+}
+
 /// Ersetzt `tags_json` eines Sparks mit der gegebenen Liste.
 /// Hält Tag-Order bei, dedupliziert nicht (Caller-Verantwortung).
 pub async fn update_spark_tags(
@@ -231,7 +244,7 @@ pub async fn get_project_sparks(pool: &SqlitePool, project_id: &str) -> Result<V
 }
 
 pub async fn create_task(pool: &SqlitePool, title: &str, project_id: Option<&str>, priority: Option<&str>) -> Result<Task, sqlx::Error> {
-    create_task_with_external_id(pool, title, project_id, priority, None).await
+    create_task_full(pool, title, project_id, priority, None, None).await
 }
 
 /// Phase E (OB-C-MIN-4): Variante für den Obsidian-Outbox-Importer. Setzt
@@ -243,19 +256,35 @@ pub async fn create_task_with_external_id(
     priority: Option<&str>,
     nexus_external_id: Option<&str>,
 ) -> Result<Task, sqlx::Error> {
+    create_task_full(pool, title, project_id, priority, nexus_external_id, None).await
+}
+
+/// FEAT-001: Voller Konstruktor mit optionalem `due_date`. Wird vom
+/// LLM-Action-Item-Extractor und vom Obsidian-Importer (mit `nexus_external_id`)
+/// genutzt. Konsumenten ohne external-id oder due_date rufen die schmaleren
+/// Wrapper [`create_task`] / [`create_task_with_external_id`].
+pub async fn create_task_full(
+    pool: &SqlitePool,
+    title: &str,
+    project_id: Option<&str>,
+    priority: Option<&str>,
+    nexus_external_id: Option<&str>,
+    due_date: Option<&str>,
+) -> Result<Task, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
     let prio = priority.unwrap_or("medium");
 
-    sqlx::query("INSERT INTO tasks (id, title, project_id, priority, nexus_external_id) VALUES (?, ?, ?, ?, ?)")
+    sqlx::query("INSERT INTO tasks (id, title, project_id, priority, nexus_external_id, due_date) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(&id)
         .bind(title)
         .bind(project_id)
         .bind(prio)
         .bind(nexus_external_id)
+        .bind(due_date)
         .execute(pool)
         .await?;
 
-    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id FROM tasks WHERE id = ?")
+    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id, due_date FROM tasks WHERE id = ?")
         .bind(&id)
         .fetch_one(pool)
         .await
@@ -266,7 +295,7 @@ pub async fn find_task_by_external_id(
     nexus_external_id: &str,
 ) -> Result<Option<Task>, sqlx::Error> {
     sqlx::query_as::<_, Task>(
-        "SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id \
+        "SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id, due_date \
          FROM tasks WHERE nexus_external_id = ?",
     )
     .bind(nexus_external_id)
@@ -299,7 +328,7 @@ pub async fn backfill_tasks_from_sparks(pool: &SqlitePool) -> Result<usize, sqlx
 }
 
 pub async fn list_tasks(pool: &SqlitePool, project_id_filter: Option<&str>, status_filter: Option<&str>) -> Result<Vec<Task>, sqlx::Error> {
-    let mut sql = String::from("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id FROM tasks WHERE 1=1");
+    let mut sql = String::from("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id, due_date FROM tasks WHERE 1=1");
     let mut binds: Vec<String> = Vec::new();
 
     if let Some(pid) = project_id_filter {
@@ -335,7 +364,7 @@ pub async fn update_task(pool: &SqlitePool, id: &str, status: Option<&str>, titl
             .await?;
     }
 
-    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id FROM tasks WHERE id = ?")
+    sqlx::query_as::<_, Task>("SELECT id, title, project_id, priority, status, created_at, updated_at, nexus_external_id, due_date FROM tasks WHERE id = ?")
         .bind(id)
         .fetch_one(pool)
         .await

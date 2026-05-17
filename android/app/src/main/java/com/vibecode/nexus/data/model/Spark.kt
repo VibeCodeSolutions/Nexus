@@ -31,3 +31,10 @@ data class UpdateSparkTagsRequest(
 data class UnsortedCountResponse(
     val count: Long
 )
+
+@Serializable
+data class ExtractTasksResponse(
+    val created: List<String> = emptyList(),
+    val skipped: Long = 0,
+    val count: Long = 0
+)

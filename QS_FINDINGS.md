@@ -1,5 +1,38 @@
 # QS Findings — NEXUS v0.1.0 Release
 
+## FEAT-001 KI-Aufgabensplitting — Post-Merge — 2026-05-17
+**Status: 🟡 AUFLAGEN-FREIGABE** (0 Blocker / 1 Major / 0 Minor)
+
+Prüfung durchgeführt von: QS — VibeCoding
+WORKLOG-Ref: `~/.claude/projects/-home-kaik-Projekte-Apps-Nexus/worklogs/vc.md` qs-20260517-012
+Commit: `65b4597` auf `origin/main`
+
+### Was geprüft wurde
+- Schicht A LLM-Trait: `ActionItem`-Struct + `EXTRACT_ACTION_ITEMS_PROMPT` + `extract_action_items()` Default + Override Claude/Ollama (empty-text early-return, Prosa-Wrapper)
+- Schicht B Migration+Endpoint: `20260520_001_task_due_date.sql`, FromRow-Coverage `repo.rs` (4 SELECTs), `POST /spark/{id}/extract-tasks` idempotent, `extract_tasks_for_spark_inner`-Helper
+- Schicht C Auto-Extract: `user_pref_bool`-Helper, `tokio::spawn` mit `Arc`-Clone Pool+LLM, `tracing::warn` ohne Propagation
+- Schicht D UI: Desktop `index.html` Button+Status-Area `role=status aria-live=polite`; Android `SparkDetailSheet` OutlinedButton + `remember(entry.id)` + `bearerAuth`
+- Tests: `cargo test -p nexus-core` 85/0+1ign (+2 ggü. Vor-Stand), Android `assembleDebug` 37/37, Desktop JS-Parse OK, Clippy keine FEAT-001-bedingten Warnings
+
+### Findings
+
+#### VC-013-VOL — 🟡 Major — Settings-Toggle Auto-Extract UI fehlt (FEAT-001-C DoD-Lücke)
+- **Prüfgegenstand:** FEAT-001-C DoD-Wortlaut „Mobile App kann Auto-Extract aktivieren; Desktop-Settings-Modal hat Toggle" (todo.md FEAT-001-C)
+- **Befund:** Backend-Pfad vollständig (Helper `repo::user_pref_bool` + Auto-Spawn in `post_spark`), aber `auto_extract_tasks_enabled` ist nur via direktem `POST /api/user_prefs/{key}` setzbar. End-User-erreichbare UI-Affordance (Toggle/Switch) fehlt in beiden Clients.
+- **Korrekturvorschlag:** Folge-Sub-Sprint VC-013-VOL-A (Desktop-Modal-Toggle) + VC-013-VOL-B (Android-Settings-Switch) — Aufwand ~20–30 Min.
+- **Status:** offen → an Belanna delegiert (Chakotay-Gate `auflagen`)
+- **Korrektur-Zyklen:** 0/2
+
+### DoD-Status FEAT-001
+| Sub-Item | Status |
+|---|---|
+| FEAT-001-A LLM-Trait | ✅ erfüllt |
+| FEAT-001-B Endpoint | ✅ erfüllt |
+| FEAT-001-C Auto-Extract | ⚠️ Backend done, UI-Toggle in Folge-Sub-Sprint VC-013-VOL |
+| FEAT-001-D UI-Button | ✅ erfüllt |
+
+---
+
 ## Sprint Nightvision NV-2 — Streaming-Endpoint + Static-Image — 2026-05-17
 **Status: ⚠️ RÜCKGABE MIT AUFLAGEN** (0 Blocker / 3 Major / 0 Minor)
 

@@ -135,38 +135,29 @@ Weitere Kandidaten (aus CURRENT_STATE.md "Nächster Sprint offen"):
 
 ---
 
-## 🚀 Nächste Features (Priorisiert 2026-05-16, Admin) — ⏳ offen, Sprint-Kandidaten
+## 🚀 Nächste Features (Priorisiert 2026-05-16, Admin)
 
-### FEAT-001 — KI-Aufgabensplitting aus Sparks
+### FEAT-001 — KI-Aufgabensplitting aus Sparks — 🟡 **AUFLAGEN-FREIGABE 2026-05-17** (Commit 65b4597)
 
-**Idee:** Ein Spracheintrag kann mehrere Themen enthalten. Aktuell wird der gesamte Text als ein Eintrag gespeichert und mit einer Kategorie versehen. Mit diesem Feature analysiert die KI den Spark und extrahiert automatisch einzelne Action-Items als Tasks.
-
-**Aktueller Stand:** 1 Spracheingabe → 1 DB-Eintrag → 1 LLM-Call → 1 Kategorie. Kein Splitting, keine automatische Task-Erstellung.
-
-**Gewünschtes Verhalten:**
-- Nutzer spricht 1 Minute über 5 Themen → App erstellt 5 Tasks mit Titel, Kategorie und optionalem Fälligkeitsdatum
-- Der ursprüngliche Spark-Text bleibt als Quelle erhalten
-- Splitting passiert im Hintergrund (analog zu `recategorize_unsorted`)
+> Tuvok-Ref qs-20260517-012, Findings-Gate `auflagen` (1 Major VC-013-VOL Settings-Toggle UI). Backend-/UI-Hauptpfad freigegeben, Folge-Auflage als Sub-Sprint VC-013-VOL unten.
 
 **Umsetzungsplan:**
-- [ ] **FEAT-001-A** — Neuer LLM-Prompt `extract_action_items(text) -> Vec<ActionItem>` (Titel, Priorität, Fälligkeitsdatum optional, Kategorie)
-  - Datei: `core/src/llm/mod.rs` (neuer Trait-Default), alle Provider-Implementierungen
-  - DoD: Prompt extrahiert aus "Kauf Milch, ruf Kai an, Todo-App fixen bis Freitag" → 3 Tasks korrekt
+- [x] **FEAT-001-A** — LLM-Prompt `extract_action_items(text) -> Vec<ActionItem>` (Trait-Default + Override Claude/Ollama, empty-text early-return, Prosa-Wrapper-Robustheit). ✅ qs-20260517-012.
+- [x] **FEAT-001-B** — `POST /spark/{id}/extract-tasks` idempotent via nexus_external_id-Schema `spark-extract:<spark_id>:<idx>`, transcript-vor-raw_text, Skip leerer Titles. ✅ qs-20260517-012.
+- [⚠] **FEAT-001-C** — Auto-Extract via user_pref + tokio::spawn (Arc-Clone Pool+LLM, tracing::warn). Backend-Pfad ✅, **UI-Toggle fehlt Desktop+Android** → Folge-Sub-Sprint VC-013-VOL.
+- [x] **FEAT-001-D** — UI: "📋 Tasks extrahieren"-Button im Spark-Detail (Desktop + Android), Status-Area role=status aria-live=polite. ✅ qs-20260517-012.
 
-- [ ] **FEAT-001-B** — Neuer Endpoint `POST /spark/{id}/extract-tasks`
-  - Datei: `core/src/handlers.rs`, `core/src/main.rs` (Route)
-  - Response: `{ "created": [task_id, ...], "count": N }`
-  - DoD: Call auf bestehenden Spark → Tasks in DB, Antwort in <3s
+### VC-013-VOL — Settings-Toggle Auto-Extract (Folge-Auflage FEAT-001-C) — ⏳ offen
 
-- [ ] **FEAT-001-C** — Optionaler Auto-Extract nach `POST /spark` (Query-Param `?auto_extract=true` oder Settings-Toggle)
-  - Datei: `core/src/handlers.rs::create_spark`
-  - DoD: Mobile App kann Auto-Extract aktivieren; Desktop-Settings-Modal hat Toggle
+> Folge-Sub-Sprint aus FEAT-001-POST-MERGE-Gate. Aufwand ~20–30 Min.
 
-- [ ] **FEAT-001-D** — UI: "Tasks extrahieren"-Button im Spark-Detail (Desktop + Android)
-  - Dateien: `desktop/src/index.html` (Detail-Modal), `android/.../SparkHistoryScreen.kt`
-  - DoD: Button sichtbar, Klick → Tasks erscheinen in Tasks-Tab ohne Reload
+- [ ] **VC-013-VOL-A** — Desktop-Settings-Modal: Toggle "Auto-Extract Tasks aus Sparks" → setzt user_pref `auto_extract_tasks_enabled` (true/false)
+  - Datei: `desktop/src/index.html` (Settings-Modal)
+  - DoD: Toggle persistiert via `POST /api/user_prefs/auto_extract_tasks_enabled`, Initialwert beim Modal-Open laden
 
-**Aufwand:** ~3–5 Tage (Backend + beide UIs). Infrastruktur (Tasks-Tabelle, LLM-Anbindung, Background-Tasks) bereits vorhanden.
+- [ ] **VC-013-VOL-B** — Android-Settings-Screen: identischer Toggle
+  - Datei: `android/app/src/main/java/.../SettingsScreen.kt` + `NexusApiClient.kt` (falls API-Wrapper fehlt)
+  - DoD: Switch sichtbar, Persistenz E2E grün gegen Core
 
 ---
 

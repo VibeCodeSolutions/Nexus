@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <title>NEXUS — Animationen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap" rel="stylesheet"/>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #f0eee9; }
+    body { font-family: 'Inter', system-ui, sans-serif; overscroll-behavior: none; }
+    #root { position: fixed; inset: 0; }
+
+    /* Frame each Stage in a faux phone bezel to read as 9:16 social */
+    .nx-phone-bezel {
+      position: relative;
+      width: 100%; height: 100%;
+      padding: 14px;
+      box-sizing: border-box;
+      background: linear-gradient(170deg, #1a1c25, #0b0c11);
+      border-radius: 38px;
+      box-shadow:
+        inset 0 0 0 1.5px rgba(255,255,255,0.06),
+        0 30px 60px rgba(0,0,0,0.4);
+    }
+    .nx-phone-bezel::before {
+      content: '';
+      position: absolute;
+      top: 22px; left: 50%; transform: translateX(-50%);
+      width: 110px; height: 28px;
+      background: #000;
+      border-radius: 999px;
+      z-index: 200;
+    }
+    .nx-phone-inner {
+      position: absolute; inset: 14px;
+      border-radius: 26px;
+      overflow: hidden;
+      background: #0b0c11;
+    }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="animations.jsx"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="nexus-ui.jsx"></script>
+  <script type="text/babel" src="variants.jsx"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="env,react">
+    // Each variant lives inside its own Stage. The Stage auto-scales to fit
+    // the artboard's pixel size. We wrap each Stage in a phone bezel for a
+    // social-ready 9:16 read.
+
+    function PhoneStage({ children, dataLabel }) {
+      return (
+        <div className="nx-phone-bezel" data-screen-label={dataLabel}>
+          <div className="nx-phone-inner">
+            <Stage
+              width={540} height={1054}
+              duration={10}
+              background="#0b0c11"
+              loop={true}
+              autoplay={true}
+              persistKey={'nx-' + dataLabel}
+            >
+              {children}
+            </Stage>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <DesignCanvas>
+          <DCSection
+            id="variants"
+            title="NEXUS — Animationen für ADHS-Köpfe"
+            subtitle="3 Richtungen · 9:16 · 10s loop · stumm, captions onscreen, VO-ready">
+
+            <DCArtboard
+              id="variant-a"
+              label="A · Gedankenstrom"
+              width={460} height={900}>
+              <PhoneStage dataLabel="Variant A">
+                <VariantA/>
+              </PhoneStage>
+            </DCArtboard>
+
+            <DCArtboard
+              id="variant-b"
+              label="B · Foto → Text"
+              width={460} height={900}>
+              <PhoneStage dataLabel="Variant B">
+                <VariantB/>
+              </PhoneStage>
+            </DCArtboard>
+
+            <DCArtboard
+              id="variant-c"
+              label="C · Komplett-Tour"
+              width={460} height={900}>
+              <PhoneStage dataLabel="Variant C">
+                <VariantC/>
+              </PhoneStage>
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

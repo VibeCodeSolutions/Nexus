@@ -15,14 +15,14 @@ pub async fn insert(pool: &SqlitePool, raw_text: &str) -> Result<BrainDumpEntry,
 }
 
 pub async fn get_by_id(pool: &SqlitePool, id: &str) -> Result<BrainDumpEntry, sqlx::Error> {
-    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id FROM braindumps WHERE id = ?")
+    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM braindumps WHERE id = ?")
         .bind(id)
         .fetch_one(pool)
         .await
 }
 
 pub async fn list(pool: &SqlitePool) -> Result<Vec<BrainDumpEntry>, sqlx::Error> {
-    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id FROM braindumps ORDER BY created_at DESC")
+    sqlx::query_as::<_, BrainDumpEntry>("SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path FROM braindumps ORDER BY created_at DESC")
         .fetch_all(pool)
         .await
 }
@@ -100,6 +100,7 @@ pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(BrainDump
     let rows = sqlx::query(
         "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, \
                 b.tags_json, b.classification_status, b.nexus_inbox_id, \
+                b.source, b.image_path, \
                 bp.project_id \
          FROM braindumps b \
          LEFT JOIN braindump_projects bp ON b.id = bp.braindump_id \
@@ -121,6 +122,8 @@ pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(BrainDump
             tags_json: row.get("tags_json"),
             classification_status: row.get("classification_status"),
             nexus_inbox_id: row.get("nexus_inbox_id"),
+            source: row.get("source"),
+            image_path: row.get("image_path"),
         };
         let project_id: Option<String> = row.get("project_id");
         (entry, project_id)
@@ -140,7 +143,7 @@ pub async fn assign_braindump_to_project(pool: &SqlitePool, braindump_id: &str, 
 
 pub async fn get_project_braindumps(pool: &SqlitePool, project_id: &str) -> Result<Vec<BrainDumpEntry>, sqlx::Error> {
     sqlx::query_as::<_, BrainDumpEntry>(
-        "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, b.tags_json, b.classification_status, b.nexus_inbox_id \
+        "SELECT b.id, b.created_at, b.raw_text, b.transcript, b.category, b.summary, b.tags_json, b.classification_status, b.nexus_inbox_id, b.source, b.image_path \
          FROM braindumps b \
          INNER JOIN braindump_projects bp ON b.id = bp.braindump_id \
          WHERE bp.project_id = ? \
@@ -199,7 +202,7 @@ pub async fn find_task_by_external_id(
 /// Läuft idempotent beim Start; erzeugt keine Duplikate dank nexus_external_id.
 pub async fn backfill_tasks_from_braindumps(pool: &SqlitePool) -> Result<usize, sqlx::Error> {
     let orphans = sqlx::query_as::<_, crate::models::BrainDumpEntry>(
-        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id \
+        "SELECT id, created_at, raw_text, transcript, category, summary, tags_json, classification_status, nexus_inbox_id, source, image_path \
          FROM braindumps WHERE LOWER(category) = 'task'",
     )
     .fetch_all(pool)

@@ -1,5 +1,53 @@
 # QS Findings — NEXUS v0.1.0 Release
 
+## Sprint Nightvision NV-1 — Foto-Braindump-Pipeline (Core-Foundation) — 2026-05-17
+**Status: ⚠️ FREIGABE MIT AUFLAGEN** (0 Blocker / 0 Major / 3 Minor)
+
+Prüfung durchgeführt von: QS — VibeCoding
+WORKLOG-Ref: `~/.claude/projects/-home-kaik-Projekte-Apps-Nexus/worklogs/vc.md` qs-20260517-003
+Sprint-Ref: `docs/sprints/nightvision-photo-ocr.md` (Sprint NV-1)
+
+### Was geprüft wurde
+- Migration `migrations/20260517_001_braindump_image.sql` (ALTER ADD COLUMN `source`, `image_path`)
+- `core/src/models.rs` — `BrainDumpEntry` + `braindump_source` Modul
+- `core/src/repo.rs` + `core/src/handlers.rs` — alle 8 FromRow-konsumierenden SELECTs erweitert (Lesson `migration-fallen` — Optional-External-ID via nullable Spalte)
+- `core/src/config.rs` — `VisionConfig` + `braindump_images_dir` + env-bool-Helper
+- `core/src/vision/{mod.rs,resize.rs,groq.rs,tesseract.rs}` — neues Modul
+- `core/Cargo.toml` — `image`-Crate + tokio `process`+`io-util` Features
+- `cargo test -p nexus-core` — 73 passed / 1 ignored (Tesseract-Binary) / 0 failed
+- Konvention-Check: Pfad (`~/.nexus/braindump_images/`) und ENV-Naming (`NEXUS_VISION_*`) konsistent zu bestehendem Pattern
+
+### Findings
+
+#### NV1-001-VOL — 🟢 Minor — Mock-Provider-Pipeline-Test fehlt
+- **Prüfgegenstand:** Sprintplan-DoD „Mock-Bild durch Pipeline → `VisionAnalysis` mit Text + Tags"
+- **Befund:** Vorhanden sind: `prepare_image`-Resize-Tests, `clean_json`-Roundtrip-Tests, `tesseract::spawn`-NotFound-Test, `analyze`-Disabled-Pfad, `VisionError`-Display. Es fehlt ein End-to-End-Test mit Mock-`VisionProvider`, der den vollständigen `analyze()`-Pfad (inkl. Tag-Normalisierung) verifiziert. `analyze()` ruft intern `create_vision_provider`, das auf Keystore zugreift — Mock erfordert Refactor zur Trait-Injection.
+- **Korrekturvorschlag:** In NV-2 mit dem Endpoint-Test gemeinsam beheben (dort eh Trait-Injection nötig). Signatur z. B. `analyze_with(provider: &dyn VisionProvider, ...)`.
+- **Status:** offen — Auflage NV-2
+- **Korrektur-Zyklen:** 0/2
+
+#### NV1-002-COD — 🟢 Minor — Duplikat `clean_json`
+- **Prüfgegenstand:** `core/src/vision/groq.rs::clean_json` und `core/src/llm/openai_compatible.rs::clean_json`
+- **Befund:** Beide Funktionen entfernen Markdown-Code-Fences. Die Vision-Variante erweitert um Prosa-Extraktion via `{`/`}`-Schneiden — funktional kompatibel, inhaltlich nahezu identisch.
+- **Korrekturvorschlag:** Helper nach `core/src/llm/mod.rs` ziehen (z. B. `pub(crate) fn extract_json(raw: &str) -> &str`) und an beiden Stellen verwenden. Backlog, kein Blocker.
+- **Status:** offen — Backlog
+- **Korrektur-Zyklen:** 0/2
+
+#### NV1-003-COD — 🟢 Minor — `unused_assignments`-allow auf `analyze()`
+- **Prüfgegenstand:** `core/src/vision/mod.rs::analyze`
+- **Befund:** `let mut vision_err: Option<String> = None;` wird im Vision-Erfolgspfad geschrieben aber nicht gelesen → Compiler-Warning. Aktuell global per `#![allow(unused_assignments)]` unterdrückt. Sauberer wäre Logik-Refactor: vision_err nur erstellen, wenn Fallback-Pfad tatsächlich erreicht.
+- **Korrekturvorschlag:** Bedingten `let`-Bind statt vorab-`None`. Backlog.
+- **Status:** offen — Backlog
+- **Korrektur-Zyklen:** 0/2
+
+### Beobachtung (nicht Finding)
+- Spec sagt „Trait `VisionProvider` in `core/src/llm/mod.rs`" — Implementierung liegt in neuem `core/src/vision/`-Modul. Bewusste Architekturentscheidung (eigene Domäne, anderer Request-Body), keine Konvention-Verletzung. Sprintplan-Wortlaut sollte in NV-2 angeglichen werden (Kosmetik).
+
+### Empfehlung
+⚠️ **Auflagen** — NV-2 muss `analyze()` zur Trait-Injection refactoren und Mock-Pipeline-Test nachreichen. NV1-002 + NV1-003 bleiben Backlog ohne Re-QS-Pflicht.
+
+---
+
 ## Phase Obsidian-Briefkasten A — Foundation (Migration + Config + Keystore + Models) — 2026-05-03
 **Status: ✅ FREIGABE OHNE AUFLAGEN** (0 Blocker / 0 Major / 2 Minor — Folge-Sprint-Bookmarks)
 

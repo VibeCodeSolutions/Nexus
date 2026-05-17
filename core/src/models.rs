@@ -58,6 +58,19 @@ pub struct BrainDumpEntry {
     pub classification_status: String,
     #[serde(default)]
     pub nexus_inbox_id: Option<String>,
+    #[serde(default = "default_braindump_source")]
+    pub source: String,
+    #[serde(default)]
+    pub image_path: Option<String>,
+}
+
+fn default_braindump_source() -> String { "text".to_string() }
+
+pub mod braindump_source {
+    #[allow(dead_code)]
+    pub const TEXT: &str = "text";
+    #[allow(dead_code)]
+    pub const PHOTO: &str = "photo";
 }
 
 fn default_classification_status() -> String {

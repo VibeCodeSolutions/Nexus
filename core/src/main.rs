@@ -12,6 +12,8 @@ mod oauth;
 mod obsidian;
 mod repo;
 mod suggestions;
+#[allow(dead_code)]
+mod vision;
 
 use axum::middleware;
 use axum::routing::{delete, get, post, put};

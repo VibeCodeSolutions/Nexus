@@ -1,28 +1,25 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | Aktiver Sprint: **S25-Designimpuls**
+**Stand:** 2026-05-19 | ⏸ **Pause** — S25 gemerged, S26 wartet
 
-## S25 — Designimpuls (Code-Done, in QS)
+## Nächster Sprint: S26 — Komponenten-Vollmigration + Settings-UI
 
-- [x] P1 — Tokens-Layer einziehen (inline, additiv, `--nx-*` prefix) → `6a2edea`
-- [x] P2 — F-001 Scroll-Fix (`100vh` → `100dvh`, `overflow: hidden`) + F-002 Polish → `fa21267`
-- [x] P3 — F-003 Copy „ADHS-OS" → „Personal OS" (5 Stellen) → `f3a15c4`
-- [x] P4 — `docs/UI_SPEC_v0.2.md` einziehen + Verweis in v0.1 → `03275e4`
-- [x] P5 — Status-Pill auf `--nx-*` migrieren (Multi-Theme-Proof) → `23b1e5c`
-- [x] Tuvok release-qs Gate → `qs-20260519-S25-001` (auflagen, VC-001-VOL behoben in `dafa41b`)
-- [x] Findings-Gate Chakotay → freigabe (2026-05-19)
-- [ ] FF-Merge nach main (Admin-Confirm)
+- [ ] Cards / Bottom-Sheet / Phone-Bezel / Charts / Settings-Rows auf `--nx-*`-Tokens migrieren (Vollmigration der v0.2-Spec, siehe `docs/UI_SPEC_v0.2.md`)
+- [ ] **Theme-Picker-UI** in Settings (Indigo / Coral / Amber / Green) — aus S25-Admin-Smoke (S25-SMOKE-1)
+- [ ] **„Zurück zum Wizard"-Button** in Settings — vor Implementierung Pre-Audit ob pre-existing (S25-SMOKE-2)
+- [ ] **VC-002-KON** — Status-Pill rgba-Triples als `--nx-{green,coral,amber}-glow`-Tokens auslagern (qs-20260519-S25-001 Minor)
+- [ ] **Browser-Pairing-Flow für Plain-Browser-Smoke** (S25-SMOKE-3, niedrig)
 
-## Backlog (in Reihenfolge)
+## Backlog (in Reihenfolge nach S26)
 
-- [ ] **S24** — Projekte-CRUD (verschoben hinter S25)
-- [ ] **S26** — Komponenten-Vollmigration auf `--nx-*` (Cards, Bottom-Sheet, Phone-Bezel, Charts, Settings-Rows)
+- [ ] **S24** — Projekte-CRUD (nutzt Bottom-Sheet/Phone-Bezel aus S26)
 - [ ] **Backlog-N1** — Bottom-Nav-Badge mit Unsorted-Spark-Count (UI_SPEC §4.9, qs-20260517-002)
 - [ ] **Backlog-N2** — Smoke-Test auf physischem Pixel-Gerät (Compose-Side aus NV-5)
 - [ ] **Backlog-Refactor** — `desktop/src/styles/`-Auslagerung (optional, eigene Spur)
 
 ## Erledigt (jüngst)
 
+- [x] **S25 — Designimpuls** (FF-Merge `7e5bc8f` → main, 2026-05-19) — Tokens v0.2, F-001/F-002 Scroll-Fix, F-003 Branding, UI_SPEC v0.2, Status-Pill-Proof
 - [x] S24-VISION-FIX (5 Provider live) — 2026-05-19
 - [x] S24-VISION-FIX-CLEANUP (Branch rebased) — 2026-05-19
 - [x] S24-Smoke-Polish (4 Findings) — 2026-05-19

@@ -1,12 +1,12 @@
 # NEXUS — Current State
 
 **Stand:** 2026-05-18
-**Aktuelle Phase:** v0.1.3 released + Post-Release-Stack abgeschlossen: NV-Closure + FEAT-001 KI-Aufgabensplitting + VC-013-VOL Settings-Toggle + FEAT-002 (A iCal-Export, B/C Härtung). Kein aktiver Sprint, nächster zu planen.
-**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `9bba058` (feat(feat-002-bc-p2) ETag + Last-Modified). main clean & sync mit origin.
+**Aktuelle Phase:** v0.1.3 released + Post-Release-Stack abgeschlossen: NV-Closure + FEAT-001 KI-Aufgabensplitting + VC-013-VOL Settings-Toggle + FEAT-002 (A iCal-Export, B/C Härtung) + NV-Vision-clippy-Cleanup. Kein aktiver Sprint, nächster zu planen.
+**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `7e8677c` (refactor(vision) clippy strict cleanup). main clean & sync mit origin. `cargo clippy --all-targets -- -D warnings` ab jetzt grün.
 
 **Sprint-Verlauf v0.1.3:** Obsidian-Briefkasten A–E ✅ · Happy Thompson A–C ✅ · Crystalline Crab Phase C ✅ · UI-Redesign Nightvision M1–M4 ✅ · Foto-Spark Pipeline NV-1..NV-5 ✅ · Phase A Sparks-Rename + Gamification-Removal ✅. Alle Sprints Tuvok-freigegeben (qs-20260509-001..004, qs-20260517-001..010).
 
-**Post-v0.1.3:** NV-Closure (3 Polish-Bookmarks) ✅ · FEAT-001 KI-Aufgabensplitting (4 Schichten) ✅ · VC-013-VOL Settings-Toggle (FEAT-001-C-Auflage) ✅ · FEAT-002-A iCal-Export Sparks+Tasks ✅ · FEAT-002-B/C iCal-Härtung (P1 AUTH+TRACE, P2 ETag+Last-Modified+304) ✅. QS-Läufe qs-20260517-011..014 + qs-20260518-001..002 alle Freigabe ohne Findings.
+**Post-v0.1.3:** NV-Closure (3 Polish-Bookmarks) ✅ · FEAT-001 KI-Aufgabensplitting (4 Schichten) ✅ · VC-013-VOL Settings-Toggle (FEAT-001-C-Auflage) ✅ · FEAT-002-A iCal-Export Sparks+Tasks ✅ · FEAT-002-B/C iCal-Härtung (P1 AUTH+TRACE, P2 ETag+Last-Modified+304) ✅ · NV-Vision-clippy-Cleanup (3 pre-existing Warnings beseitigt, strict-Modus grün) ✅. QS-Läufe qs-20260517-011..014 + qs-20260518-001..003 alle Freigabe ohne Findings.
 
 ---
 
@@ -74,9 +74,10 @@ Stand-alone Mini-Sprints nach v0.1.3-Tag, kein neuer Release-Tag bisher.
   - **Phase 2 ETAG:** `core/src/repo.rs` neue `sparks_freshness`/`tasks_freshness` (Tuple `(Option<String>, i64)` aus `MAX(timestamp)`+`COUNT(*)`, Tasks-Filter spiegelt das Export-Set exakt). `core/src/handlers.rs` 4 neue Header-Helper (`ics_etag` deterministisch über Hex-Millis+Count mit Raw/Empty-Fallback, `ics_last_modified` als IMF-fixdate RFC 7231, `apply_freshness_headers` für 200+304-Header-Mutation), beide `export_*_ics`-Endpoints auf `HeaderMap`-Extraktor + `If-None-Match`→304-Pfad umgestellt (Body leer bei 304, Headers werden auch dort gesetzt für nächsten Re-Fetch). Strong-ETag, kein W/-Prefix-Support (für Calendar-Subscribe-Clients ausreichend). Tests +9 (5 etag-Helper + 2 last-modified + 2 freshness-repo). QS qs-20260518-002 ✅ freigabe (0 Findings). cargo test final 103/0+1ign.
 
 **Backlog (offen):**
-- **NV-Vision-Stack clippy strict cleanup** (eigener Sprint überfällig): 3 pre-existing Warnings persistieren seit qs-20260517-014 (`vision/mod.rs` duplicated_attributes, `handlers.rs run_photo_spark_pipeline` too_many_arguments 9/7, `vision/resize.rs` doc_lazy_continuation). Tuvok-Empfehlung in qs-20260518-001 + qs-20260518-002 wiederholt.
+- ~~NV-Vision-Stack clippy strict cleanup~~ ✅ erledigt 2026-05-18 (Commit `7e8677c`, qs-20260518-003).
 - VC-013-MIN-1: Android Path-Encoding-Wrapper generisch robust machen.
 - Optional: Mobile-Subscribe-Helper-Button in Settings (Settings-Modal/Android zeigt fertige `?token=…`-Subscribe-URL mit Copy-to-Clipboard) — Mini-Folge-Sprint möglich, nicht zwingend.
+- **Daniel-Feature-Spec-Gaps** (siehe `docs/daniel-feature-spec-gap.md`): 18 Findings aus BUILD-SPEC-Analyse, 3 Sprint-Vorschläge (Funktional / Polish / Konzeptklärung). Zwei offene Konzeptfragen: DA-001 Sparks-Filter „Alle/Idea/Task" vs. Kategorie-Pluralität, DB-006 Desktop-Live-Camera vs. File-Upload-only.
 
 ---
 

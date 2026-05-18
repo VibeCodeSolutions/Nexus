@@ -1,6 +1,9 @@
 package com.vibecode.nexus.ui.screen
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -8,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -17,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -26,7 +31,31 @@ import com.vibecode.nexus.data.model.SparkLinks
 import com.vibecode.nexus.data.model.SparkResponse
 import com.vibecode.nexus.data.model.Link
 import com.vibecode.nexus.data.model.ProjectResponse
+import com.vibecode.nexus.data.model.TaskResponse
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+// DANIEL-POLISH DA-002: Mapping Spark → "wurde extrahiert?" via
+// `task.nexus_external_id`-Pattern. Regex extrahiert die spark_id.
+private val SPARK_EXTRACT_RE = Regex("""^spark-extract:(.+?):\d+$""")
+
+private fun buildSparkExtractedSet(tasks: List<TaskResponse>): Set<String> {
+    val out = HashSet<String>()
+    for (t in tasks) {
+        val ext = t.nexus_external_id ?: continue
+        val m = SPARK_EXTRACT_RE.matchEntire(ext) ?: continue
+        out.add(m.groupValues[1])
+    }
+    return out
+}
+
+// DANIEL-POLISH DA-002: Kind-Badge-Farben (Idea = lila tonal,
+// Task = grün tonal). Background mit niedriger Alpha, Text-Color
+// gesättigter. Funktioniert in beiden Themes.
+private val KIND_IDEA_BG = Color(0x26A78BFA)  // rgba(167,139,250,0.15)
+private val KIND_IDEA_FG = Color(0xFFC4B5FD)
+private val KIND_TASK_BG = Color(0x2634D399)  // rgba(52,211,153,0.15)
+private val KIND_TASK_FG = Color(0xFF6EE7B7)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +66,10 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
     val uiPrefs = remember { UiPreferences(context) }
     var entries by remember { mutableStateOf<List<SparkResponse>>(emptyList()) }
     var projects by remember { mutableStateOf<List<ProjectResponse>>(emptyList()) }
+    // DANIEL-POLISH DA-002: Set der Spark-IDs, aus denen schon Tasks
+    // extrahiert wurden. Wird parallel zu Sparks geladen und für die
+    // IDEA/TASK-Kind-Badge in den Karten genutzt.
+    var extractedSparkIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var detailEntry by remember { mutableStateOf<SparkResponse?>(null) }
@@ -49,6 +82,11 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
                 .onSuccess { entries = it; isLoading = false }
                 .onFailure { errorMsg = it.message; isLoading = false }
             apiClient.getProjects().onSuccess { projects = it }
+            // DANIEL-POLISH DA-002: Tasks-Pull für Spark→Task-Mapping.
+            // Fehler nicht fatal — fällt auf "alle Idea" zurück.
+            apiClient.getTasks().onSuccess { taskList ->
+                extractedSparkIds = buildSparkExtractedSet(taskList)
+            }
         }
     }
 
@@ -176,25 +214,44 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
                     }
                     Text(msg, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(visibleEntries, key = { it.id }) { entry ->
-                        SwipeToDismissItem(
-                            entry = entry,
-                            onClick = { detailEntry = entry },
-                            onDelete = {
-                                scope.launch {
-                                    apiClient.deleteSpark(entry.id)
-                                        .onSuccess {
-                                            entries = entries.filter { it.id != entry.id }
-                                            snackbarHostState.showSnackbar("Gelöscht")
+                else -> {
+                    // DANIEL-POLISH DA-005: Sheet-Dim — beim offenen
+                    // Detail-Sheet wird die Liste hinter dem Scrim
+                    // zusätzlich auf 0.4 alpha gedimmt.
+                    val listAlpha by animateFloatAsState(
+                        targetValue = if (detailEntry != null) 0.4f else 1f,
+                        animationSpec = tween(durationMillis = 200),
+                        label = "list_dim"
+                    )
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.graphicsLayer { alpha = listAlpha }
+                    ) {
+                        itemsIndexed(visibleEntries, key = { _, e -> e.id }) { index, entry ->
+                            // DANIEL-POLISH DA-003: Karten-Stagger-Animation
+                            // (slide-up + fade + scale) beim ersten
+                            // Erscheinen, index-basierter Delay (cap 320 ms).
+                            StaggeredAppear(index = index) {
+                                SwipeToDismissItem(
+                                    entry = entry,
+                                    isTask = extractedSparkIds.contains(entry.id),
+                                    onClick = { detailEntry = entry },
+                                    onDelete = {
+                                        scope.launch {
+                                            apiClient.deleteSpark(entry.id)
+                                                .onSuccess {
+                                                    entries = entries.filter { it.id != entry.id }
+                                                    snackbarHostState.showSnackbar("Gelöscht")
+                                                }
+                                                .onFailure {
+                                                    snackbarHostState.showSnackbar("Löschen fehlgeschlagen: ${it.message}")
+                                                    load()
+                                                }
                                         }
-                                        .onFailure {
-                                            snackbarHostState.showSnackbar("Löschen fehlgeschlagen: ${it.message}")
-                                            load()
-                                        }
-                                }
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -300,9 +357,14 @@ private fun SparkDetailSheet(
             }
 
             if (entry.tags.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    entry.tags.forEach { tag ->
-                        AssistChip(onClick = {}, enabled = false, label = { Text(tag) })
+                // DANIEL-POLISH DA-004: Tag-Pop-In gestaffelt beim Sheet-
+                // Open. Key am Composable-Aufrufer (entry.id) sorgt für
+                // Reset, wenn man zwischen Sparks navigiert.
+                key(entry.id) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        entry.tags.forEachIndexed { idx, tag ->
+                            PopInTagChip(label = tag, index = idx)
+                        }
                     }
                 }
             }
@@ -435,6 +497,56 @@ private fun WikiLinkFlow(
     }
 }
 
+// DANIEL-POLISH DA-002: Kompakte Kind-Badge — Letter-Spacing-Uppercase
+// Pill links oben auf jeder Spark-Karte. IDEA = lila tonal, TASK = grün
+// tonal.
+@Composable
+private fun KindBadge(isTask: Boolean) {
+    val (bg, fg, label) = if (isTask) {
+        Triple(KIND_TASK_BG, KIND_TASK_FG, "Task")
+    } else {
+        Triple(KIND_IDEA_BG, KIND_IDEA_FG, "Idea")
+    }
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = bg
+    ) {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = fg,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+        )
+    }
+}
+
+// DANIEL-POLISH DA-004: Tag-Chip mit Pop-In-Animation (scale 0.7→1 +
+// fade), per-Chip-Delay (60 ms versetzt). Reset beim Sheet-Open via
+// Key-Param am Composable-Aufrufer.
+@Composable
+private fun PopInTagChip(label: String, index: Int) {
+    val visible = remember { Animatable(0f) }
+    val scale = remember { Animatable(0.7f) }
+    LaunchedEffect(Unit) {
+        delay((index * 60L).coerceAtMost(420L))
+        kotlinx.coroutines.coroutineScope {
+            launch { visible.animateTo(1f, tween(220)) }
+            launch { scale.animateTo(1f, tween(220)) }
+        }
+    }
+    AssistChip(
+        onClick = {},
+        enabled = false,
+        label = { Text(label) },
+        modifier = Modifier.graphicsLayer {
+            alpha = visible.value
+            scaleX = scale.value
+            scaleY = scale.value
+        }
+    )
+}
+
 private fun Link.isSentinel(): Boolean = relation == "noop-marker" && created_by == "llm"
 
 private fun wikiLabelFor(
@@ -455,10 +567,40 @@ private fun wikiLabelFor(
     return "📝 $id"
 }
 
+// DANIEL-POLISH DA-003: Wrapper-Composable für gestaffeltes Einblenden
+// der Spark-Karten. Initial einmal beim Erscheinen (LaunchedEffect-Key
+// Unit + Index als Delay-Quelle). Cap bei 320 ms — sonst warten lange
+// Listen unnötig.
+@Composable
+private fun StaggeredAppear(index: Int, content: @Composable () -> Unit) {
+    val offsetY = remember { Animatable(18f) }
+    val alpha = remember { Animatable(0f) }
+    val scale = remember { Animatable(0.98f) }
+    LaunchedEffect(Unit) {
+        delay((index * 40L).coerceAtMost(320L))
+        kotlinx.coroutines.coroutineScope {
+            launch { offsetY.animateTo(0f, tween(320)) }
+            launch { alpha.animateTo(1f, tween(320)) }
+            launch { scale.animateTo(1f, tween(320)) }
+        }
+    }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            this.alpha = alpha.value
+            this.translationY = offsetY.value
+            this.scaleX = scale.value
+            this.scaleY = scale.value
+        }
+    ) {
+        content()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissItem(
     entry: SparkResponse,
+    isTask: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -491,6 +633,21 @@ private fun SwipeToDismissItem(
     ) {
         Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
             Column(modifier = Modifier.padding(12.dp)) {
+                // DANIEL-POLISH DA-002: Kind-Badge oben links auf jeder
+                // Spark-Card. TASK wenn aus diesem Spark schon Tasks
+                // extrahiert wurden, sonst IDEA als Default.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    KindBadge(isTask = isTask)
+                    Text(
+                        text = entry.created_at.take(16).replace("T", " "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -499,11 +656,6 @@ private fun SwipeToDismissItem(
                         text = entry.category ?: "Unsorted",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = entry.created_at.take(16).replace("T", " "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(4.dp))

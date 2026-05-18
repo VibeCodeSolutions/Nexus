@@ -1,7 +1,12 @@
 package com.vibecode.nexus.ui.screen
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,7 +49,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -272,12 +283,12 @@ private fun SwipeableTaskCard(
             }
         }
     ) {
-        TaskCard(task)
+        TaskCard(task, onMarkDone = onMarkDone)
     }
 }
 
 @Composable
-private fun TaskCard(task: TaskResponse) {
+private fun TaskCard(task: TaskResponse, onMarkDone: () -> Unit = {}) {
     val isDone = task.status == "done"
     val priorityColor = when (task.priority) {
         "high" -> NexusAccent.PriorityHigh
@@ -302,6 +313,16 @@ private fun TaskCard(task: TaskResponse) {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // DANIEL-POLISH DC-005: Animierte Checkbox mit Checkmark-
+            // Pfad (Canvas drawPath + PathMeasure für „zeichnet sich"-
+            // Effekt). Tap auf die Box markiert offene Tasks als done.
+            AnimatedCheckbox(
+                checked = isDone,
+                onToggle = { if (!isDone) onMarkDone() }
+            )
+
+            Spacer(Modifier.width(12.dp))
+
             // Priority indicator
             Box(
                 modifier = Modifier
@@ -347,6 +368,67 @@ private fun TaskCard(task: TaskResponse) {
                     )
                 }
             }
+        }
+    }
+}
+
+// DANIEL-POLISH DC-005: Animierte Checkbox — Checkmark-Pfad
+// (M 2 6 L 5 9 L 10 3) zeichnet sich beim Tick via PathMeasure +
+// animateFloatAsState (Progress 0→1, 240 ms ease-out). Box selbst
+// transitions Background von transparent zu success-grün.
+@Composable
+private fun AnimatedCheckbox(
+    checked: Boolean,
+    onToggle: () -> Unit,
+) {
+    val progress by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = tween(durationMillis = 240),
+        label = "check_progress"
+    )
+    val bg by animateColorAsState(
+        targetValue = if (checked) Color(0xFF4CAF50) else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "check_bg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (checked) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline,
+        animationSpec = tween(durationMillis = 200),
+        label = "check_border"
+    )
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(bg)
+            .border(2.dp, borderColor, RoundedCornerShape(5.dp))
+            .clickable { onToggle() },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(16.dp)) {
+            // Pfad M 2 6 L 5 9 L 10 3 in 12x12-Viewbox → auf Canvas-Größe skaliert.
+            val w = size.width
+            val h = size.height
+            val sx = w / 12f
+            val sy = h / 12f
+            val path = Path().apply {
+                moveTo(2f * sx, 6f * sy)
+                lineTo(5f * sx, 9f * sy)
+                lineTo(10f * sx, 3f * sy)
+            }
+            val measure = PathMeasure().apply { setPath(path, false) }
+            val totalLen = measure.length
+            val animated = Path()
+            measure.getSegment(0f, totalLen * progress, animated, true)
+            drawPath(
+                path = animated,
+                color = Color.White,
+                style = Stroke(
+                    width = 2.4f * sx,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
         }
     }
 }

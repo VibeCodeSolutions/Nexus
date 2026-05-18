@@ -28,5 +28,10 @@ data class TaskResponse(
     // Backend liefert `due_date` als ISO-YYYY-MM-DD seit Migration
     // 20260520_001. Android-Model zog hinterher — jetzt nachgezogen,
     // damit die Nächster-Fokus-Card das Datum anzeigen kann.
-    val due_date: String? = null
+    val due_date: String? = null,
+    // DANIEL-POLISH DA-002 (2026-05-18): Tasks aus Sparks tragen
+    // `nexus_external_id = "spark-extract:<spark_id>:<idx>"`. Wird
+    // clientseitig in SparkHistoryScreen genutzt, um IDEA/TASK-Badge
+    // pro Spark-Karte zu bestimmen.
+    val nexus_external_id: String? = null
 )

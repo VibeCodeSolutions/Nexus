@@ -23,5 +23,10 @@ data class TaskResponse(
     val priority: String,
     val project_id: String? = null,
     val created_at: String,
-    val updated_at: String? = null
+    val updated_at: String? = null,
+    // FEAT-001 (Backend) → DANIEL-FUNKTIONAL (Android-Pull, 2026-05-18):
+    // Backend liefert `due_date` als ISO-YYYY-MM-DD seit Migration
+    // 20260520_001. Android-Model zog hinterher — jetzt nachgezogen,
+    // damit die Nächster-Fokus-Card das Datum anzeigen kann.
+    val due_date: String? = null
 )

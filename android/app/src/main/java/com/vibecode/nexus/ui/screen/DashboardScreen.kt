@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibecode.nexus.data.NexusApiClient
+import com.vibecode.nexus.data.model.TaskResponse
 import com.vibecode.nexus.ui.theme.NexusAccent
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -52,28 +53,48 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var sparkCount by remember { mutableStateOf<Int?>(null) }
-    var unsortedCount by remember { mutableStateOf(0) }
-    var openTaskCount by remember { mutableStateOf<Int?>(null) }
-    var projectCount by remember { mutableStateOf<Int?>(null) }
+    // DANIEL-FUNKTIONAL DC-001..004: vier Stat-Counter aus /api/dashboard/stats.
+    // Vorher liefen drei Einzelaufrufe (getSparks/getTasks/getProjects); der
+    // Aggregat-Endpoint spart Roundtrips und liefert HEUTE/DIESE-WOCHE-Werte,
+    // die clientseitig nicht ableitbar waren.
+    var todaySparks by remember { mutableStateOf<Long?>(null) }
+    var openTaskCount by remember { mutableStateOf<Long?>(null) }
+    var activeProjects by remember { mutableStateOf<Long?>(null) }
+    var doneThisWeek by remember { mutableStateOf<Long?>(null) }
+    var unsortedCount by remember { mutableStateOf(0L) }
+    // DANIEL-FUNKTIONAL DC-003: Nächster offener Task mit Fälligkeit. `null`
+    // = noch nicht geladen ODER kein passender Task ODER Netzwerk-Fehler.
+    // Wir tracken den Lade-/Fehler-Zustand separat via `nextFocusLoaded` +
+    // `nextFocusError`, damit die UI Empty-Hint vs. Network-Fail
+    // differenzieren kann (analog Desktop DC-P2-N03-Fix).
+    var nextFocus by remember { mutableStateOf<TaskResponse?>(null) }
+    var nextFocusLoaded by remember { mutableStateOf(false) }
+    var nextFocusError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(isPaired) {
         if (!isPaired) return@LaunchedEffect
         scope.launch {
             coroutineScope {
-                val bd = async { apiClient.getSparks() }
-                val ts = async { apiClient.getTasks() }
-                val ps = async { apiClient.getProjects() }
-                bd.await().onSuccess { entries ->
-                    sparkCount = entries.size
-                    unsortedCount = entries.count {
-                        it.category.isNullOrBlank() || it.category.equals("Unsorted", ignoreCase = true)
+                val stats = async { apiClient.getDashboardStats() }
+                val focus = async { apiClient.getDashboardNextFocus() }
+                val unsort = async { apiClient.getUnsortedCount() }
+                stats.await().onSuccess { s ->
+                    todaySparks    = s.today_sparks
+                    openTaskCount  = s.total_open_tasks
+                    activeProjects = s.active_projects
+                    doneThisWeek   = s.done_this_week
+                }
+                focus.await()
+                    .onSuccess { resp ->
+                        nextFocus = resp.task
+                        nextFocusLoaded = true
+                        nextFocusError = null
                     }
-                }
-                ts.await().onSuccess { tasks ->
-                    openTaskCount = tasks.count { it.status != "done" && it.status != "completed" }
-                }
-                ps.await().onSuccess { p -> projectCount = p.size }
+                    .onFailure { err ->
+                        nextFocusLoaded = true
+                        nextFocusError = "Nächster Fokus konnte nicht geladen werden (Verbindung prüfen)."
+                    }
+                unsort.await().onSuccess { c -> unsortedCount = c }
             }
         }
     }
@@ -130,9 +151,9 @@ fun DashboardScreen(
         }
 
         // Alert-Card (only when unsorted > 0)
-        if (unsortedCount > 0) {
+        if (unsortedCount > 0L) {
             AlertCard(
-                count = unsortedCount,
+                count = unsortedCount.toInt(),
                 onClick = { onNavigate("history") }
             )
         }
@@ -146,7 +167,10 @@ fun DashboardScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        // 2x2 Overview-Grid
+        // DANIEL-FUNKTIONAL: 2x2 Overview-Grid mit vier Stat-Cards
+        // (HEUTE / OFFEN / PROJEKTE / DIESE WOCHE). UNSORTIERT-Card
+        // entfällt — Unsortiert-Hinweis kommt weiter über die
+        // AlertCard oben (sticht stärker hervor als ein Stat-Tile).
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -156,9 +180,9 @@ fun DashboardScreen(
         ) {
             item {
                 OverviewCard(
-                    count = sparkCount?.toString() ?: "—",
+                    count = todaySparks?.toString() ?: "—",
                     icon = "🧠",
-                    label = "SPARKS",
+                    label = "HEUTE",
                     onClick = { onNavigate("history") }
                 )
             }
@@ -166,13 +190,13 @@ fun DashboardScreen(
                 OverviewCard(
                     count = openTaskCount?.toString() ?: "—",
                     icon = "✅",
-                    label = "AUFGABEN",
+                    label = "OFFEN",
                     onClick = { onNavigate("tasks") }
                 )
             }
             item {
                 OverviewCard(
-                    count = projectCount?.toString() ?: "—",
+                    count = activeProjects?.toString() ?: "—",
                     icon = "📁",
                     label = "PROJEKTE",
                     onClick = { onNavigate("projects") }
@@ -180,13 +204,94 @@ fun DashboardScreen(
             }
             item {
                 OverviewCard(
-                    count = unsortedCount.toString(),
-                    icon = "⚠",
-                    label = "UNSORTIERT",
-                    onClick = { onNavigate("history") }
+                    count = doneThisWeek?.toString() ?: "—",
+                    icon = "🏆",
+                    label = "DIESE WOCHE",
+                    onClick = { onNavigate("tasks") }
                 )
             }
         }
+
+        // DANIEL-FUNKTIONAL DC-003: Nächster-Fokus-Card unterhalb des Stat-Grids.
+        // Drei Zustände: Task vorhanden / `task: null` / Netzwerkfehler.
+        NextFocusCard(
+            task = nextFocus,
+            loaded = nextFocusLoaded,
+            error = nextFocusError,
+            onClick = { onNavigate("tasks") }
+        )
+    }
+}
+
+@Composable
+private fun NextFocusCard(
+    task: TaskResponse?,
+    loaded: Boolean,
+    error: String?,
+    onClick: () -> Unit,
+) {
+    when {
+        task != null -> {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClick)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "NÄCHSTER FOKUS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.6.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = task.title.ifBlank { "Ohne Titel" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    val meta = buildString {
+                        task.due_date?.takeIf { it.isNotBlank() }?.let { append("Fällig: $it") }
+                        if (task.priority.isNotBlank()) {
+                            if (isNotEmpty()) append(" · ")
+                            append("Priorität ${task.priority.uppercase()}")
+                        }
+                    }
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            text = meta,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+        loaded && error != null -> {
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+        loaded -> {
+            Text(
+                text = "Kein Fokus-Task — alle Termine erledigt oder ohne Datum.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+        // !loaded → kein Render (LaunchedEffect läuft noch)
+        else -> Unit
     }
 }
 

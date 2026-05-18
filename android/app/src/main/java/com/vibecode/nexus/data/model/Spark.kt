@@ -38,3 +38,25 @@ data class ExtractTasksResponse(
     val skipped: Long = 0,
     val count: Long = 0
 )
+
+/**
+ * DANIEL-FUNKTIONAL DC-001..004: Dashboard-Stat-Aggregat. Speist die vier
+ * Stat-Cards Heute / Offen / Projekte / Diese-Woche-Erledigt.
+ */
+@Serializable
+data class DashboardStatsResponse(
+    val today_sparks: Long,
+    val done_this_week: Long,
+    val total_open_tasks: Long,
+    val active_projects: Long
+)
+
+/**
+ * DANIEL-FUNKTIONAL DC-003: Nächster offener Task mit Fälligkeit für die
+ * Hero-Card unter dem Stat-Grid. `task` ist explizit `null` wenn nichts
+ * passt — kein 404, sondern nullable Body-Feld.
+ */
+@Serializable
+data class DashboardNextFocusResponse(
+    val task: com.vibecode.nexus.data.model.TaskResponse? = null
+)

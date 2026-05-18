@@ -19,7 +19,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.vibecode.nexus.data.NexusApiClient
+import com.vibecode.nexus.data.UiPreferences
 import com.vibecode.nexus.data.model.SparkLinks
 import com.vibecode.nexus.data.model.SparkResponse
 import com.vibecode.nexus.data.model.Link
@@ -30,6 +32,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun SparkHistoryScreen(apiClient: NexusApiClient) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    // DANIEL-FUNKTIONAL DA-001: Filter-Persistenz via UiPreferences.
+    val uiPrefs = remember { UiPreferences(context) }
     var entries by remember { mutableStateOf<List<SparkResponse>>(emptyList()) }
     var projects by remember { mutableStateOf<List<ProjectResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -50,17 +55,35 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
     LaunchedEffect(Unit) { load() }
 
     val unsortedCount = entries.count { it.category.isNullOrBlank() || it.category == "Unsorted" }
-    // Dynamische Kategorien aus den Daten (Spec §4.6 Filter Pills, single-select).
+    // DANIEL-FUNKTIONAL DA-001 Hybrid:
+    // Reihe 2 = Lebensbereich-Kategorien (alle aus DB außer Idea/Task,
+    // die in Reihe 1 stehen). Konsistent zum Desktop-Verhalten
+    // (populateCategoryFilter() filtert TYPE_VALUES raus).
+    val typeValues = remember { setOf("Idea", "Task") }
     val categories = remember(entries) {
-        entries.mapNotNull { it.category?.takeIf { c -> c.isNotBlank() && c != "Unsorted" } }
+        entries.mapNotNull { it.category?.takeIf { c -> c.isNotBlank() && c != "Unsorted" && c !in typeValues } }
             .distinct()
             .sorted()
     }
-    var activeFilter by remember { mutableStateOf<String?>(null) } // null = "Alle"
-    val visibleEntries = when (activeFilter) {
-        null -> entries
-        "__unsorted__" -> entries.filter { it.category.isNullOrBlank() || it.category == "Unsorted" }
-        else -> entries.filter { it.category.equals(activeFilter, ignoreCase = true) }
+    // Beide Filter werden aus UiPreferences vorbelegt — Persistenz über
+    // App-Restart hinweg. `null`/empty = „Alle" für die jeweilige Reihe.
+    var typeFilter by remember { mutableStateOf(uiPrefs.sparkTypeFilter) }
+    var lifeFilter by remember { mutableStateOf(uiPrefs.sparkLifeFilter) }
+
+    val visibleEntries = remember(entries, typeFilter, lifeFilter) {
+        entries.filter { entry ->
+            // Lebensbereich-Filter (Reihe 2)
+            if (lifeFilter == "__unsorted__") {
+                if (!(entry.category.isNullOrBlank() || entry.category == "Unsorted")) return@filter false
+            } else if (lifeFilter != null) {
+                if (!entry.category.equals(lifeFilter, ignoreCase = true)) return@filter false
+            }
+            // Type-Filter (Reihe 1) — case-insensitive auf category
+            if (typeFilter != null) {
+                if (!entry.category.orEmpty().equals(typeFilter, ignoreCase = true)) return@filter false
+            }
+            true
+        }
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
@@ -77,32 +100,61 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
                 modifier = Modifier.padding(vertical = 16.dp)
             )
 
-            // Filter-Pills (Spec §4.6): Alle / <dynamische Kategorien> / Unsortiert
-            val filterScroll = rememberScrollState()
+            // DANIEL-FUNKTIONAL DA-001 Hybrid: zwei Filter-Reihen.
+            // Reihe 1 oben: Type (Alle / 💡 Idea / ✅ Task).
+            // Reihe 2 unten: Lebensbereich (Alle / <dynamische Kategorien
+            // ohne Idea/Task> / Unsortiert). Beide unabhängig, Persistenz
+            // via UiPreferences.
+            val typeScroll = rememberScrollState()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(filterScroll)
+                    .horizontalScroll(typeScroll)
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = typeFilter == null,
+                    onClick = { typeFilter = null; uiPrefs.sparkTypeFilter = null },
+                    label = { Text("Alle") }
+                )
+                FilterChip(
+                    selected = typeFilter == "Idea",
+                    onClick = { typeFilter = "Idea"; uiPrefs.sparkTypeFilter = "Idea" },
+                    label = { Text("💡 Idea") }
+                )
+                FilterChip(
+                    selected = typeFilter == "Task",
+                    onClick = { typeFilter = "Task"; uiPrefs.sparkTypeFilter = "Task" },
+                    label = { Text("✅ Task") }
+                )
+            }
+
+            val lifeScroll = rememberScrollState()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(lifeScroll)
                     .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
-                    selected = activeFilter == null,
-                    onClick = { activeFilter = null },
+                    selected = lifeFilter == null,
+                    onClick = { lifeFilter = null; uiPrefs.sparkLifeFilter = null },
                     label = { Text("Alle (${entries.size})") }
                 )
                 categories.forEach { cat ->
                     val n = entries.count { it.category.equals(cat, ignoreCase = true) }
                     FilterChip(
-                        selected = activeFilter == cat,
-                        onClick = { activeFilter = cat },
+                        selected = lifeFilter == cat,
+                        onClick = { lifeFilter = cat; uiPrefs.sparkLifeFilter = cat },
                         label = { Text("$cat ($n)") }
                     )
                 }
                 if (unsortedCount > 0) {
                     FilterChip(
-                        selected = activeFilter == "__unsorted__",
-                        onClick = { activeFilter = "__unsorted__" },
+                        selected = lifeFilter == "__unsorted__",
+                        onClick = { lifeFilter = "__unsorted__"; uiPrefs.sparkLifeFilter = "__unsorted__" },
                         label = { Text("Unsortiert ($unsortedCount)") }
                     )
                 }
@@ -113,14 +165,17 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
                     CircularProgressIndicator()
                 }
                 errorMsg != null -> Text("Fehler: $errorMsg", color = MaterialTheme.colorScheme.error)
-                visibleEntries.isEmpty() -> Text(
-                    when (activeFilter) {
-                        null -> "Keine Sparks vorhanden."
-                        "__unsorted__" -> "Keine unsortierten Einträge."
-                        else -> "Keine Einträge in „$activeFilter\"."
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                visibleEntries.isEmpty() -> {
+                    val msg = when {
+                        typeFilter == null && lifeFilter == null -> "Keine Sparks vorhanden."
+                        lifeFilter == "__unsorted__" && typeFilter == null -> "Keine unsortierten Einträge."
+                        else -> {
+                            val parts = listOfNotNull(typeFilter, lifeFilter?.takeUnless { it == "__unsorted__" })
+                            "Keine Einträge im aktuellen Filter (${parts.joinToString(" + ")})."
+                        }
+                    }
+                    Text(msg, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(visibleEntries, key = { it.id }) { entry ->
                         SwipeToDismissItem(

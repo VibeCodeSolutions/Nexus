@@ -16,6 +16,8 @@ import com.vibecode.nexus.data.model.TaskResponse
 import com.vibecode.nexus.data.model.TaskUpdateRequest
 import com.vibecode.nexus.data.model.ExtractTasksResponse
 import com.vibecode.nexus.data.model.UnsortedCountResponse
+import com.vibecode.nexus.data.model.DashboardStatsResponse
+import com.vibecode.nexus.data.model.DashboardNextFocusResponse
 import com.vibecode.nexus.data.model.UpdateSparkTagsRequest
 import com.vibecode.nexus.diagnostics.DiagReport
 import com.vibecode.nexus.diagnostics.DiagReportAck
@@ -124,6 +126,28 @@ class NexusApiClient(private val settings: ConnectionSettings) {
             bearerAuth(token!!)
         }.body()
         response.count
+    }
+
+    /**
+     * DANIEL-FUNKTIONAL DC-001..004: Aggregat-Endpoint für die vier
+     * Dashboard-Stat-Cards. Ein Roundtrip statt drei Einzelaufrufe für
+     * Sparks/Tasks/Projects-Counts.
+     */
+    suspend fun getDashboardStats(): Result<DashboardStatsResponse> = authedRequest {
+        client.get("$baseUrl/api/dashboard/stats") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    /**
+     * DANIEL-FUNKTIONAL DC-003: Nächster offener Task mit Fälligkeit für
+     * die Hero-Card. `result.task == null` bedeutet keine passende Aufgabe
+     * (alle erledigt oder ohne Datum).
+     */
+    suspend fun getDashboardNextFocus(): Result<DashboardNextFocusResponse> = authedRequest {
+        client.get("$baseUrl/api/dashboard/next-focus") {
+            bearerAuth(token!!)
+        }.body()
     }
 
     /**

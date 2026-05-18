@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "nexus", about = "NEXUS Personal ADHS-OS — Core Daemon")]
+#[command(name = "nexus", about = "NEXUS Personal OS — Core Daemon")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,

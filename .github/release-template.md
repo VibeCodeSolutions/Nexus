@@ -1,6 +1,6 @@
 # NEXUS $VERSION
 
-Personal ADHS-OS — Gedanken, Aufgaben und Projekte ohne Reibung.
+Personal OS — Gedanken, Aufgaben und Projekte ohne Reibung.
 
 ## Installation
 

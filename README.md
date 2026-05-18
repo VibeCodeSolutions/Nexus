@@ -1,4 +1,4 @@
-# NEXUS — Personal ADHS-OS
+# NEXUS — Personal OS
 
 > Personal-OS gegen Zettelchaos. Voice-First Spark, KI-Kategorisierung, lokal & modular.
 

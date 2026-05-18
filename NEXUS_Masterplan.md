@@ -1,4 +1,4 @@
-# NEXUS — Personal ADHS-OS
+# NEXUS — Personal OS
 
 **Autor:** Kai "Admin" Krauthausen — VibeCode Solutions
 **Arbeitsname:** NEXUS (final zu entscheiden)

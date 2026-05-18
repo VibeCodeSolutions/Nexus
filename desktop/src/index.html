@@ -76,6 +76,10 @@
   --nx-green: #36C97A;
   --nx-amber: #D4A04C;
   --nx-coral: #C95C5C;
+  /* State-Glows (theme-unabhängig, für Status-Pills u.ä.) — VC-002-KON */
+  --nx-green-glow: rgba(54, 201, 122, 0.35);
+  --nx-coral-glow: rgba(201, 92, 92, 0.35);
+  --nx-amber-glow: rgba(212, 160, 76, 0.35);
   /* Marken-Akzent default Indigo */
   --nx-accent:       #7C79FF;
   --nx-accent-soft:  #4A4769;
@@ -292,9 +296,9 @@ body {
 .status-pill .dot.success { background: var(--nx-green); }
 .status-pill .dot.warning { background: var(--nx-amber); }
 .status-pill .dot.danger  { background: var(--nx-coral); }
-.status-pill.connected { color: var(--nx-green); border-color: rgba(54, 201, 122, .35); }
-.status-pill.offline   { color: var(--nx-coral); border-color: rgba(201, 92, 92, .35); }
-.status-pill.warning   { color: var(--nx-amber); border-color: rgba(212, 160, 76, .35); }
+.status-pill.connected { color: var(--nx-green); border-color: var(--nx-green-glow); }
+.status-pill.offline   { color: var(--nx-coral); border-color: var(--nx-coral-glow); }
+.status-pill.warning   { color: var(--nx-amber); border-color: var(--nx-amber-glow); }
 
 /* Sidebar */
 .sidebar {

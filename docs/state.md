@@ -4,18 +4,17 @@
 
 ## Aktiver Sprint
 
-⏸ **Pause** — S25 gemerged, S26 vorbereitet, Admin im Break.
+✅ **S26-KOMPMIG QS grün** — 4 Pflicht-Phasen Code-Done, Tuvok release-qs `freigabe` (qs-20260519-S26-001, 0 Findings). FF-Merge `sprint/s26-komponenten-vollmigration` → `main` wartet auf Admin-Confirm.
 
 ## Backlog (Sprint-Reihenfolge)
 
-1. **S26 — Komponenten-Vollmigration + Settings-UI** (nächster Sprint nach Pause)
-   - Cards, Bottom-Sheet, Phone-Bezel, Charts, Settings-Rows auf `--nx-*`-Tokens migrieren.
-   - **Backlog-Item VC-002-KON** (aus qs-20260519-S25-001): Status-Pill state-rgba-Triples (`rgba(54,201,122,.35)` etc.) als dedizierte `--nx-{green,coral,amber}-glow`-Tokens deklarieren und referenzieren.
-   - **Backlog-Item S25-SMOKE-1 — Designauswahl in Settings:** UI-Komponente für Theme-Picker (Indigo / Coral / Amber / Green) in Settings-View. Aktuell ist `data-accent` nur via Console-Setattribute setzbar — fehlt user-facing.
-   - **Backlog-Item S25-SMOKE-2 — „Zurück zum Wizard" aus Settings:** UX-Lücke vom Admin-Smoke bemerkt. Vor Implementierung: prüfen ob pre-existing (war's je da?) oder neuer Bug — Belanna-Pre-Audit.
-   - **Backlog-Item S25-SMOKE-3 — Browser-Pairing-Flow für Smoke-ohne-Tauri:** Wenn man `desktop/src/index.html` im nackten Browser öffnet, scheitern alle Daten-API-Calls am Bearer-Token. Für künftige Smokes wäre ein Dev-Mode mit Test-Token oder Onboarding-Pairing aus dem Plain-Browser nützlich. Priorität niedrig (Tauri-Build ist Default-Run).
-2. **S24 — Projekte-CRUD** (war vor S25 verschoben, kommt nach S26)
-   - Nutzt Bottom-Sheet/Phone-Bezel-Komponenten aus S26.
+1. **S24 — Projekte-CRUD** (rückt nach S26-Merge auf nächster Sprint-Slot)
+   - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.
+2. **S27-Backlog** (Konvention-Hardening aus qs-20260519-S26-001 + Restposten aus S25-Admin-Smoke)
+   - **S27-HARDEN-1** — `--nx-bezel`-Token für `.nx-phone`-Hintergrund einführen, sobald Light-Bezel-Varianten kommen.
+   - **S27-HARDEN-2** — Theme-Picker-Swatches via CSS-Var statt Inline-Hex referenzieren, sobald Light-Theme-Accent-Variationen aktiv werden.
+   - **S25-SMOKE-3 / S26-P6 (verschoben)** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser). UX-Feature mit Backend-Touch, eigene Spur, niedrige Prio.
+   - **Charts (Out-of-Scope S26)** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` (SVG-Komponenten aus UI_SPEC_v0.2 §3.3) on-demand, wenn ein Use-Case sie braucht.
 
 ## Letzte Releases
 

@@ -158,9 +158,18 @@ design-system/v0.2-pulse  (basiert auf main 5698a61, identisch zum Sprint-Start)
 
 | Phase | Commit | Status |
 |---|---|---|
-| P1 — Tokens-Layer einziehen | `tbd` | offen |
-| P2 — F-001 Scroll-Fix | `tbd` | offen |
-| P3 — F-003 Branding | `tbd` | offen |
-| P4 — UI_SPEC v0.2 einziehen | `tbd` | offen |
-| P5 — Status-Pill Migration (Proof) | `tbd` | offen |
-| Tuvok release-qs Gate | — | offen |
+| Sprint-Eröffnung (state/todo/sprint-file) | `95f4c17` | ✅ |
+| P1 — Tokens-Layer einziehen | `6a2edea` | ✅ Code-Done |
+| P2 — F-001 Scroll-Fix | `fa21267` | ✅ Code-Done |
+| P3 — F-003 Branding | `f3a15c4` | ✅ Code-Done |
+| P4 — UI_SPEC v0.2 einziehen | `03275e4` | ✅ Code-Done |
+| P5 — Status-Pill Migration (Proof) | `23b1e5c` | ✅ Code-Done |
+| Tuvok release-qs Gate | — | 🚧 in QS |
+
+## Notizen P1-P5 für QS
+
+- **CSS-Bug-Fix im patch:** Motion-Opt-Out in `patch/design-tokens.css` Zeilen 160–167 hatte Selektor + `@media`-Block in einer kombinierten Regel — beim Einziehen korrigiert (siehe P1 index.html nach den Keyframes).
+- **Google-Fonts via @import:** Wird remote geladen, kein lokaler Fallback. Bei Tauri-CSP-Block bleibt Funktion erhalten dank System-Font-Fallback in `font-family`. P5/P6-Refactor kann später `@font-face` lokal bundeln.
+- **F-001 Smoke nicht automatisch testbar:** Mobile-Viewport-Verifikation muss Tuvok manuell oder Admin per Smoke-Run prüfen. Build-Check + brace-balance sind grün.
+- **F-003-Vollständigkeit:** `grep -rn "ADHS-OS"` außer in `patch/` und Sprint-Doku leer. Sprint-Doku-Vorkommen (`docs/sprints/s25-designimpuls.md`, `docs/todo.md`) sind legitime Phase-Bezeichner.
+- **Status-Pill-Migration ist Proof, kein Vollumfang:** Cards, Filter-Pills, Bottom-Sheet etc. bleiben auf v0.1-Tokens — bewusste Sprint-Grenze, S26+ macht Vollmigration.

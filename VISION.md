@@ -1,6 +1,6 @@
 # NEXUS — Vision & Fahrplan
 
-**Stand:** 2026-05-17  
+**Stand:** 2026-05-18  
 **Autoren:** Daniel Ley (daniel-cc) + Kai Krauthausen (kai-cc)  
 **Status:** Verbindlich ab diesem Commit. Ersetzt alle vorherigen Positionierungsaussagen.
 
@@ -8,22 +8,24 @@
 
 ## 1. Was Nexus ist
 
-Nexus ist der KI-Assistent für Menschen, die zu viel im Kopf haben und zu wenig Zeit — Unternehmer, Freelancer, Solo-Selbständige, die sich keine menschliche Assistenz leisten können oder wollen.
+Nexus ist ein interaktiver KI-Assistent, der alles auffängt, analysiert und ordnet — Gedanken, Ideen, Aufgaben, Fotos, Termine. Egal ob gesprochen, fotografiert oder getippt: Nexus versteht den Kontext, ordnet automatisch zu und bringt Ordnung ins Chaos.
 
-**Ein Satz:** Nexus fängt jeden Gedanken auf, versteht ihn und macht daraus echte Arbeit.
+**Ein Satz:** Sprich es aus. Nexus macht den Rest.
 
-Nexus ist kein Task-Manager, kein Notizbuch, kein Projektmanagement-Tool. Es ist das Bindeglied zwischen dem, was im Kopf passiert, und dem, was tatsächlich erledigt wird.
+Nexus ist kein Notizbuch, kein Task-Manager und kein Kalender. Es ist das intelligente Bindeglied zwischen allem, was in deinem Kopf passiert, und dem, was tatsächlich passiert.
+
+**Kernprinzip:** Der Nutzer gibt Input in beliebiger Form — Nexus denkt mit, ordnet ein und handelt.
 
 ---
 
 ## 2. Zielgruppe
 
-**Primär:** Ein-Personen-Betrieb / Freelancer / Berater ohne Assistenz  
-- Hat Clients, Projekte, Deadlines — alles läuft durch einen Kopf  
-- Kann sich keine fünf Apps und keine Assistentin leisten  
-- Denkt viel unterwegs, vergisst viel unterwegs  
+**Primär:** Alle, die zu viel im Kopf haben und zu wenig Struktur  
+- Selbständige, Freelancer, Kreative, Studenten, Eltern  
+- Menschen, die Ideen verlieren weil sie keine Zeit haben sie festzuhalten  
+- Nutzer, die mehrere Apps nutzen aber keinen gemeinsamen Überblick haben  
 
-**Sekundär:** Kleines Team (2–5 Personen), wo einer "der Organisierte" ist
+**Sekundär:** Kleine Teams, in denen einer für die Struktur zuständig ist
 
 **Nicht im Fokus:** Enterprise, große Teams, Projektmanagement à la Jira
 
@@ -31,13 +33,12 @@ Nexus ist kein Task-Manager, kein Notizbuch, kein Projektmanagement-Tool. Es ist
 
 ## 3. Das Signal-Konzept (Kernmechanik)
 
-Jeder Input heißt ab sofort **Signal** (oder **Impuls** — Kai entscheidet endgültig).
+Jeder Input heißt **Signal**.
 
 Ein Signal kann sein:
-- **Sprache** — Voice-Memo, spontaner Gedanke ("Ich muss Kai wegen dem Angebot anrufen")
-- **Foto** — Visitenkarte, Whiteboard, Rechnung, Notizzettel
+- **Sprache** — Voice-Memo, spontaner Gedanke ("Ich muss morgen Kai anrufen wegen dem Angebot")
+- **Foto** — Visitenkarte, Whiteboard, Rechnung, Notizzettel, Screenshot
 - **Text** — kurze getippte Notiz
-- **Später:** E-Mail-Weiterleitung, Kalender-Import, Webhook
 
 Die KI verarbeitet jedes Signal automatisch:
 
@@ -46,169 +47,169 @@ Signal rein
     ↓
 KI analysiert: Was ist das? Task / Idee / Info / Termin / Kontakt?
     ↓
+KI ordnet zu: Welches Projekt? Neues Projekt? Übergreifend?
+    ↓
 Output (automatisch):
   → Task mit Fälligkeit + Projekt-Zuweisung
-  → Kalender-Event
-  → Notiz verknüpft mit bestehendem Projekt/Kontakt
-  → Tag-Vorschläge + Knowledge-Graph-Link
+  → Kalender-Event erstellt
+  → Notiz verknüpft mit Projekt/Kontakt
+  → Neue Idee gespeichert und markiert
 ```
 
 Der Nutzer greift nur ein, wenn er will — nicht, weil er muss.
 
 ---
 
-## 4. Was sich ändert (Pivot)
+## 4. Kernfunktionen
 
-### 4.1 Gamification fliegt raus — komplett
+### 4.1 Voice-Signal
+- Mikrofon-Button → Gedanke einsprechen → Nexus analysiert, kategorisiert, ordnet zu
+- On-Device Speech-to-Text, kein Cloud-Zwang
+- Funktioniert auch unterwegs, offline
 
-XP, Level, Streaks, Achievements, `xp_events`-Tabelle, `user_levels` — alles entfernt.  
-Begründung: Wirkt für die Zielgruppe amateurhaft. Ein Unternehmer braucht keine Punkte, er braucht Ergebnisse.
+### 4.2 Foto-Signal
+- Foto aufnehmen oder aus Galerie wählen
+- KI erkennt: Visitenkarte → Kontakt anlegen; Whiteboard → Idee speichern; Rechnung → Task "Rechnung bezahlen bis X"
+- OCR + semantische Analyse kombiniert
 
-**Scope des Removal-Sprints:**
-- DB-Migrations zum Droppen der Tabellen
-- Endpoints entfernen
-- Desktop-UI: Erfolge-Tab raus, Gamification-Elemente raus
-- Android: Achievements-Screen raus
+### 4.3 Automatische Kalendereinträge
+- Nexus erkennt Zeitangaben in Signals ("morgen", "nächsten Dienstag", "bis Ende des Monats")
+- Erstellt automatisch Einträge in Google Calendar / Apple Calendar / lokale Kalender-App
+- Kein manuelles Tippen von Terminen mehr
 
-### 4.2 "Braindump" → "Signal" oder "Impuls"
+### 4.4 Projektintelligenz
+- Nexus erkennt, welche Signals zusammengehören
+- Schlägt neue Projekte vor oder ordnet bestehenden zu
+- Übergreifende Signals (die zu keinem Projekt passen) werden separat markiert
 
-Alle Vorkommen im Code, in der API, in der UI, in der Doku umbenennen.  
-Kai entscheidet welcher Begriff. Danach: ein Rename-Sprint, danach konsequent der neue Begriff.
-
-**Betroffene Stellen:** API-Paths (`/braindump/...`), DB-Tabellen (`braindumps`), UI-Labels, Doku, Variablennamen.
-
-### 4.3 Positionierung ADHS → Entrepreneur
-
-ADHS bleibt als Vorteil im Hintergrund (die App ist gut für schnelle, unstrukturierte Gedanken), aber die primäre Kommunikation dreht sich um Unternehmer und Selbständige.  
-Das verändert: Onboarding-Text, Marketing-Sprache, Feature-Prioritäten.
-
----
-
-## 5. Was bleibt und wird zentraler
-
-- **Knowledge Graph** — Verbindungen zwischen Signals und Projekten sind das Gedächtnis des Assistenten. Wird noch wichtiger.
-- **Multi-Provider LLM** — Nutzer wählt selbst: Cloud (Groq, Claude, Gemini, xAI) oder lokal (Ollama). Kein Lock-in.
-- **Voice-First** — Haupteingabe bleibt Sprache. Foto ist Erweiterung, nicht Ersatz.
-- **Cross-Platform** — Desktop (Linux/Mac/Win) + Android. Beide vollwertig.
-- **Privacy-First** — Daten bleiben beim Nutzer. Kein Nexus-Cloud-Zwang.
+### 4.5 Dashboard & Überblick
+- Alle Signals, geordnet nach Projekt, Kategorie, Datum
+- Schnellsuche über alle Inhalte
+- Offene Tasks, anstehende Termine, neueste Ideen — alles auf einen Blick
 
 ---
 
-## 6. Deployment-Modi (alle drei müssen funktionieren)
+## 5. Businessmodell
 
-```
-┌─────────────────────────────────────────────┐
-│              NEXUS APP (Mobile/Desktop)      │
-│  Signal rein → KI verarbeitet → Output       │
-└──────────────┬──────────────────────────────┘
-               │ Verbindung zu...
-     ┌─────────┼──────────┐
-     ▼         ▼          ▼
-  [Mode A]  [Mode B]   [Mode C]
-  PC-Host   Cloud/VPS   Handy-Host
-```
+### App Store Distribution
+- **Apple App Store** (iOS + macOS)
+- **Google Play Store** (Android)
+- Desktop: Windows + Linux (direkt oder via Store)
 
-| Modus | Host | Clients | Status | Nächster Schritt |
-|---|---|---|---|---|
-| **A — PC-as-Host** | User's PC/Mac/Linux | Handy als Client | ✅ Fertig | — |
-| **B — Cloud/VPS** | Hetzner/eigener Server | Alle Geräte | ~90% | Docs + Auth-Härtung (N-001-SIC) |
-| **C — Handy-Host** | Android-Gerät selbst | PC als Display | ❌ Noch nicht | Erfordert lokales Modell + nexus-core auf ARM |
+### Abonnement — 2 Tiers
 
-Mode C ist der Langfrist-Moonshot und hängt direkt am lokalen Modell (Abschnitt 7).
+| Feature | Basic 4,99€/mo | Pro 7,99€/mo |
+|---|:---:|:---:|
+| Voice-Signal + KI-Analyse | ✅ | ✅ |
+| Text-Signal | ✅ | ✅ |
+| Basis-Kategorisierung (Idee / Task / Info / Termin) | ✅ | ✅ |
+| Projekte (bis 5) | ✅ | ✅ |
+| Signals pro Monat (bis 200) | ✅ | ✅ |
+| Dashboard + Suche | ✅ | ✅ |
+| **Foto-Signal + Analyse** | ❌ | ✅ |
+| **Automatische Kalendereinträge** | ❌ | ✅ |
+| **Unlimitierte Projekte** | ❌ | ✅ |
+| **Unlimitierte Signals** | ❌ | ✅ |
+| **KI-Projektvorschläge** | ❌ | ✅ |
+| **Multi-Gerät Sync** | ❌ | ✅ |
+| **Prioritäts-Support** | ❌ | ✅ |
 
----
-
-## 7. Lokales Modell — Fahrplan
-
-**Ziel:** Nexus soll vollständig offline auf einem Smartphone laufen — kein Server, keine Cloud, keine Abhängigkeit.
-
-### Track 1 — Sofort nutzbar (nächste 1–3 Monate)
-
-Bestehende kleine Open-Source-Modelle einbinden. Diese laufen bereits auf Smartphones:
-
-- **Llama 3.2 1B / 3B** (Meta) — gut für Klassifizierung + Task-Extraktion
-- **Phi-3-mini 3.8B** (Microsoft) — stark für kleine Geräte
-- **Gemma 2B** (Google) — Alternative
-
-Konkrete Schritte:
-1. Ollama-Provider in nexus-core auf `aarch64-linux-android` kompilieren (oder llama.cpp-Android-Binding)
-2. Android-App kann lokales Modell laden + ausführen ohne Server
-3. Mode C wird technisch möglich
-
-### Track 2 — Mittelfristig (3–12 Monate)
-
-Fine-tuning eines kleinen Modells auf Nexus-spezifische Aufgaben:
-- Trainings-Daten: anonymisierte Signal-Muster ("dieser Text → diese Kategorie/Tasks")
-- Basis: Llama 3.2 1B oder Phi-3-mini
-- Ziel: Modell das bei Signal-Verarbeitung besser ist als ein Generic-LLM gleicher Größe
-- Kai koordiniert Training-Infrastruktur (hat Erfahrung mit lokalem LLM-Betrieb)
-
-### Track 3 — Langfristig (12+ Monate)
-
-Eigenes Nexus-Modell, öffentlich verfügbar, optimiert für:
-- Entrepreneur-Kontext
-- Deutsche + englische Sprache
-- Offline auf Mittelklasse-Smartphone (< 4 GB RAM)
+> Tier-Aufteilung ist ein Vorschlag — Kai und Daniel entscheiden final vor App-Store-Launch.
 
 ---
 
-## 8. Feature-Roadmap
+## 6. Technologie & Architektur
 
-### Phase A — Cleanup & Rebranding (vor allen neuen Features)
+### 6.1 Tech-Stack
 
-1. Gamification komplett entfernen
-2. Braindump → Signal/Impuls umbenennen (Kai entscheidet Begriff)
-3. Onboarding-Text auf neue Positionierung anpassen
+| Schicht | Technologie |
+|---|---|
+| Core | Rust, tokio, axum, sqlx/SQLite |
+| Desktop-UI | Tauri (Rust + Web/React) |
+| Mobile | Kotlin + Jetpack Compose |
+| Mobile-HTTP | Ktor-Client |
+| Voice (Mobile) | Android SpeechRecognizer / iOS Speech Framework |
+| Inference | On-Device (Details: intern) |
+| Kalender | Google Calendar API, Apple EventKit, iCal |
+| Foto-Analyse | On-Device OCR + Semantic Model |
 
-**Wer:** Beide CLIs. Kai entscheidet Begriff, dann Rename.  
-**Schätzung:** 3–5 Tage
-
-### Phase B — KI wird echter Assistent (laufende Sprints)
-
-1. **Foto-Signal** (Sprint NV-3/4/5) — Foto aufnehmen → OCR + Tags → Signal
-2. **Signal-Splitting** (FEAT-001) — 1 langer Signal-Text → N Tasks automatisch extrahiert
-3. **Kalender-Integration** (FEAT-002) — Tasks mit Datum → direkt in Google Calendar / iCal
-
-**Wer:** daniel-cc (Desktop/UI), kai-cc (schwere Core-Arbeit)  
-**Schätzung:** 2–3 Wochen
-
-### Phase C — Deployment-Vollständigkeit
-
-1. Mode B (Cloud/VPS) dokumentieren + absichern (N-001-SIC)
-2. Mode C Proof-of-Concept: nexus-core auf Android ARM kompilieren
-3. Offline-Betrieb mit lokalem Modell (Track 1 oben)
-
-**Wer:** Primär kai-cc  
-**Schätzung:** 3–6 Wochen
-
-### Phase D — KI-Qualität & Personalisierung
-
-1. Kontakt-Erkennung aus Signals ("Kai", "der Kunde von Montag")
-2. Automatische Projekt-Zuweisung verbessern (heute: Vorschläge, morgen: sicher)
-3. Zusammenfassung: "Was hast du diese Woche gemacht?" / "Was steht an?"
-4. "Wer wartet auf was von mir?" — Client-Status-View
-
-**Wer:** kai-cc (LLM-Logik), daniel-cc (UI)
-
-### Phase E — Lokales Modell (Track 2)
-
-Fine-tuning + Integration. Koordination zwischen Kai und Daniel separat geplant.
-
----
-
-## 9. Architektur-Prinzipien (ab sofort verbindlich)
+### 6.2 Architektur-Prinzipien (verbindlich)
 
 1. **Kein Cloud-Zwang** — jedes Feature muss ohne Nexus-eigenen Server funktionieren
-2. **Privacy-First** — User-Daten verlassen das Gerät nur auf expliziten Wunsch des Users
-3. **Offline-Pfad immer mitdenken** — wenn Feature online-only, muss das explizit dokumentiert sein
-4. **Große Tasks → kai-cc** — aufwändige Core/Backend/Modell-Arbeit wird als `cc-msg` Issue an Kai delegiert
-5. **Kleine, UI-nahe Tasks → daniel-cc** — Desktop-UI, Doku, Glue-Code
+2. **Privacy-First** — Daten verlassen das Gerät nur auf expliziten Wunsch des Nutzers
+3. **Offline-First** — Kernfunktionen laufen ohne Internetverbindung
+4. **On-Device KI** — Inference läuft lokal auf dem Gerät (NPU/Neural Engine wo verfügbar)
+5. **Modular** — jede Funktion ist eigenständig lauffähig
+
+### 6.3 On-Device KI (internes Kernziel)
+
+Nexus' wichtigster technischer Vorteil: die KI läuft vollständig auf dem Gerät des Nutzers.
+
+Unterstützte Hardware:
+- **Apple** → Neural Engine (CoreML / ONNX)
+- **Intel Core Ultra** → NPU (OpenVINO / ONNX Runtime)
+- **AMD Ryzen AI** → XDNA (DirectML / ONNX Runtime)
+- **Android** → Snapdragon NPU / MediaTek APU
+
+Konsequenzen:
+- Keine laufenden API-Kosten pro Nutzer
+- Echte Privacy (Daten verlassen das Gerät nie)
+- Funktioniert offline, ohne Latenz
+- Bessere Margen als Cloud-LLM-basierte Konkurrenz
+
+Details zum Modell und Training: **intern, nicht öffentlich dokumentieren.**
 
 ---
 
-## 10. Was dieses Dokument ist und nicht ist
+## 7. Phasenplan
 
-**Ist:** Verbindliche Richtung. Kai und seine Agents entscheiden auf Basis davon, welche konkreten Sprints wie aussehen.
+### Phase A — Cleanup (vor allen neuen Features)
+- Gamification komplett entfernen (XP, Level, Streaks, Achievements, DB-Tabellen)
+- Onboarding-Text auf neue Positionierung anpassen (weg von ADHS-OS)
+- README + Store-Beschreibung vorbereiten
+
+**Wer:** Beide CLIs  
+**Schätzung:** 3–5 Tage
+
+### Phase B — Kernfeatures vollständig (laufend)
+- Voice-Signal stabil + polished
+- Foto-Signal: OCR + Analyse + Zuordnung
+- Kalender-Integration: Google + Apple
+
+**Wer:** daniel-cc (Desktop/UI), kai-cc (Core/KI-Logik)  
+**Schätzung:** 3–5 Wochen
+
+### Phase C — App-Store-Readiness
+- Onboarding-Flow (Erststart, Abo-Auswahl, Pairing)
+- In-App-Purchase / Abo-Verwaltung (RevenueCat oder native Store-API)
+- App Store Assets: Screenshots, Beschreibung, Datenschutzerklärung
+- Apple Review-Konformität + Google Play Policy
+- Beta-Test (TestFlight / Play Internal Track)
+
+**Wer:** Daniel (UI/UX/Store), Kai (Backend/Abo-Logik)  
+**Schätzung:** 4–6 Wochen
+
+### Phase D — On-Device KI (Track 1: existierende Modelle)
+- Kleines Open-Source-Modell on-device einbinden (Llama / Phi / Gemma)
+- Android + iOS: lokale Inference ohne Server
+- Offline-Betrieb vollständig
+
+**Wer:** Primär kai-cc  
+**Schätzung:** 4–8 Wochen
+
+### Phase E — On-Device KI (Track 2: eigenes Fine-Tuning)
+- Fine-tuning auf Nexus-spezifische Aufgaben
+- Deployment auf allen Plattformen via ONNX
+- Details: internes Planungsdokument
+
+**Wer:** kai-cc koordiniert  
+**Schätzung:** 3–12 Monate (parallel zu anderen Phasen)
+
+---
+
+## 8. Was dieses Dokument ist und nicht ist
+
+**Ist:** Verbindliche Richtung. Beide CLIs und ihre Agents entscheiden auf Basis davon, was als nächstes gebaut wird.
 
 **Ist nicht:** Implementierungs-Spec. Einzelne Sprints haben eigene Plan-Files.
 
@@ -216,5 +217,6 @@ Fine-tuning + Integration. Koordination zwischen Kai und Daniel separat geplant.
 
 ---
 
-*Erstellt im Gespräch zwischen Daniel (daniel-cc) und Claude Sonnet 4.6, 2026-05-17.*  
-*Nächster Schritt: Kai liest dieses Dokument und entscheidet (1) Signal vs. Impuls, (2) Reihenfolge Phase A vs. laufende NV-Sprints.*
+*Erstellt im Gespräch zwischen Daniel (daniel-cc) und Claude Sonnet 4.6, 2026-05-18.*  
+*Ersetzt VISION.md vom 2026-05-17 vollständig.*  
+*Nächster Schritt: Kai reviewed dieses Dokument → Issue #6 schließen / kommentieren → Phase A starten.*

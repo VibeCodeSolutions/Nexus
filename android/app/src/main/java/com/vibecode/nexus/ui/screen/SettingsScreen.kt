@@ -374,12 +374,20 @@ private fun SparksPrefsCard(
 ) {
     val scope = rememberCoroutineScope()
     var autoExtractEnabled by remember { mutableStateOf(false) }
+    // S24-SMOKE-POLISH SM-S24-1: zweiter Toggle für Foto-Analyse.
+    // Default-Annahme `true` (passt zur Core-Migration 20260521_001);
+    // wird beim Laden mit dem tatsächlich persistierten Wert ersetzt.
+    var cameraAnalysisEnabled by remember { mutableStateOf(true) }
     var loaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         apiClient.getUserPrefs().onSuccess { prefs ->
             val raw = prefs["auto_extract_tasks_enabled"]
             autoExtractEnabled = raw == "true" || raw == "1"
+            // S24-SMOKE-POLISH SM-S24-1: explizit gesetzten Wert ehren,
+            // fehlender Eintrag → `true` (Default aus Migration).
+            val camRaw = prefs["camera_analysis_enabled"]
+            cameraAnalysisEnabled = camRaw == null || camRaw == "true" || camRaw == "1"
             loaded = true
         }.onFailure {
             loaded = true
@@ -424,6 +432,44 @@ private fun SparksPrefsCard(
                                 if (newValue) "true" else "false"
                             ).onFailure { e ->
                                 autoExtractEnabled = !newValue
+                                snackbarHostState.showSnackbar(
+                                    "Konnte nicht gespeichert werden: ${e.message ?: "unbekannt"}"
+                                )
+                            }
+                        }
+                    }
+                )
+            }
+
+            // S24-SMOKE-POLISH SM-S24-1: Foto-Analyse-Toggle (Runtime-
+            // Schalter gegen `camera_analysis_enabled` im Core). Optimistic
+            // update + Rollback bei Fehler, gleiches Muster wie oben.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Foto-Analyse aktivieren",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        "Foto-Sparks werden per Vision-LLM analysiert (Tags + OCR).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = cameraAnalysisEnabled,
+                    enabled = loaded,
+                    onCheckedChange = { newValue ->
+                        cameraAnalysisEnabled = newValue
+                        scope.launch {
+                            apiClient.setUserPref(
+                                "camera_analysis_enabled",
+                                if (newValue) "true" else "false"
+                            ).onFailure { e ->
+                                cameraAnalysisEnabled = !newValue
                                 snackbarHostState.showSnackbar(
                                     "Konnte nicht gespeichert werden: ${e.message ?: "unbekannt"}"
                                 )

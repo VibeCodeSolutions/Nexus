@@ -281,7 +281,21 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("history") {
-                            SparkHistoryScreen(apiClient = apiClient)
+                            SparkHistoryScreen(
+                                apiClient = apiClient,
+                                // S24-SMOKE-POLISH SM-S24-2: Nav-Callback
+                                // für tappbaren Erfolgs-Pill im Detail-
+                                // Sheet. Springt zum Tasks-Tab.
+                                onNavigateToTasks = {
+                                    navController.navigate("tasks") {
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
                         }
                         composable("tasks") {
                             TasksScreen(

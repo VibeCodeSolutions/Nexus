@@ -124,6 +124,46 @@ fun DashboardScreen(
             )
         }
 
+        // S24-SMOKE-POLISH SM-S24-3 (Variante A): Hero-Input-Bar als
+        // primärer CTA für den Spark-Eingabe-Flow. Sieht aus wie ein
+        // Text-Feld → starke Affordance, Tap-Target deckt die ganze
+        // Bildschirmbreite. Öffnet das Voice-Spark-Sheet (Route "spark"),
+        // analog zum bisherigen "🎙️ Aufnehmen"-Quick-Action. Die vier
+        // bestehenden Quick-Actions bleiben darunter erhalten — die Bar
+        // ist additiv, nicht ersetzend, damit die anderen Sprünge
+        // (Sparks/Aufgabe/Projekte) erreichbar bleiben.
+        if (isPaired) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigate("spark") }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("✨", fontSize = 22.sp)
+                    Text(
+                        text = "Was beschäftigt dich gerade?",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "🎙️",
+                        fontSize = 22.sp,
+                    )
+                }
+            }
+        }
+
         if (!isPaired) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,

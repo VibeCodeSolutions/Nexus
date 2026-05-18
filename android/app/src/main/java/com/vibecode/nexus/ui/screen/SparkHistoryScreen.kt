@@ -59,7 +59,13 @@ private val KIND_TASK_FG = Color(0xFF6EE7B7)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SparkHistoryScreen(apiClient: NexusApiClient) {
+fun SparkHistoryScreen(
+    apiClient: NexusApiClient,
+    // S24-SMOKE-POLISH SM-S24-2: Navigation zum Tasks-Tab nach
+    // erfolgreichem Task-Extract. Default = no-op, damit Tests/Previews
+    // ohne NavController auskommen.
+    onNavigateToTasks: () -> Unit = {},
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     // DANIEL-FUNKTIONAL DA-001: Filter-Persistenz via UiPreferences.
@@ -108,20 +114,33 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
     var typeFilter by remember { mutableStateOf(uiPrefs.sparkTypeFilter) }
     var lifeFilter by remember { mutableStateOf(uiPrefs.sparkLifeFilter) }
 
-    val visibleEntries = remember(entries, typeFilter, lifeFilter) {
-        entries.filter { entry ->
-            // Lebensbereich-Filter (Reihe 2)
-            if (lifeFilter == "__unsorted__") {
-                if (!(entry.category.isNullOrBlank() || entry.category == "Unsorted")) return@filter false
-            } else if (lifeFilter != null) {
-                if (!entry.category.equals(lifeFilter, ignoreCase = true)) return@filter false
-            }
-            // Type-Filter (Reihe 1) — case-insensitive auf category
-            if (typeFilter != null) {
-                if (!entry.category.orEmpty().equals(typeFilter, ignoreCase = true)) return@filter false
-            }
-            true
+    // S24-SMOKE-POLISH SM-S24-4: gemeinsame Filter-Funktion für Liste
+    // UND Tab-/Chip-Counts. Vorher zählten die Lebensbereich-Chips nur
+    // gegen `entry.category == cat` und ignorierten den aktiven
+    // typeFilter → Counts zeigten Inhalt, aber die Listen-Query mit
+    // kombiniertem typeFilter filterte alles raus ("Random (2)" → leer).
+    //
+    // Jetzt: `matches(entry, lifeOverride)` baut die identische Prüfung
+    // sowohl für `visibleEntries` (lifeOverride = aktiver lifeFilter) als
+    // auch für jede Chip-Count-Berechnung (lifeOverride = die Kategorie,
+    // gegen die der Chip zählen will). Invariant: count(chip) ==
+    // list(chip).size — geprüft via UI nach Polish.
+    fun matches(entry: SparkResponse, lifeOverride: String?): Boolean {
+        // Lebensbereich-Prädikat
+        if (lifeOverride == "__unsorted__") {
+            if (!(entry.category.isNullOrBlank() || entry.category == "Unsorted")) return false
+        } else if (lifeOverride != null) {
+            if (!entry.category.equals(lifeOverride, ignoreCase = true)) return false
         }
+        // Type-Prädikat (Reihe 1) — case-insensitive auf category
+        if (typeFilter != null) {
+            if (!entry.category.orEmpty().equals(typeFilter, ignoreCase = true)) return false
+        }
+        return true
+    }
+
+    val visibleEntries = remember(entries, typeFilter, lifeFilter) {
+        entries.filter { matches(it, lifeFilter) }
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
@@ -176,13 +195,19 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
                     .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // S24-SMOKE-POLISH SM-S24-4: Counts spiegeln den
+                // aktiven typeFilter wider. Jeder Chip zeigt, wie viele
+                // Sparks erscheinen würden, wenn man IHN klickt — also
+                // matches(entry, lifeOverride = chip-kategorie).
+                // Invariant: count(chip) == list(chip).size.
+                val allLifeCount = entries.count { matches(it, null) }
                 FilterChip(
                     selected = lifeFilter == null,
                     onClick = { lifeFilter = null; uiPrefs.sparkLifeFilter = null },
-                    label = { Text("Alle (${entries.size})") }
+                    label = { Text("Alle ($allLifeCount)") }
                 )
                 categories.forEach { cat ->
-                    val n = entries.count { it.category.equals(cat, ignoreCase = true) }
+                    val n = entries.count { matches(it, cat) }
                     FilterChip(
                         selected = lifeFilter == cat,
                         onClick = { lifeFilter = cat; uiPrefs.sparkLifeFilter = cat },
@@ -190,10 +215,11 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
                     )
                 }
                 if (unsortedCount > 0) {
+                    val n = entries.count { matches(it, "__unsorted__") }
                     FilterChip(
                         selected = lifeFilter == "__unsorted__",
                         onClick = { lifeFilter = "__unsorted__"; uiPrefs.sparkLifeFilter = "__unsorted__" },
-                        label = { Text("Unsortiert ($unsortedCount)") }
+                        label = { Text("Unsortiert ($n)") }
                     )
                 }
             }
@@ -271,6 +297,12 @@ fun SparkHistoryScreen(apiClient: NexusApiClient) {
                 scope.launch { snackbarHostState.showSnackbar("Projekt im Projekte-Tab: $name") }
                 detailEntry = null
             },
+            // S24-SMOKE-POLISH SM-S24-2: Tap-to-Navigate auf dem Erfolgs-
+            // Pill nach Task-Extract.
+            onNavigateToTasks = {
+                detailEntry = null
+                onNavigateToTasks()
+            },
             onDismiss = { detailEntry = null }
         )
     }
@@ -285,6 +317,7 @@ private fun SparkDetailSheet(
     projects: List<ProjectResponse>,
     onNavigateToSpark: (String) -> Unit,
     onNavigateToProject: (String) -> Unit,
+    onNavigateToTasks: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -296,6 +329,11 @@ private fun SparkDetailSheet(
     val scope = rememberCoroutineScope()
     var extractBusy by remember(entry.id) { mutableStateOf(false) }
     var extractStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    // S24-SMOKE-POLISH SM-S24-2: getrennt vom Status-String, damit nur
+    // bei tatsächlich angelegten Aufgaben (count > 0) ein Tap zum Tasks-
+    // Tab springt — Skip-Hinweis ("bereits vorhanden") bleibt informativ
+    // ohne Navigations-Affordance.
+    var extractDidCreate by remember(entry.id) { mutableStateOf(false) }
 
     LaunchedEffect(entry.id) {
         linksLoading = true
@@ -371,37 +409,77 @@ private fun SparkDetailSheet(
 
             // FEAT-001 Schicht D: Tasks extrahieren — idempotenter Endpoint,
             // Doppelklick erzeugt keine Duplikate.
+            // S24-SMOKE-POLISH SM-S24-2: deutsch "Aufgabe(n)" statt "Task(s)"
+            // (konsistent zum BottomNav-Label "Aufgaben"); Erfolgs-Status
+            // tappbar → springt zum Tasks-Tab.
             OutlinedButton(
                 onClick = {
                     extractBusy = true
                     extractStatus = "Analysiere Spark …"
+                    extractDidCreate = false
                     scope.launch {
                         apiClient.extractTasksFromSpark(entry.id)
                             .onSuccess { res ->
                                 extractStatus = when {
                                     res.count == 0L && res.skipped == 0L ->
-                                        "Keine umsetzbaren Tasks im Spark gefunden."
+                                        "Keine umsetzbaren Aufgaben im Spark gefunden."
                                     res.count == 0L ->
-                                        "Bereits ${res.skipped} Task${if (res.skipped == 1L) "" else "s"} aus diesem Spark extrahiert (keine neuen)."
-                                    else -> "✓ ${res.count} Task${if (res.count == 1L) "" else "s"} angelegt" +
+                                        "Bereits ${res.skipped} Aufgabe${if (res.skipped == 1L) "" else "n"} aus diesem Spark extrahiert (keine neuen)."
+                                    else -> "✓ ${res.count} Aufgabe${if (res.count == 1L) "" else "n"} angelegt" +
                                         if (res.skipped > 0) " (${res.skipped} bereits vorhanden)." else "."
                                 }
+                                extractDidCreate = res.count > 0L
                             }
-                            .onFailure { extractStatus = "Fehler: ${it.message ?: "unbekannt"}" }
+                            .onFailure {
+                                extractStatus = "Fehler: ${it.message ?: "unbekannt"}"
+                                extractDidCreate = false
+                            }
                         extractBusy = false
                     }
                 },
                 enabled = !extractBusy,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (extractBusy) "Extrahiere …" else "📋 Tasks extrahieren")
+                Text(if (extractBusy) "Extrahiere …" else "📋 Aufgaben extrahieren")
             }
             extractStatus?.let { msg ->
-                Text(
-                    msg,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // S24-SMOKE-POLISH SM-S24-2: tappbares Pill bei Erfolgs-
+                // Statusen (count > 0). Springt zum Tasks-Tab; bei
+                // Skip-/Fehler-Status nur Anzeige.
+                if (extractDidCreate) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToTasks() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                msg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "Anzeigen ›",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             HorizontalDivider()

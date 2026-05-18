@@ -1508,7 +1508,23 @@ pub async fn post_spark_from_image(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<Response, (StatusCode, String)> {
+    // S24-SMOKE-POLISH SM-S24-1: Zweistufiger Check.
+    // 1) Compile-/Deploy-Schalter via NEXUS_VISION_ENABLED (env). Default
+    //    false — wenn off, ist Vision generell nicht verfügbar (kein
+    //    Provider-Key konfiguriert).
+    // 2) Runtime-Toggle via user_pref `camera_analysis_enabled`. Default
+    //    `true` (siehe Migration 20260521_001) — User kann via Settings
+    //    abschalten, ohne den Server neu starten zu müssen.
     if !state.vision_config.enabled {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Vision-Analyse ist deaktiviert. Aktivieren via Settings (Kamera-Analyse).".into(),
+        ));
+    }
+    let camera_pref = repo::user_pref_bool(&state.pool, "camera_analysis_enabled")
+        .await
+        .unwrap_or(true); // Fail-open: bei DB-Fehler nicht den Foto-Flow blocken.
+    if !camera_pref {
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
             "Vision-Analyse ist deaktiviert. Aktivieren via Settings (Kamera-Analyse).".into(),

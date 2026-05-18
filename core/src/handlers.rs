@@ -1,5 +1,5 @@
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse, Json, Response};
 use serde::{Deserialize, Serialize};
@@ -381,6 +381,15 @@ pub async fn extract_tasks_from_spark(
 //   in `build_sparks_calendar` per `tracing::warn!` mit `spark_id` +
 //   Original-Wert geloggt, bevor auf `Utc::now()` gefallen wird. Vorher
 //   war der Fallback silent (siehe Backlog-Item FEAT-002-TRACE).
+// - **ETAG/Last-Modified:** beide Endpoints liefern `ETag` (deterministisch
+//   aus `(max_timestamp, count)`) und — falls Timestamp parsbar —
+//   `Last-Modified` (RFC 7232 IMF-fixdate). Bei `If-None-Match`-Match
+//   wird `304 Not Modified` ohne Body zurückgegeben (Header werden auch
+//   bei 304 mitgeschickt, damit der nächste Re-Fetch den ETag wieder
+//   verwenden kann). Freshness-Quelle für Sparks: `MAX(created_at)`
+//   (Sparks tragen kein `updated_at`-Feld). Für Tasks: `MAX(updated_at)`
+//   gefiltert auf das gleiche Set wie der Export (offen + Fälligkeit).
+//   Leere Treffermenge → ETag `"empty-0"`, 304 weiterhin zulässig.
 
 fn ics_response(body: String) -> impl axum::response::IntoResponse {
     (
@@ -388,6 +397,63 @@ fn ics_response(body: String) -> impl axum::response::IntoResponse {
         [(header::CONTENT_TYPE, "text/calendar; charset=utf-8")],
         body,
     )
+}
+
+/// FEAT-002-ETAG: Deterministischer ETag aus `(max_timestamp, count)`.
+///
+/// Format: `"<hex-millis>-<count>"` (RFC 7232 quoted-string). Wenn der
+/// Timestamp parsbar ist, kommt seine Unix-Millisekunden-Repräsentation
+/// in den ETag — sonst ein Hex-Dump der Rohbytes als Fallback, damit
+/// der ETag auch bei Daten-Drift in der Spalte stabil und vergleichbar
+/// bleibt. Leere Treffermenge → `"empty-0"`.
+///
+/// Stabilität: dieselbe `(ts, count)`-Eingabe ergibt prozess-übergreifend
+/// denselben Output (kein HashSeed-Randomness, keine Wall-Clock-Lookups).
+fn ics_etag(ts: Option<&str>, count: i64) -> String {
+    use chrono::NaiveDateTime;
+    match ts {
+        Some(s) => {
+            match NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+                Ok(naive) => {
+                    let millis = naive.and_utc().timestamp_millis();
+                    format!("\"{millis:x}-{count}\"")
+                }
+                Err(_) => {
+                    let raw_hex: String = s.bytes().map(|b| format!("{b:02x}")).collect();
+                    format!("\"raw-{raw_hex}-{count}\"")
+                }
+            }
+        }
+        None => format!("\"empty-{count}\""),
+    }
+}
+
+/// FEAT-002-ETAG: Liefert den RFC-7232/IMF-fixdate-`Last-Modified`-String
+/// (HTTP-Date), z.B. `"Mon, 18 May 2026 14:32:00 GMT"`. Nur gesetzt,
+/// wenn der SQLite-Timestamp parsbar ist; sonst `None` (Header wird
+/// dann weggelassen, ETag bleibt aussagekräftig genug).
+fn ics_last_modified(ts: Option<&str>) -> Option<String> {
+    use chrono::{NaiveDateTime, TimeZone, Utc};
+    let s = ts?;
+    let naive = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok()?;
+    let dt = Utc.from_utc_datetime(&naive);
+    Some(dt.format("%a, %d %b %Y %H:%M:%S GMT").to_string())
+}
+
+/// FEAT-002-ETAG: Setzt `ETag` (+ optional `Last-Modified`) auf eine
+/// bestehende Response. Wird sowohl für 200- als auch für 304-Antworten
+/// gebraucht — externe Calendar-Clients erwarten den ETag auch bei
+/// `Not Modified`-Antworten, damit der nächste Re-Fetch denselben
+/// `If-None-Match` schickt.
+fn apply_freshness_headers(resp: &mut Response, etag: &str, last_modified: Option<&str>) {
+    if let Ok(v) = HeaderValue::from_str(etag) {
+        resp.headers_mut().insert(header::ETAG, v);
+    }
+    if let Some(lm) = last_modified {
+        if let Ok(v) = HeaderValue::from_str(lm) {
+            resp.headers_mut().insert(header::LAST_MODIFIED, v);
+        }
+    }
 }
 
 fn spark_summary(text: &str) -> String {
@@ -477,20 +543,54 @@ fn build_tasks_calendar(tasks: &[crate::models::Task]) -> String {
 
 pub async fn export_sparks_ics(
     State(state): State<AppState>,
+    headers: HeaderMap,
 ) -> Result<Response, (StatusCode, Json<Value>)> {
+    let (max_ts, count) = repo::sparks_freshness(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let etag = ics_etag(max_ts.as_deref(), count);
+    let last_mod = ics_last_modified(max_ts.as_deref());
+
+    if let Some(client_etag) = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) {
+        if client_etag.trim() == etag {
+            let mut resp = StatusCode::NOT_MODIFIED.into_response();
+            apply_freshness_headers(&mut resp, &etag, last_mod.as_deref());
+            return Ok(resp);
+        }
+    }
+
     let entries = repo::list(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-    Ok(ics_response(build_sparks_calendar(&entries)).into_response())
+    let mut resp = ics_response(build_sparks_calendar(&entries)).into_response();
+    apply_freshness_headers(&mut resp, &etag, last_mod.as_deref());
+    Ok(resp)
 }
 
 pub async fn export_tasks_ics(
     State(state): State<AppState>,
+    headers: HeaderMap,
 ) -> Result<Response, (StatusCode, Json<Value>)> {
+    let (max_ts, count) = repo::tasks_freshness(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let etag = ics_etag(max_ts.as_deref(), count);
+    let last_mod = ics_last_modified(max_ts.as_deref());
+
+    if let Some(client_etag) = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) {
+        if client_etag.trim() == etag {
+            let mut resp = StatusCode::NOT_MODIFIED.into_response();
+            apply_freshness_headers(&mut resp, &etag, last_mod.as_deref());
+            return Ok(resp);
+        }
+    }
+
     let tasks = repo::list_tasks(&state.pool, None, None)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-    Ok(ics_response(build_tasks_calendar(&tasks)).into_response())
+    let mut resp = ics_response(build_tasks_calendar(&tasks)).into_response();
+    apply_freshness_headers(&mut resp, &etag, last_mod.as_deref());
+    Ok(resp)
 }
 
 pub async fn suggest_projects(
@@ -2688,6 +2788,97 @@ mod synaptic_phase_b_tests {
         let s = super::spark_summary(&long_text);
         assert!(s.ends_with("..."), "expected ellipsis, got {s}");
         assert!(s.chars().count() <= 60);
+    }
+
+    // FEAT-002-ETAG — Helper-Tests.
+
+    #[test]
+    fn test_ics_etag_format_with_valid_timestamp() {
+        let etag = super::ics_etag(Some("2026-05-17 12:30:00"), 5);
+        // RFC-7232 quoted-string mit Hex-Millis + Count.
+        assert!(etag.starts_with('"') && etag.ends_with('"'));
+        assert!(etag.contains("-5"));
+        // Dieselbe Eingabe → dasselbe Ergebnis (Determinismus).
+        let etag2 = super::ics_etag(Some("2026-05-17 12:30:00"), 5);
+        assert_eq!(etag, etag2);
+    }
+
+    #[test]
+    fn test_ics_etag_changes_when_count_changes() {
+        let e1 = super::ics_etag(Some("2026-05-17 12:30:00"), 5);
+        let e2 = super::ics_etag(Some("2026-05-17 12:30:00"), 6);
+        assert_ne!(e1, e2);
+    }
+
+    #[test]
+    fn test_ics_etag_changes_when_timestamp_changes() {
+        let e1 = super::ics_etag(Some("2026-05-17 12:30:00"), 5);
+        let e2 = super::ics_etag(Some("2026-05-17 12:30:01"), 5);
+        assert_ne!(e1, e2);
+    }
+
+    #[test]
+    fn test_ics_etag_empty_collection() {
+        assert_eq!(super::ics_etag(None, 0), "\"empty-0\"");
+        // Count zählt mit, auch wenn Timestamp fehlt (entsteht nicht im
+        // SQL-Pfad, aber defensiv testen).
+        assert_eq!(super::ics_etag(None, 3), "\"empty-3\"");
+    }
+
+    #[test]
+    fn test_ics_etag_fallback_on_unparseable_timestamp() {
+        let etag = super::ics_etag(Some("not-a-timestamp"), 1);
+        assert!(etag.starts_with("\"raw-"));
+        assert!(etag.contains("-1\""));
+    }
+
+    #[test]
+    fn test_ics_last_modified_formats_imf_fixdate() {
+        let lm = super::ics_last_modified(Some("2026-05-17 12:30:00")).unwrap();
+        // IMF-fixdate: "Sun, 17 May 2026 12:30:00 GMT"
+        assert!(lm.ends_with(" GMT"));
+        assert!(lm.contains("17 May 2026"));
+        assert!(lm.contains("12:30:00"));
+    }
+
+    #[test]
+    fn test_ics_last_modified_none_for_unparseable_or_missing() {
+        assert!(super::ics_last_modified(None).is_none());
+        assert!(super::ics_last_modified(Some("garbage")).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_sparks_freshness_reflects_max_and_count() {
+        let pool = setup_pool().await;
+        let (ts0, c0) = repo::sparks_freshness(&pool).await.unwrap();
+        assert!(ts0.is_none() && c0 == 0);
+
+        sqlx::query("INSERT INTO sparks (id, created_at, raw_text) VALUES ('s1', '2026-05-17 10:00:00', 'a')")
+            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO sparks (id, created_at, raw_text) VALUES ('s2', '2026-05-18 09:00:00', 'b')")
+            .execute(&pool).await.unwrap();
+
+        let (ts1, c1) = repo::sparks_freshness(&pool).await.unwrap();
+        assert_eq!(ts1.as_deref(), Some("2026-05-18 09:00:00"));
+        assert_eq!(c1, 2);
+    }
+
+    #[tokio::test]
+    async fn test_tasks_freshness_matches_export_filter() {
+        let pool = setup_pool().await;
+        // Sollte das gleiche Set zählen wie `build_tasks_calendar`:
+        // status != 'done' UND due_date IS NOT NULL.
+        sqlx::query(
+            "INSERT INTO tasks (id, title, priority, status, due_date) VALUES \
+             ('t-done', 'Erledigt', 'medium', 'done', '2026-05-20'), \
+             ('t-nodate', 'OhneDatum', 'medium', 'open', NULL), \
+             ('t-valid-1', 'V1', 'medium', 'open', '2026-05-22'), \
+             ('t-valid-2', 'V2', 'medium', 'open', '2026-05-25')"
+        ).execute(&pool).await.unwrap();
+
+        let (_ts, count) = repo::tasks_freshness(&pool).await.unwrap();
+        // Nur die 2 validen Tasks zählen.
+        assert_eq!(count, 2);
     }
 
     // FEAT-002-TRACE — Fallback bei korruptem created_at darf den Spark

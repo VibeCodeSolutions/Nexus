@@ -303,6 +303,32 @@ pub async fn find_task_by_external_id(
     .await
 }
 
+/// FEAT-002-ETAG: Liefert `(max(created_at), count)` über alle Sparks.
+/// Wird vom iCal-Export-Endpoint für ETag/Last-Modified-Berechnung
+/// genutzt. Leere Tabelle → `(None, 0)`.
+pub async fn sparks_freshness(pool: &SqlitePool) -> Result<(Option<String>, i64), sqlx::Error> {
+    let row: (Option<String>, i64) = sqlx::query_as(
+        "SELECT MAX(created_at), COUNT(*) FROM sparks",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
+/// FEAT-002-ETAG: Liefert `(max(updated_at), count)` über genau jene
+/// Tasks, die im iCal-Tasks-Export erscheinen (offen UND mit Fälligkeit).
+/// Filter spiegelt das Verhalten von `build_tasks_calendar`. Leere
+/// Treffermenge → `(None, 0)`.
+pub async fn tasks_freshness(pool: &SqlitePool) -> Result<(Option<String>, i64), sqlx::Error> {
+    let row: (Option<String>, i64) = sqlx::query_as(
+        "SELECT MAX(updated_at), COUNT(*) FROM tasks \
+         WHERE status != 'done' AND due_date IS NOT NULL",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
 /// Backfill: Für alle Sparks mit category='Task' ohne zugehörigen Task einen anlegen.
 /// Läuft idempotent beim Start; erzeugt keine Duplikate dank nexus_external_id.
 pub async fn backfill_tasks_from_sparks(pool: &SqlitePool) -> Result<usize, sqlx::Error> {

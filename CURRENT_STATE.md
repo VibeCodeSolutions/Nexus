@@ -1,12 +1,12 @@
 # NEXUS — Current State
 
 **Stand:** 2026-05-18
-**Aktuelle Phase:** v0.1.3 released + Post-Release-Stack abgeschlossen: NV-Closure + FEAT-001 KI-Aufgabensplitting + VC-013-VOL Settings-Toggle + FEAT-002 (A iCal-Export, B/C Härtung) + NV-Vision-clippy-Cleanup. Kein aktiver Sprint, nächster zu planen.
-**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `7e8677c` (refactor(vision) clippy strict cleanup). main clean & sync mit origin. `cargo clippy --all-targets -- -D warnings` ab jetzt grün.
+**Aktuelle Phase:** v0.1.3 released + Post-Release-Stack abgeschlossen: NV-Closure + FEAT-001 KI-Aufgabensplitting + VC-013-VOL Settings-Toggle + FEAT-002 (A iCal-Export, B/C Härtung) + NV-Vision-clippy-Cleanup + Daniel-Funktional Sprint (Dashboard 2×2 + NextFocusCard + Filter-Pills Hybrid, Desktop+Android). Kein aktiver Sprint, nächster Daniel-Polish steht an.
+**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `54e129e` (feat(daniel-funktional-p3) Android Dashboard). main clean & sync mit origin. `cargo clippy --all-targets -- -D warnings` grün. Tests 113/0+1ign.
 
 **Sprint-Verlauf v0.1.3:** Obsidian-Briefkasten A–E ✅ · Happy Thompson A–C ✅ · Crystalline Crab Phase C ✅ · UI-Redesign Nightvision M1–M4 ✅ · Foto-Spark Pipeline NV-1..NV-5 ✅ · Phase A Sparks-Rename + Gamification-Removal ✅. Alle Sprints Tuvok-freigegeben (qs-20260509-001..004, qs-20260517-001..010).
 
-**Post-v0.1.3:** NV-Closure (3 Polish-Bookmarks) ✅ · FEAT-001 KI-Aufgabensplitting (4 Schichten) ✅ · VC-013-VOL Settings-Toggle (FEAT-001-C-Auflage) ✅ · FEAT-002-A iCal-Export Sparks+Tasks ✅ · FEAT-002-B/C iCal-Härtung (P1 AUTH+TRACE, P2 ETag+Last-Modified+304) ✅ · NV-Vision-clippy-Cleanup (3 pre-existing Warnings beseitigt, strict-Modus grün) ✅. QS-Läufe qs-20260517-011..014 + qs-20260518-001..003 alle Freigabe ohne Findings.
+**Post-v0.1.3:** NV-Closure (3 Polish-Bookmarks) ✅ · FEAT-001 KI-Aufgabensplitting (4 Schichten) ✅ · VC-013-VOL Settings-Toggle (FEAT-001-C-Auflage) ✅ · FEAT-002-A iCal-Export Sparks+Tasks ✅ · FEAT-002-B/C iCal-Härtung (P1 AUTH+TRACE, P2 ETag+Last-Modified+304) ✅ · NV-Vision-clippy-Cleanup (3 pre-existing Warnings beseitigt, strict-Modus grün) ✅ · Daniel-Funktional Sprint (P1 Core+Endpoints, P2 Desktop UI, P3 Android UI) ✅. QS-Läufe qs-20260517-011..014 + qs-20260518-001..007 alle Freigabe (eine Auflagen-Schleife P2 in 1 Zyklus geheilt, sonst ohne Findings).
 
 ---
 
@@ -369,13 +369,16 @@ nexus-core pair       # QR-Code für Android-Pairing
 
 ## Nächster Sprint (offen)
 
-Stand 2026-05-18 nach Konzeptklärung: NV-Linie + Daniel-Vorschläge weiter, Vault-Implementierung geparkt (Admin-Entscheidung: Obsidian-Briefkasten reicht). Reihenfolge:
+Stand 2026-05-18 nach Daniel-Funktional-Closure. Reihenfolge:
 
-1. **Daniel-Funktional** (1-2 Tage 🟡) — Dashboard HEUTE-Counter + DIESE-WOCHE-Erledigt + Nächster-Fokus-Card + 2×2-Layout · Filter-Pills Hybrid (Type-Reihe Alle/Idea/Task + Lebensbereich-Reihe). Siehe `docs/daniel-feature-spec-gap.md` Sprint-Vorschlag 1.
-2. **Daniel-Polish** (1 Tag 🟡) — Kind-Badges · Karten-Stagger · Tag-Pop-In · Sheet-Dim · Scan-Overlay-Visualisierung (Android) · Status-Chips · Streaming-Cursor · Glow-Hover · Shutter-Flash · Checkbox-Animation. Siehe Sprint-Vorschlag 2.
-3. **Pixel-Smoke** (Admin-Aktion, parallel möglich) — physischer E2E-Test der Nightvision-Android-App auf echtem Gerät (CameraX + SSE + Bottom-Nav-Badge live).
-4. **VC-013-MIN-1** Android Path-Encoding-Wrapper (klein, parallel möglich).
-5. **Mobile-Subscribe-Helper für iCal** (optional, ~2-3h) — Settings zeigt `?token=…`-Subscribe-URL mit Copy-to-Clipboard.
+1. **Daniel-Polish** (1 Tag 🟡) — Kind-Badges · Karten-Stagger · Tag-Pop-In · Sheet-Dim · Scan-Overlay-Visualisierung (Android) · Status-Chips · Streaming-Cursor · Glow-Hover · Shutter-Flash · Checkbox-Animation. Siehe Sprint-Vorschlag 2.
+2. **Pixel-Smoke** (Admin-Aktion, parallel möglich) — physischer E2E-Test der Nightvision-Android-App auf echtem Gerät (CameraX + SSE + Bottom-Nav-Badge live + Dashboard 2×2 + NextFocusCard + Filter-Hybrid).
+3. **VC-013-MIN-1** Android Path-Encoding-Wrapper (klein, parallel möglich).
+4. **Mobile-Subscribe-Helper für iCal** (optional, ~2-3h) — Settings zeigt `?token=…`-Subscribe-URL mit Copy-to-Clipboard.
+5. **Drei Daniel-Funktional-Backlog-Items** (alle Tuvok-Hinweise, keine Findings, eigene Mini-Sprints möglich):
+   - `completed_at`-Feld auf Tasks für 100%ige DIESE-WOCHE-Semantik (statt aktuell `updated_at`-Drift bei Edits)
+   - LLM-Output-Normalisierung (canonical-case-Guard) für `category`-Werte
+   - Task-ID-Highlight beim NextFocusCard-Klick (aktuell nur Tab-Switch ohne Detail-Auto-Open)
 
 **Geparkt (nicht kurzfristig):**
 - ~~Vault-Implementierung~~ (Admin-Entscheidung 2026-05-18: Obsidian-Briefkasten reicht erstmal, eigener Markdown-Vault wird nicht gebaut)

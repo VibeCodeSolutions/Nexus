@@ -19,6 +19,7 @@
 //! als SSE-Frames an den Client streamt.
 
 pub mod claude;
+pub mod gemini;
 pub mod groq;
 pub mod ollama;
 pub mod resize;
@@ -228,9 +229,20 @@ pub fn create_vision_provider(cfg: &VisionConfig) -> Result<Box<dyn VisionProvid
                 .unwrap_or_else(|| "claude-haiku-4-5-20251001".to_string());
             Ok(Box::new(claude::ClaudeVisionProvider::new(model, key)))
         }
+        "gemini" => {
+            let key = keystore::get_key("gemini").map_err(|e| {
+                format!("Vision-Provider `gemini`: kein API-Key konfiguriert ({e})")
+            })?;
+            let model = cfg
+                .model
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "gemini-2.5-flash".to_string());
+            Ok(Box::new(gemini::GeminiVisionProvider::new(model, key)))
+        }
         other => Err(format!(
             "Vision-Provider `{other}` ist (noch) nicht implementiert. \
-             Aktuell verfügbar: groq, ollama, claude."
+             Aktuell verfügbar: groq, ollama, claude, gemini."
         )),
     }
 }

@@ -540,6 +540,51 @@ body {
   gap: var(--sp-3);
   margin-bottom: var(--sp-6);
 }
+.overview-grid.overview-grid-2x2 {
+  /* DANIEL-FUNKTIONAL: 4-Card 2×2-Layout (HEUTE / OFFEN / PROJEKTE / DIESE WOCHE) */
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.next-focus-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  background: var(--bg-card);
+  border: 1px solid var(--primary);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-6);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.next-focus-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.next-focus-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.next-focus-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.next-focus-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.next-focus-empty {
+  margin-bottom: var(--sp-6);
+  text-align: center;
+  padding: var(--sp-3);
+}
 .overview-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1219,22 +1264,36 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
     <span class="alert-arrow" aria-hidden="true">›</span>
   </div>
 
-  <div class="overview-grid">
-    <button class="overview-card" data-action="nav-sparks" aria-label="Sparks öffnen">
-      <span class="overview-count" id="dashCountSparks">—</span>
+  <div class="overview-grid overview-grid-2x2">
+    <button class="overview-card" data-action="nav-sparks" aria-label="Heutige Sparks öffnen">
+      <span class="overview-count" id="dashCountToday">—</span>
       <span class="overview-icon" aria-hidden="true">🧠</span>
-      <span class="overview-label">Sparks</span>
+      <span class="overview-label">Heute</span>
     </button>
-    <button class="overview-card" data-action="nav-tasks" aria-label="Aufgaben öffnen">
-      <span class="overview-count" id="dashCountTasks">—</span>
+    <button class="overview-card" data-action="nav-tasks" aria-label="Offene Aufgaben öffnen">
+      <span class="overview-count" id="dashCountOpen">—</span>
       <span class="overview-icon" aria-hidden="true">✅</span>
       <span class="overview-label">Offen</span>
     </button>
-    <button class="overview-card" data-action="nav-projects" aria-label="Projekte öffnen">
-      <span class="overview-count" id="dashCountProjects">—</span>
+    <button class="overview-card" data-action="nav-projects" aria-label="Aktive Projekte öffnen">
+      <span class="overview-count" id="dashCountActive">—</span>
       <span class="overview-icon" aria-hidden="true">📁</span>
       <span class="overview-label">Projekte</span>
     </button>
+    <button class="overview-card" data-action="nav-tasks" aria-label="Diese Woche erledigte Aufgaben">
+      <span class="overview-count" id="dashCountWeek">—</span>
+      <span class="overview-icon" aria-hidden="true">🏆</span>
+      <span class="overview-label">Diese Woche</span>
+    </button>
+  </div>
+
+  <button class="next-focus-card" id="dashNextFocus" data-action="dash-next-focus-click" hidden aria-label="Nächster Fokus-Task öffnen">
+    <span class="next-focus-label">NÄCHSTER FOKUS</span>
+    <span class="next-focus-title" id="dashNextFocusTitle">—</span>
+    <span class="next-focus-meta" id="dashNextFocusMeta">—</span>
+  </button>
+  <div class="next-focus-empty" id="dashNextFocusEmpty" hidden>
+    <span class="subtle">Kein Fokus-Task — alle Termine erledigt oder ohne Datum.</span>
   </div>
 </section>
 
@@ -1247,6 +1306,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
         <button class="btn btn-ghost btn-sm hidden" id="bdUnsortedBadge" data-action="bd-filter-unsorted">Unsortiert (0)</button>
         <button class="btn btn-danger btn-sm" id="bdBulkDelete" data-action="bd-bulk-delete" disabled>Löschen</button>
       </div>
+    </div>
+    <!-- DANIEL-FUNKTIONAL DA-001: Hybrid-Filter — Reihe 1 Type, Reihe 2 Lebensbereich -->
+    <div class="filter-pills filter-pills-type" id="bdTypeFilterPills" role="tablist" aria-label="Type-Filter">
+      <button class="filter-pill active" role="tab" data-type="">Alle</button>
+      <button class="filter-pill" role="tab" data-type="Idea">💡 Idea</button>
+      <button class="filter-pill" role="tab" data-type="Task">✅ Task</button>
     </div>
     <div class="filter-pills" id="bdFilterPills" role="tablist" aria-label="Kategorie-Filter">
       <button class="filter-pill active" role="tab" data-filter="">Alle</button>
@@ -1591,7 +1656,12 @@ async function refreshSparks() {
     if (seq !== _refreshSeq) return; // veraltete Antwort verwerfen
     sparks = Array.isArray(result) ? result : (result?.data || result?.items || []);
     populateCategoryFilter();
-    renderSparks(sparks);
+    initTypeFilterPills();
+    restoreSavedFilters();
+    // DC-P2-M01-Fix: `filterSparks()` statt `renderSparks(sparks)` —
+    // gespeicherte Filter müssen beim ersten Render greifen, sonst wirkt
+    // die Persistenz erst nach manuellem Pill-Klick.
+    filterSparks();
     refreshUnsortedBadge();
     if (_pendingDetailId) {
       const id = _pendingDetailId;
@@ -1654,7 +1724,14 @@ function filterUnsorted() {
 }
 
 function populateCategoryFilter() {
-  const cats = [...new Set(sparks.map(b => b.category).filter(Boolean))];
+  // DC-P2-N01-Fix: Type-Werte (Idea/Task) gehören in die Type-Reihe oben,
+  // nicht doppelt in die Lebensbereich-Reihe. Wir filtern sie hier explizit
+  // raus, damit Reihe 2 nur noch echte Lebensbereich-Kategorien zeigt
+  // (Arbeit/Privat/Random/Unsorted/etc.) — keine Überlappung, keine
+  // Combined-Filter-Leer-Menge-Falle.
+  const TYPE_VALUES = new Set(['Idea', 'Task']);
+  const cats = [...new Set(sparks.map(b => b.category).filter(Boolean))]
+    .filter(c => !TYPE_VALUES.has(c));
   const container = document.getElementById('bdFilterPills');
   if (!container) return;
   const currentFilter = container.querySelector('.filter-pill.active')?.dataset.filter ?? '';
@@ -1671,16 +1748,72 @@ function populateCategoryFilter() {
 }
 
 function filterSparks() {
-  // Text-Suche läuft serverseitig (refreshSparks mit ?q=). Hier nur Kategorie-Filter
-  // plus "Unsorted"-Sonderfall.
-  const activePill = document.querySelector('#bdFilterPills .filter-pill.active');
-  const cat = activePill?.dataset.filter || '';
+  // Text-Suche läuft serverseitig (refreshSparks mit ?q=). Hier kombinieren wir:
+  // - Type-Filter (Daniel DA-001 Reihe 1): matched case-insensitive auf category-Wert
+  //   ("idea" / "task"). Sonderwert "" = alle Typen.
+  // - Lebensbereich-Filter (Reihe 2): matched exakt auf category-Wert ODER
+  //   Sonderfall "Unsorted" (kein/leerer category-Wert oder classification_status='unsorted').
+  // Beide Reihen sind unabhängig; ein Spark muss beide Filter passieren.
+  const typePill = document.querySelector('#bdTypeFilterPills .filter-pill.active');
+  const lifePill = document.querySelector('#bdFilterPills .filter-pill.active');
+  const typeFilter = typePill?.dataset.type || '';
+  const lifeFilter = lifePill?.dataset.filter || '';
+
+  // Persistiere Filter-State für Reload (DA-001 DoD: „Persistenz über Reload")
+  try {
+    localStorage.setItem('nexus.bdFilters', JSON.stringify({ type: typeFilter, life: lifeFilter }));
+  } catch (_) { /* localStorage kann in privacy-mode fehlen */ }
+
   const filtered = sparks.filter(b => {
-    if (cat === 'Unsorted') return !b.category || b.classification_status === 'unsorted';
-    if (cat && b.category !== cat) return false;
+    // Lebensbereich
+    if (lifeFilter === 'Unsorted') {
+      if (b.category && b.classification_status !== 'unsorted') return false;
+    } else if (lifeFilter && b.category !== lifeFilter) {
+      return false;
+    }
+    // Type (Idea/Task) — case-insensitive Match auf category
+    if (typeFilter) {
+      const cat = (b.category || '').toLowerCase();
+      if (cat !== typeFilter.toLowerCase()) return false;
+    }
     return true;
   });
   renderSparks(filtered);
+}
+
+// Type-Filter-Pills (DANIEL-FUNKTIONAL DA-001 Reihe 1) sind fix im HTML
+// verdrahtet. Click-Handler werden EINMAL beim ersten Refresh registriert —
+// `dataset.initialized` verhindert Doppel-Listener bei jedem `refreshSparks()`.
+function initTypeFilterPills() {
+  const container = document.getElementById('bdTypeFilterPills');
+  if (!container || container.dataset.initialized === '1') return;
+  container.querySelectorAll('.filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      container.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      filterSparks();
+    });
+  });
+  container.dataset.initialized = '1';
+}
+
+function restoreSavedFilters() {
+  // Restore Filter-State (Type + Lebensbereich) aus LocalStorage. Wird beim
+  // Init der Sparks-View aufgerufen, NACH populateCategoryFilter() (damit
+  // die dynamischen Lebensbereich-Pills schon im DOM sind).
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('nexus.bdFilters') || '{}'); } catch (_) {}
+  const typeCont = document.getElementById('bdTypeFilterPills');
+  const lifeCont = document.getElementById('bdFilterPills');
+  const activate = (cont, sel) => {
+    if (!cont) return;
+    const pill = cont.querySelector(sel);
+    if (!pill) return;
+    cont.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+  };
+  if (saved.type) activate(typeCont, `[data-type="${saved.type.replace(/"/g, '\\"')}"]`);
+  if (saved.life) activate(lifeCont, `[data-filter="${saved.life.replace(/"/g, '\\"')}"]`);
 }
 
 function renderSparks(items) {
@@ -2142,26 +2275,56 @@ async function refreshDashboard() {
   checkConnection();
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  // Load all counts in parallel
-  const [bds, ts, ps, unsorted] = await Promise.allSettled([
-    api('/spark',                  {}, { silent: true }),
-    api('/tasks',                      {}, { silent: true }),
-    api('/projects',                   {}, { silent: true }),
-    api('/spark/unsorted/count',   {}, { silent: true }),
+  // DANIEL-FUNKTIONAL: Aggregat-Endpoint ersetzt drei Einzelaufrufe für
+  // Dashboard-Counter. /api/dashboard/stats liefert today_sparks +
+  // total_open_tasks + active_projects + done_this_week in einem Roundtrip.
+  // Nächster-Fokus-Card kommt aus /api/dashboard/next-focus.
+  const [stats, nextFocus, unsorted] = await Promise.allSettled([
+    api('/api/dashboard/stats',      {}, { silent: true }),
+    api('/api/dashboard/next-focus', {}, { silent: true }),
+    api('/spark/unsorted/count',     {}, { silent: true }),
   ]);
 
-  if (bds.status === 'fulfilled') {
-    const arr = Array.isArray(bds.value) ? bds.value : (bds.value?.data || []);
-    set('dashCountSparks', arr.length);
+  if (stats.status === 'fulfilled' && stats.value) {
+    set('dashCountToday',  stats.value.today_sparks      ?? '—');
+    set('dashCountOpen',   stats.value.total_open_tasks  ?? '—');
+    set('dashCountActive', stats.value.active_projects   ?? '—');
+    set('dashCountWeek',   stats.value.done_this_week    ?? '—');
   }
-  if (ts.status === 'fulfilled') {
-    const arr = Array.isArray(ts.value) ? ts.value : (ts.value?.data || []);
-    const open = arr.filter(t => t.status !== 'done' && t.status !== 'completed').length;
-    set('dashCountTasks', open);
-  }
-  if (ps.status === 'fulfilled') {
-    const arr = Array.isArray(ps.value) ? ps.value : (ps.value?.data || []);
-    set('dashCountProjects', arr.length);
+
+  // Nächster-Fokus-Card: Task / Empty-Hint / Netzwerk-Fehler (DC-P2-N03-Fix:
+  // unterscheidet zwischen „task: null" (= alle Termine geschafft) und
+  // Backend-Down (= Card weg, Empty-Hint mit Fehlertext).
+  const nfCard  = document.getElementById('dashNextFocus');
+  const nfEmpty = document.getElementById('dashNextFocusEmpty');
+  if (nfCard && nfEmpty) {
+    if (nextFocus.status === 'rejected') {
+      nfCard.setAttribute('hidden', '');
+      nfEmpty.removeAttribute('hidden');
+      nfEmpty.querySelector('.subtle').textContent =
+        'Nächster Fokus konnte nicht geladen werden (Verbindung prüfen).';
+    } else {
+      const task = nextFocus.value?.task ?? null;
+      if (task) {
+        const titleEl = document.getElementById('dashNextFocusTitle');
+        const metaEl  = document.getElementById('dashNextFocusMeta');
+        if (titleEl) titleEl.textContent = task.title || 'Ohne Titel';
+        if (metaEl) {
+          const priority = task.priority ? task.priority.toUpperCase() : '';
+          const due = task.due_date || '';
+          metaEl.textContent = [due && `Fällig: ${due}`, priority && `Priorität ${priority}`]
+            .filter(Boolean).join(' · ') || '—';
+        }
+        nfCard.dataset.taskId = task.id;
+        nfCard.removeAttribute('hidden');
+        nfEmpty.setAttribute('hidden', '');
+      } else {
+        nfCard.setAttribute('hidden', '');
+        nfEmpty.removeAttribute('hidden');
+        nfEmpty.querySelector('.subtle').textContent =
+          'Kein Fokus-Task — alle Termine erledigt oder ohne Datum.';
+      }
+    }
   }
 
   // Alert card + nav badge
@@ -3274,6 +3437,11 @@ document.addEventListener('click', (e) => {
     case 'nav-tasks':        navigate('tasks'); break;
     case 'nav-projects':     navigate('projects'); break;
     case 'dash-alert-click': navigate('sparks'); filterUnsorted(); break;
+    case 'dash-next-focus-click': {
+      const tid = e.target.closest('.next-focus-card')?.dataset.taskId;
+      if (tid) { navigate('tasks'); /* Task-Detail-Highlight ist eigener Folge-Sprint */ }
+      break;
+    }
     case 'theme-cycle': cycleTheme(); break;
     case 'settings-open': openSettings(); break;
     case 'settings-close': closeSettings(); break;

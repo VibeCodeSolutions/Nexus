@@ -2015,6 +2015,17 @@ button.task-checkbox:hover { border-color: var(--primary); }
       <option value="none">Keine</option>
     </select>
 
+    <h3 class="h3-llm">Gefahrenzone</h3>
+    <div class="nx-settings-row" data-danger="true">
+      <div class="nx-settings-meta">
+        <strong class="nx-settings-label">Zurück zum Wizard</strong>
+        <small class="nx-settings-sub">Setzt die lokale Pairing-Verbindung zurück und öffnet den Einrichtungs-Assistenten erneut.</small>
+      </div>
+      <div class="nx-settings-control">
+        <button class="btn btn-ghost btn-sm" data-action="wizard-restart">Wizard starten</button>
+      </div>
+    </div>
+
     <div class="actions mt-16">
       <button class="btn btn-ghost" data-action="settings-close">Schließen</button>
       <button class="btn btn-primary" data-action="settings-save">Verbindung speichern</button>
@@ -2794,6 +2805,23 @@ async function savePref(key, value) {
   } catch (e) { alert('Pref konnte nicht gespeichert werden: ' + e.message); }
 }
 function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+
+function restartWizard() {
+  // Lokales Pairing löschen (UI-Geste). Server-seitiger Unpair-Reset ist eigener
+  // Sprint — wenn der Server noch paired=true meldet, kommt der User beim nächsten
+  // App-Start automatisch ins Dashboard zurück. Für den manuellen Re-Pair-Flow
+  // reicht das hier.
+  localStorage.removeItem('nexus_url');
+  localStorage.removeItem('nexus_token');
+  coreUrl = 'http://127.0.0.1:7777';
+  token = '';
+  closeSettings();
+  const overlay = document.getElementById('onboardingOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+  document.querySelectorAll('.onboarding-screen').forEach(s => s.classList.remove('active'));
+  const welcome = document.getElementById('screenWelcome');
+  if (welcome) welcome.classList.add('active');
+}
 function saveSettings() {
   coreUrl = document.getElementById('settingUrl').value.trim() || 'http://127.0.0.1:7777';
   token = document.getElementById('settingToken').value.trim();
@@ -4101,6 +4129,7 @@ document.addEventListener('click', (e) => {
     }
     case 'theme-cycle': cycleTheme(); break;
     case 'theme-accent-set': applyAccent(el.dataset.accent); break;
+    case 'wizard-restart': restartWizard(); break;
     case 'settings-open': openSettings(); break;
     case 'settings-close': closeSettings(); break;
     case 'settings-save': saveSettings(); break;

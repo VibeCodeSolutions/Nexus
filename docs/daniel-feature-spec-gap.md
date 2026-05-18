@@ -130,6 +130,7 @@
 
 ### Sprint-Vorschlag 3 — „Daniel-Komplett-Konzeptklärung" ✅ ERLEDIGT 2026-05-18
 - ✅ DA-001 Filter-Pills: **Hybrid** (Type-Pills + Lebensbereich-Reihe). Wird in Sprint 1 umgesetzt.
+  - Re-Konsultation 2026-05-18 (post Daniel-Funktional Sprint): Hybrid bestätigt, kein Rückbau. Task-State-Sichtbarkeit wird über DA-002 (Kind-Badge auf Karten) im Polish-Sprint abgedeckt.
 - ✅ DB-006 Desktop-Live-Camera: **skip** (Android-only Workflow, Desktop bleibt File-Upload).
 - ✅ Reihenfolge: NV-Vision-clippy-Cleanup ist erledigt (Commit 7e8677c). Vault-Implementierung ist geparkt (Admin-Entscheidung 2026-05-18: Obsidian-Briefkasten reicht). Nächster Sprint = Daniel-Funktional (Sprint 1).
 

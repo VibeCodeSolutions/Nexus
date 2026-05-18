@@ -260,32 +260,41 @@ body {
 .topbar-actions { display: flex; gap: var(--sp-2); align-items: center; flex-shrink: 0; }
 
 /* Status pill */
+/* S25-P5: Status-Pill auf --nx-* Tokens migriert (v0.2 "Pulse" Proof).
+   Visuelle Änderungen: Mono-Font für System-Status, uppercase mit
+   weiterem letter-spacing (v0.2 Mono-Label-Regel). Funktional und
+   Markup identisch. Bei <html data-accent="…"> wechselt --nx-border-hi
+   nicht, aber die Pill-Migration ist Proof, dass die Token-Schicht
+   greift. */
 .status-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-  transition: border-color 0.2s, color 0.2s;
+  border: 1px solid var(--nx-border-hi);
+  border-radius: var(--nx-r-pill);
+  font-family: var(--nx-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--nx-text-dim);
+  transition: border-color var(--nx-dur-base) var(--nx-ease-out),
+              color var(--nx-dur-base) var(--nx-ease-out);
 }
 .status-pill .dot {
   width: 6px; height: 6px;
   border-radius: 50%;
-  background: var(--text-dim);
-  transition: background 0.2s;
+  background: var(--nx-text-dim);
+  transition: background var(--nx-dur-base) var(--nx-ease-out);
   flex-shrink: 0;
 }
-.status-pill .dot.success { background: var(--success); }
-.status-pill .dot.warning { background: var(--warning); }
-.status-pill .dot.danger  { background: var(--danger); }
-.status-pill.connected { color: var(--success); border-color: rgba(76,175,80,.35); }
-.status-pill.offline   { color: var(--danger);  border-color: rgba(239,83,80,.35); }
-.status-pill.warning   { color: var(--warning); border-color: rgba(245,158,11,.35); }
+.status-pill .dot.success { background: var(--nx-green); }
+.status-pill .dot.warning { background: var(--nx-amber); }
+.status-pill .dot.danger  { background: var(--nx-coral); }
+.status-pill.connected { color: var(--nx-green); border-color: rgba(54, 201, 122, .35); }
+.status-pill.offline   { color: var(--nx-coral); border-color: rgba(201, 92, 92, .35); }
+.status-pill.warning   { color: var(--nx-amber); border-color: rgba(212, 160, 76, .35); }
 
 /* Sidebar */
 .sidebar {

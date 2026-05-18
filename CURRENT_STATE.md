@@ -369,14 +369,19 @@ nexus-core pair       # QR-Code für Android-Pairing
 
 ## Nächster Sprint (offen)
 
-Sprint-Slot frei nach v0.1.3 + Post-Release-Feature-Stack. Mögliche Kandidaten aus Backlog & Bookmarks:
+Stand 2026-05-18 nach Konzeptklärung: NV-Linie + Daniel-Vorschläge weiter, Vault-Implementierung geparkt (Admin-Entscheidung: Obsidian-Briefkasten reicht). Reihenfolge:
 
-- **FEAT-002-B/C — iCal-Härtung** — Token-in-URL (AUTH) + ETag/Last-Modified + Trace-Logging. Kleiner Sprint, schließt FEAT-002 vollständig ab.
-- **Vault-Implementierung** — `docs/VAULT-DESIGN.md` als 7-11-Tage-Spec liegt seit Joyful Jellyfish bereit; Links-Tabelle deckt schon ~80% des Edges-Schemas. ADHS-relevant.
-- **Pixel-Smoke** — physischer E2E-Test der Nightvision-Android-App (CameraX + SSE + Bottom-Nav-Badge live).
-- **Provider-Coverage `extract_links` + `extract_action_items`** — gemini/openai/mistral/groq/deepseek/openrouter/zai (aktuell nur Claude + Ollama für beide Traits).
-- **Fokus-Module** — FocusPact / HyperfokusWächter (Masterplan-Roadmap).
-- **Wellbeing** — ReizRunter / Abend-Ritual (Masterplan-Roadmap).
-- **Remote-Sync** — Tailscale-Integration (Masterplan-Roadmap).
+1. **Daniel-Funktional** (1-2 Tage 🟡) — Dashboard HEUTE-Counter + DIESE-WOCHE-Erledigt + Nächster-Fokus-Card + 2×2-Layout · Filter-Pills Hybrid (Type-Reihe Alle/Idea/Task + Lebensbereich-Reihe). Siehe `docs/daniel-feature-spec-gap.md` Sprint-Vorschlag 1.
+2. **Daniel-Polish** (1 Tag 🟡) — Kind-Badges · Karten-Stagger · Tag-Pop-In · Sheet-Dim · Scan-Overlay-Visualisierung (Android) · Status-Chips · Streaming-Cursor · Glow-Hover · Shutter-Flash · Checkbox-Animation. Siehe Sprint-Vorschlag 2.
+3. **Pixel-Smoke** (Admin-Aktion, parallel möglich) — physischer E2E-Test der Nightvision-Android-App auf echtem Gerät (CameraX + SSE + Bottom-Nav-Badge live).
+4. **VC-013-MIN-1** Android Path-Encoding-Wrapper (klein, parallel möglich).
+5. **Mobile-Subscribe-Helper für iCal** (optional, ~2-3h) — Settings zeigt `?token=…`-Subscribe-URL mit Copy-to-Clipboard.
 
-Sprint-Auswahl + H2-Planung steht aus.
+**Geparkt (nicht kurzfristig):**
+- ~~Vault-Implementierung~~ (Admin-Entscheidung 2026-05-18: Obsidian-Briefkasten reicht erstmal, eigener Markdown-Vault wird nicht gebaut)
+- Provider-Coverage `extract_links` + `extract_action_items` (gemini/openai/mistral/groq/deepseek/openrouter/zai)
+- Fokus-Module (FocusPact / HyperfokusWächter, Masterplan-Roadmap)
+- Wellbeing (ReizRunter / Abend-Ritual, Masterplan-Roadmap)
+- Remote-Sync Tailscale-Integration (Masterplan-Roadmap)
+
+Sprint-Auswahl: Daniel-Funktional als nächstes, H2-Planung folgt.

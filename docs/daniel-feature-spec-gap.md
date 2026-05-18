@@ -33,7 +33,7 @@
 ### Gaps
 | Gap | Typ | Aufwand |
 |---|---|---|
-| **DA-001 — Filter-Pills semantisch falsch:** aktuell „Alle" + dynamisch alle Kategorien aus DB (Random/Arbeit/Privat/Task/Idea/…). Daniel zeigt schlanker: **„Alle / Idea / Task"** als Type-Filter (Kategorie-Subset auf 2 Klassen reduziert). Konzeptuelle Frage an Admin: war die Kategorie-Pluralität in M3 bewusst, oder soll auf Daniels schlanke Variante zurückgebaut werden? | konzeptuell | M (Decision + 1-2h Code) |
+| **DA-001 — Filter-Pills Hybrid-Schema:** Admin-Entscheidung 2026-05-18: **Hybrid** — erste Filter-Reihe „Alle / Idea / Task" wie Daniel-Spec (Type-Filter), zweite Reihe (optional einklappbar) für Lebensbereich (Arbeit/Privat/…). Beide Welten bedient: Daniel-konformes Type-Modell + bestehende Kategorien-Flexibilität. Aufwand höher als reiner Rückbau (zwei Filter-Reihen + LocalStorage-State + Combined-Query). | funktional + UI | M-L (~3-4h Code Desktop+Android) |
 | **DA-002 — Kind-Badge auf Karten:** Daniel zeigt IDEA-Tag (lila) bzw. TASK-Tag (grün) prominent links oben in jeder Karte als Letter-Spacing-Uppercase-Pill. Aktuelle Cards haben `category`-Anzeige, aber nicht visuell als IDEA-vs-TASK-Kind unterschieden. | visuell | S (CSS + 1 String-Mapping) |
 | **DA-003 — Karten-Stagger-Animation:** beim Spark-Liste-Laden staggered Karten rein (18px slide-up + opacity + scale). Aktuell vermutlich instant-render. | UI-Polish | S (CSS-animation @keyframes mit nth-child-Delay) |
 | **DA-004 — Tag-Pop-In-Animation im Detail-Sheet:** Tags erscheinen einzeln gestaffelt (0.18s je). Aktuell vermutlich statisch all-at-once. | UI-Polish | S (CSS-animation oder JS-Stagger) |
@@ -68,7 +68,7 @@
 | **DB-003 — Streaming-Cursor in OCR-Panel:** blinkender `▌` am Ende des OCR-Body während Streaming. Aktuell vermutlich nicht vorhanden. | UI-Polish | XS (CSS @keyframes + Pseudo-Element) |
 | **DB-004 — Glow-Hover-State des Add-Buttons:** lila Glow + Outline-Ring beim Hover/Pre-Tap auf den +Spark-Button. Aktuell vermutlich Standard-Hover. | UI-Polish | XS (CSS `:hover` + box-shadow) |
 | **DB-005 — Shutter-Flash beim Capture:** weißer Full-Screen-Fade kurz nach Tap. Aktuell vermutlich kein Flash. | UI-Polish | XS (CSS-animation overlay) |
-| **DB-006 — Desktop-Live-Camera-Option:** Daniel zeigt Camera als Live-Preview. Desktop hat aktuell nur File-Upload (NV-3). Frage an Admin: Live-Webcam-Capture im Desktop-`<dialog>` als neuer Sprint, oder File-Upload reicht für Desktop-Use-Case? | funktional | L (`getUserMedia()` + Capture-Pipeline neu) |
+| ~~DB-006 — Desktop-Live-Camera-Option~~ | n/a | **Admin-Entscheidung 2026-05-18: SKIP.** Kamera bleibt Android-exklusiv (Foto-Workflow ist auf dem Handy: abfotografieren statt einsprechen, LLM sortiert). Desktop bleibt bei File-Upload (NV-3). |
 
 ---
 
@@ -104,15 +104,14 @@
 ## Sprint-Kandidaten — Konsolidiert
 
 ### Sprint-Vorschlag 1 — „Daniel-Funktional"
-**Scope:** alle funktionalen Lücken (Daten-/Logik-Features, kein reines UI-Polish).
-- DA-001 Filter-Pills-Konzept-Entscheidung + Refactor (falls Admin auf „Alle/Idea/Task" zurückbaut)
-- DB-006 Desktop-Live-Camera (falls Admin will — sonst skip)
-- DC-001 HEUTE-Counter
-- DC-002 DIESE-WOCHE-Erledigt-Counter
-- DC-003 Nächster-Fokus-Card
-- DC-004 Dashboard-Layout 2×2
+**Scope:** alle funktionalen Lücken (Daten-/Logik-Features, kein reines UI-Polish). Konzeptfragen sind nach Klärung 2026-05-18 alle entschieden.
+- DA-001 Filter-Pills Hybrid: Type-Pills (Alle/Idea/Task) + Lebensbereich-Reihe (Desktop+Android)
+- DC-001 HEUTE-Counter (Dashboard)
+- DC-002 DIESE-WOCHE-Erledigt-Counter (Dashboard)
+- DC-003 Nächster-Fokus-Card (Dashboard)
+- DC-004 Dashboard-Layout 2×2 (folgt aus DC-001+DC-002)
 
-**Geschätzt:** 1–2 Tage. Klasse 🟡 standard, evtl. 🟠 wenn DB-006 dabei.
+**Geschätzt:** 1-2 Tage. Klasse 🟡 standard. Beide Clients betroffen (Desktop + Android).
 
 ### Sprint-Vorschlag 2 — „Daniel-Polish"
 **Scope:** UI-Polish, Animationen, visuelle Treue.
@@ -129,12 +128,10 @@
 
 **Geschätzt:** 1 Tag. Klasse 🟡 standard (rein additiv, keine Logik-Änderungen).
 
-### Sprint-Vorschlag 3 — „Daniel-Komplett-Konzeptklärung"
-**Scope:** vor den anderen Sprints; Admin trifft konzeptuelle Entscheidungen.
-- DA-001 Filter-Pills: Kategorie-Pluralität vs. Idea/Task binary?
-- DB-006 Desktop-Live-Camera: bauen oder File-Upload-only behalten?
-- Aufwand-Sortierung: was zuerst, was später?
-- Reihenfolge gegenüber den anderen offenen Sprints (Vault, FocusPact, NV-Vision-clippy-Cleanup, Pixel-Smoke)
+### Sprint-Vorschlag 3 — „Daniel-Komplett-Konzeptklärung" ✅ ERLEDIGT 2026-05-18
+- ✅ DA-001 Filter-Pills: **Hybrid** (Type-Pills + Lebensbereich-Reihe). Wird in Sprint 1 umgesetzt.
+- ✅ DB-006 Desktop-Live-Camera: **skip** (Android-only Workflow, Desktop bleibt File-Upload).
+- ✅ Reihenfolge: NV-Vision-clippy-Cleanup ist erledigt (Commit 7e8677c). Vault-Implementierung ist geparkt (Admin-Entscheidung 2026-05-18: Obsidian-Briefkasten reicht). Nächster Sprint = Daniel-Funktional (Sprint 1).
 
 ---
 

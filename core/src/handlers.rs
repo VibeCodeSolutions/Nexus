@@ -1561,17 +1561,17 @@ pub async fn post_spark_from_image(
     let prepared_bytes = prepared.bytes;
 
     tokio::spawn(async move {
-        run_photo_spark_pipeline(
-            state_for_task,
-            prepared_bytes,
-            prepared_mime,
-            image_path_for_task,
-            image_filename_for_task,
+        run_photo_spark_pipeline(PhotoSparkPipelineCtx {
+            state: state_for_task,
+            image_bytes: prepared_bytes,
+            mime: prepared_mime,
+            image_path: image_path_for_task,
+            image_filename: image_filename_for_task,
             note,
             vision_provider,
             vision_err,
             tx,
-        )
+        })
         .await;
     });
 
@@ -1581,11 +1581,14 @@ pub async fn post_spark_from_image(
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()).into_response())
 }
 
-/// Background-Task: ruft die Vision-Pipeline auf, streamt Frames in den
-/// Channel, und persistiert den fertigen Spark in der DB. Fehler werden
-/// als `error`-Frame durchgereicht (kein Panic — der Stream-Reader sieht
-/// den Frame und kann die UI entsprechend updaten).
-async fn run_photo_spark_pipeline(
+/// Eingabe-Bündel für [`run_photo_spark_pipeline`].
+///
+/// 2026-05-18 (NV-Vision-clippy-Cleanup): die Pipeline-Funktion hatte
+/// 9 positionale Argumente und löste `clippy::too_many_arguments` aus.
+/// Diese Struct gruppiert die Eingaben thematisch: Bilddaten +
+/// Persistenz-Metadaten + Vision-Provider-State + Output-Channel.
+/// Lokal-private — kein API-Break gegenüber externen Aufrufern.
+struct PhotoSparkPipelineCtx {
     state: AppState,
     image_bytes: Vec<u8>,
     mime: String,
@@ -1595,7 +1598,24 @@ async fn run_photo_spark_pipeline(
     vision_provider: Option<Box<dyn vision::VisionProvider>>,
     vision_err: Option<String>,
     tx: tokio::sync::mpsc::Sender<PipelineFrame>,
-) {
+}
+
+/// Background-Task: ruft die Vision-Pipeline auf, streamt Frames in den
+/// Channel, und persistiert den fertigen Spark in der DB. Fehler werden
+/// als `error`-Frame durchgereicht (kein Panic — der Stream-Reader sieht
+/// den Frame und kann die UI entsprechend updaten).
+async fn run_photo_spark_pipeline(ctx: PhotoSparkPipelineCtx) {
+    let PhotoSparkPipelineCtx {
+        state,
+        image_bytes,
+        mime,
+        image_path,
+        image_filename,
+        note,
+        vision_provider,
+        vision_err,
+        tx,
+    } = ctx;
     let analysis_result = vision::analyze_with_provider(
         vision_provider.as_deref(),
         vision_err,
@@ -1831,17 +1851,17 @@ mod nv_photo_spark_tests {
         std::fs::create_dir_all(&images_dir).expect("mkdir images");
         std::fs::write(&image_path, b"fake-jpeg-bytes").expect("write image");
 
-        let task = tokio::spawn(run_photo_spark_pipeline(
-            state.clone(),
-            b"fake-jpeg-bytes".to_vec(),
-            "image/jpeg".to_string(),
+        let task = tokio::spawn(run_photo_spark_pipeline(PhotoSparkPipelineCtx {
+            state: state.clone(),
+            image_bytes: b"fake-jpeg-bytes".to_vec(),
+            mime: "image/jpeg".to_string(),
             image_path,
-            image_filename.clone(),
-            Some("Sprint-Notiz".into()),
-            Some(Box::new(mock) as Box<dyn VisionProvider>),
-            None,
+            image_filename: image_filename.clone(),
+            note: Some("Sprint-Notiz".into()),
+            vision_provider: Some(Box::new(mock) as Box<dyn VisionProvider>),
+            vision_err: None,
             tx,
-        ));
+        }));
 
         let frames = drain_frames(rx).await;
         task.await.expect("pipeline-task done");
@@ -1895,17 +1915,17 @@ mod nv_photo_spark_tests {
 
         let (tx, rx) = tokio::sync::mpsc::channel::<PipelineFrame>(8);
 
-        let task = tokio::spawn(run_photo_spark_pipeline(
-            state.clone(),
-            b"x".to_vec(),
-            "image/jpeg".to_string(),
-            tmp_images.path().join("nope.jpg"),
-            "nope.jpg".to_string(),
-            None,
-            None,
-            Some("kein API-Key konfiguriert".into()),
+        let task = tokio::spawn(run_photo_spark_pipeline(PhotoSparkPipelineCtx {
+            state: state.clone(),
+            image_bytes: b"x".to_vec(),
+            mime: "image/jpeg".to_string(),
+            image_path: tmp_images.path().join("nope.jpg"),
+            image_filename: "nope.jpg".to_string(),
+            note: None,
+            vision_provider: None,
+            vision_err: Some("kein API-Key konfiguriert".into()),
             tx,
-        ));
+        }));
 
         let frames = drain_frames(rx).await;
         task.await.expect("pipeline done");

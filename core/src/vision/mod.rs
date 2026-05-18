@@ -1,8 +1,8 @@
 // Einige Symbole (resize::PreparedImage::mime-Konstante, VisionError-Varianten
 // im Test-Pfad) werden erst durch den HTTP-Handler in NV-2 voll konsumiert —
-// daher lokale Dead-Code-Toleranz. `unused_assignments` ist mit dem
-// `analyze_with_provider`-Refactor (NV1-003) nicht mehr nötig.
-#![allow(dead_code)]
+// daher lokale Dead-Code-Toleranz. Das `#[allow(dead_code)]` sitzt jetzt am
+// `mod vision;` in `main.rs` (redundantes Inner-Attribut hier entfernt, sonst
+// löst es `clippy::duplicated_attributes` aus).
 
 //! Sprint Nightvision NV-1 — Vision-LLM + OCR-Fallback für Foto-Sparks.
 //!

@@ -33,6 +33,7 @@ pub struct PreparedImage {
 /// Fehler-Pfade:
 /// - Bild-Format wird nicht erkannt → `Err(...)`
 /// - Encoder schlägt fehl → `Err(...)`
+///
 /// Beides sollte der Aufrufer als `400 Bad Request` durchreichen.
 pub fn prepare_image(input: &[u8]) -> Result<PreparedImage, String> {
     let reader = ImageReader::new(Cursor::new(input))

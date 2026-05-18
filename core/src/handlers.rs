@@ -367,6 +367,20 @@ pub async fn extract_tasks_from_spark(
 //   VTODO inconsistent — VEVENT als 1-Tages-Event ist überall lesbar.
 // - UID-Schema: `nexus-spark-<id>@nexus` / `nexus-task-<id>@nexus`,
 //   stabil über Re-Fetches (kein Timestamp im UID).
+//
+// FEAT-002 Sprint B/C — Härtung (Stand 2026-05-18):
+// - **AUTH (Token-in-URL):** beide Endpoints akzeptieren `?token=<bearer>`
+//   als Fallback zum `Authorization: Bearer …`-Header, gesteuert via
+//   `auth::path_allows_token_in_url`. Trade-off: Token landet in HTTP-
+//   Access-Logs, Browser-History und Referer-Headern. Bewusst akzeptiert
+//   für den Calendar-Subscribe-Use-Case (Apple Calendar / GCal können
+//   keinen Custom-Header setzen). Pairing-Events werden weiterhin nur
+//   beim Header-Pfad geloggt — passive Subscribe-Polls sind keine
+//   Pairings.
+// - **TRACE:** Parse-Fehler beim `created_at`-Feld eines Sparks werden
+//   in `build_sparks_calendar` per `tracing::warn!` mit `spark_id` +
+//   Original-Wert geloggt, bevor auf `Utc::now()` gefallen wird. Vorher
+//   war der Fallback silent (siehe Backlog-Item FEAT-002-TRACE).
 
 fn ics_response(body: String) -> impl axum::response::IntoResponse {
     (
@@ -401,9 +415,22 @@ fn build_sparks_calendar(entries: &[crate::models::SparkEntry]) -> String {
         // SQLite-DateTime ("YYYY-MM-DD HH:MM:SS"). Bei Parse-Fehler fällt der
         // Eintrag NICHT raus — wir nehmen `Utc::now()` als Fallback, damit
         // der Spark zumindest sichtbar bleibt (sonst wäre ein einziger
-        // korrupter Timestamp ein silent-skip).
-        let naive = NaiveDateTime::parse_from_str(&spark.created_at, "%Y-%m-%d %H:%M:%S")
-            .unwrap_or_else(|_| Utc::now().naive_utc());
+        // korrupter Timestamp ein silent-skip). FEAT-002-TRACE: der
+        // Fallback wird per `tracing::warn!` mit `spark_id` + Original-
+        // Wert geloggt, damit Daten-Drift im DB-Schema nicht stumm
+        // versickert.
+        let naive = match NaiveDateTime::parse_from_str(&spark.created_at, "%Y-%m-%d %H:%M:%S") {
+            Ok(dt) => dt,
+            Err(e) => {
+                tracing::warn!(
+                    spark_id = %spark.id,
+                    raw = %spark.created_at,
+                    error = %e,
+                    "ics export: created_at parse failed, fallback to Utc::now"
+                );
+                Utc::now().naive_utc()
+            }
+        };
         let dt: DateTime<Utc> = Utc.from_utc_datetime(&naive);
 
         let event = Event::new()
@@ -2661,5 +2688,31 @@ mod synaptic_phase_b_tests {
         let s = super::spark_summary(&long_text);
         assert!(s.ends_with("..."), "expected ellipsis, got {s}");
         assert!(s.chars().count() <= 60);
+    }
+
+    // FEAT-002-TRACE — Fallback bei korruptem created_at darf den Spark
+    // nicht silent skippen. Wir verifizieren, dass der Fallback-Pfad
+    // ausgeführt wird (VEVENT trotz Garbage-Timestamp drin). Der
+    // tracing::warn-Aufruf selbst wird per Code-Review verifiziert, da
+    // tracing-Capture eine zusätzliche dev-dep wäre.
+    #[tokio::test]
+    async fn test_spark_ics_fallback_when_created_at_invalid() {
+        let pool = setup_pool().await;
+        sqlx::query(
+            "INSERT INTO sparks (id, created_at, raw_text) VALUES (?, ?, ?)"
+        )
+            .bind("spark-bad-ts")
+            .bind("not-a-timestamp")
+            .bind("Trotzdem exportieren")
+            .execute(&pool).await.unwrap();
+
+        let entries = repo::list(&pool).await.unwrap();
+        let ics = super::build_sparks_calendar(&entries);
+
+        // Der Spark erscheint trotz korruptem Timestamp.
+        assert!(ics.contains("UID:nexus-spark-spark-bad-ts@nexus"));
+        assert!(ics.contains("Trotzdem exportieren"));
+        // VEVENT hat ein DTSTART (irgendein UTC-Wert, weil Fallback griff).
+        assert!(ics.contains("DTSTART"));
     }
 }

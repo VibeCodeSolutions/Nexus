@@ -170,6 +170,35 @@ fn is_loopback(addr: &SocketAddr) -> bool {
     addr.ip().is_loopback()
 }
 
+/// Paths that may accept `?token=<bearer>` as URL-query fallback for the
+/// `Authorization: Bearer <token>` header.
+///
+/// **Security trade-off (FEAT-002-AUTH):** tokens in URLs land in HTTP
+/// access logs, browser history, and referer headers. We accept this
+/// surface only for read-only calendar-subscription endpoints, which are
+/// typically consumed by clients (Apple Calendar, Google Calendar
+/// subscribe) that cannot set custom HTTP headers. Adding more paths
+/// here widens that attack surface — review carefully.
+fn path_allows_token_in_url(path: &str) -> bool {
+    matches!(path, "/spark/export.ics" | "/tasks/export.ics")
+}
+
+/// Extract `token=<value>` from a URL query string. Returns the
+/// URL-decoded value or `None` if no `token=` parameter is present or
+/// the value is empty.
+fn extract_query_token(query: Option<&str>) -> Option<String> {
+    let q = query?;
+    for pair in q.split('&') {
+        if let Some(rest) = pair.strip_prefix("token=") {
+            let decoded = urlencoding::decode(rest).ok()?.into_owned();
+            if !decoded.is_empty() {
+                return Some(decoded);
+            }
+        }
+    }
+    None
+}
+
 /// Axum middleware: verify Bearer token on API routes.
 ///
 /// Public paths (`/health`, `/api/setup-status`) are always allowed —
@@ -178,6 +207,13 @@ fn is_loopback(addr: &SocketAddr) -> bool {
 /// sparks, projects and stats, and the default bind is `0.0.0.0`,
 /// so leaving `/` unauthenticated would leak everything to anyone on the
 /// same network. Bearer auth required.
+///
+/// On the calendar-subscribe allow-list (`path_allows_token_in_url`), a
+/// `?token=<bearer>` query-string fallback is consulted when no
+/// `Authorization` header is present. This is the only place where the
+/// token is permitted in a URL — pairing-event tracking stays gated on
+/// the header path, so passive subscribe-polls do not register as
+/// user-initiated pairings.
 ///
 /// If a request to *any* path carries a valid Bearer from a non-loopback
 /// peer, we record it as a pairing event. The Android client makes this
@@ -209,17 +245,43 @@ pub async fn require_token(
         _ => false,
     };
 
+    // FEAT-002-AUTH: URL-token fallback. Only consulted when no
+    // Authorization header was provided, and only for paths on the
+    // calendar-subscribe allow-list. Same constant-time compare as the
+    // Bearer path.
+    let url_token_allowed = !has_auth && path_allows_token_in_url(&path);
+    let url_token_valid = if url_token_allowed {
+        match (&stored, extract_query_token(req.uri().query())) {
+            (Some(token), Some(qt)) => constant_time_eq(&qt, token),
+            _ => false,
+        }
+    } else {
+        false
+    };
+    if url_token_allowed {
+        if url_token_valid {
+            tracing::info!("auth: url-token akzeptiert für peer={} path={}", addr, path);
+        } else {
+            tracing::warn!(
+                "auth: url-token ungültig oder fehlt für peer={} path={}",
+                addr, path
+            );
+        }
+    }
+
     let loopback = is_loopback(&addr);
     tracing::debug!(
-        "auth: path={} peer={} loopback={} has_auth={} bearer_valid={}",
-        path, addr, loopback, has_auth, bearer_valid
+        "auth: path={} peer={} loopback={} has_auth={} bearer_valid={} url_token_valid={}",
+        path, addr, loopback, has_auth, bearer_valid, url_token_valid
     );
     if has_auth && !bearer_valid {
         tracing::warn!("auth: ungültiger Bearer von peer={} path={}", addr, path);
     }
 
-    // Track pairing whenever a remote client presents a valid token,
-    // regardless of which endpoint they hit.
+    // Track pairing whenever a remote client presents a valid Bearer
+    // header, regardless of which endpoint they hit. URL-token requests
+    // are *not* counted as pairing events — calendar-subscribe polls
+    // should not silently mark the device as paired.
     if bearer_valid && !loopback {
         tracing::info!("auth: pairing-event von peer={} path={}", addr, path);
         mark_paired_now();
@@ -229,14 +291,78 @@ pub async fn require_token(
         return Ok(next.run(req).await);
     }
 
-    // Protected endpoints require a stored token AND a valid Bearer.
+    // Protected endpoints require a stored token AND a valid Bearer
+    // (or, on the allow-list, a valid URL-token).
     if stored.is_none() {
         tracing::error!("Kein Pairing-Token gefunden — alle API-Zugriffe blockiert");
         return Err(StatusCode::UNAUTHORIZED);
     }
-    if bearer_valid {
+    if bearer_valid || url_token_valid {
         Ok(next.run(req).await)
     } else {
         Err(StatusCode::UNAUTHORIZED)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_allows_token_in_url_only_ics_endpoints() {
+        assert!(path_allows_token_in_url("/spark/export.ics"));
+        assert!(path_allows_token_in_url("/tasks/export.ics"));
+        // Negativ-Kontrollen: ähnliche Pfade dürfen NICHT zugreifen.
+        assert!(!path_allows_token_in_url("/spark"));
+        assert!(!path_allows_token_in_url("/tasks"));
+        assert!(!path_allows_token_in_url("/spark/export.ics/extra"));
+        assert!(!path_allows_token_in_url("/spark/exportXics"));
+        assert!(!path_allows_token_in_url("/"));
+        assert!(!path_allows_token_in_url("/health"));
+    }
+
+    #[test]
+    fn test_extract_query_token_finds_value() {
+        assert_eq!(
+            extract_query_token(Some("token=abc123")),
+            Some("abc123".to_string())
+        );
+        assert_eq!(
+            extract_query_token(Some("foo=bar&token=xyz&baz=qux")),
+            Some("xyz".to_string())
+        );
+        assert_eq!(
+            extract_query_token(Some("token=tok-with-dashes_and_underscores")),
+            Some("tok-with-dashes_and_underscores".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_query_token_returns_none_without_param() {
+        assert_eq!(extract_query_token(None), None);
+        assert_eq!(extract_query_token(Some("")), None);
+        assert_eq!(extract_query_token(Some("foo=bar")), None);
+        // Leerer token-Wert zählt als „nicht vorhanden".
+        assert_eq!(extract_query_token(Some("token=")), None);
+        // Falsche Groß-/Kleinschreibung: keine Toleranz (Bearer-Konvention).
+        assert_eq!(extract_query_token(Some("Token=abc")), None);
+        // `token`-Substring darf nicht matchen — nur Prefix-Match auf "token=".
+        assert_eq!(extract_query_token(Some("auth_token=abc")), None);
+    }
+
+    #[test]
+    fn test_extract_query_token_url_decodes() {
+        // URL-Sonderzeichen werden dekodiert.
+        assert_eq!(
+            extract_query_token(Some("token=a%2Bb%3Dc")),
+            Some("a+b=c".to_string())
+        );
+        // Plus-Encoding für Space wird von urlencoding-crate nicht
+        // gemappt (Standard-percent-decoding); das ist OK weil Bearer-
+        // Tokens URL-safe Base64 sind und kein '+' enthalten dürften.
+        assert_eq!(
+            extract_query_token(Some("token=abc%20def")),
+            Some("abc def".to_string())
+        );
     }
 }

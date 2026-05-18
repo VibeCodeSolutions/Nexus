@@ -1013,6 +1013,51 @@ pub async fn unsorted_count(
     Ok(Json(json!({ "count": count })))
 }
 
+// DANIEL-FUNKTIONAL (Sprint Daniel-Funktional, 2026-05-18): Dashboard-
+// Aggregat-Endpoints. Speisen die vier Stat-Cards (HEUTE / OFFEN /
+// PROJEKTE / DIESE WOCHE ERLEDIGT) und die Nächster-Fokus-Card auf
+// Desktop+Android. Bewusst kein DB-View — die einzelnen Counts sind
+// kleine separate Queries, das macht Tests einfacher und vermeidet
+// View-Migrationen. Beide Endpoints sind Bearer-pflichtig durch den
+// globalen `auth::require_token`-Layer in main.rs.
+
+pub async fn dashboard_stats(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let today_sparks = repo::sparks_today_count(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("today_sparks: {e}")}))))?;
+    let done_this_week = repo::tasks_done_this_week_count(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("done_this_week: {e}")}))))?;
+    let total_open_tasks = repo::open_tasks_count(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("total_open_tasks: {e}")}))))?;
+    let active_projects = repo::active_projects_count(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("active_projects: {e}")}))))?;
+
+    Ok(Json(json!({
+        "today_sparks": today_sparks,
+        "done_this_week": done_this_week,
+        "total_open_tasks": total_open_tasks,
+        "active_projects": active_projects,
+    })))
+}
+
+pub async fn dashboard_next_focus(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let task = repo::next_open_task(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    // Wenn kein offener Task mit Fälligkeit existiert, liefern wir
+    // explizit `{ "task": null }` statt 404 — der Client muss nur
+    // auf das Feld prüfen, kein Status-Branching.
+    Ok(Json(json!({ "task": task })))
+}
+
 // --- Setup / Onboarding Endpoints ---
 
 #[derive(Serialize)]
@@ -2925,5 +2970,136 @@ mod synaptic_phase_b_tests {
         assert!(ics.contains("Trotzdem exportieren"));
         // VEVENT hat ein DTSTART (irgendein UTC-Wert, weil Fallback griff).
         assert!(ics.contains("DTSTART"));
+    }
+
+    // DANIEL-FUNKTIONAL Phase 1 — Dashboard-Aggregat-Tests
+
+    #[tokio::test]
+    async fn test_sparks_today_count_empty() {
+        let pool = setup_pool().await;
+        let n = repo::sparks_today_count(&pool).await.unwrap();
+        assert_eq!(n, 0);
+    }
+
+    #[tokio::test]
+    async fn test_sparks_today_count_excludes_other_dates() {
+        let pool = setup_pool().await;
+        // Zwei Sparks an einem fixen alten Datum, einer an "now" (Default).
+        sqlx::query("INSERT INTO sparks (id, created_at, raw_text) VALUES ('s-old1', '2020-01-01 12:00:00', 'alt1')")
+            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO sparks (id, created_at, raw_text) VALUES ('s-old2', '2020-01-02 12:00:00', 'alt2')")
+            .execute(&pool).await.unwrap();
+        // Default-Insert: created_at = datetime('now') via Schema-Default
+        sqlx::query("INSERT INTO sparks (id, raw_text) VALUES ('s-today', 'heute')")
+            .execute(&pool).await.unwrap();
+
+        let n = repo::sparks_today_count(&pool).await.unwrap();
+        assert_eq!(n, 1, "nur der Default-NOW-Insert zählt");
+    }
+
+    #[tokio::test]
+    async fn test_sparks_today_count_counts_multiple_today() {
+        let pool = setup_pool().await;
+        for i in 0..3 {
+            sqlx::query("INSERT INTO sparks (id, raw_text) VALUES (?, ?)")
+                .bind(format!("s-{i}"))
+                .bind(format!("heute-{i}"))
+                .execute(&pool).await.unwrap();
+        }
+        let n = repo::sparks_today_count(&pool).await.unwrap();
+        assert_eq!(n, 3);
+    }
+
+    #[tokio::test]
+    async fn test_tasks_done_this_week_count_filters_status() {
+        let pool = setup_pool().await;
+        // 2× done in den letzten 7 Tagen, 1× open (sollte raus)
+        sqlx::query(
+            "INSERT INTO tasks (id, title, priority, status, updated_at) VALUES \
+             ('t-done1', 'A', 'medium', 'done', datetime('now', '-1 day')), \
+             ('t-done2', 'B', 'medium', 'done', datetime('now', '-3 days')), \
+             ('t-open',  'C', 'medium', 'open', datetime('now', '-2 days'))"
+        ).execute(&pool).await.unwrap();
+
+        let n = repo::tasks_done_this_week_count(&pool).await.unwrap();
+        assert_eq!(n, 2);
+    }
+
+    #[tokio::test]
+    async fn test_tasks_done_this_week_count_filters_week_boundary() {
+        let pool = setup_pool().await;
+        // 1× done innerhalb 7 Tage, 1× done älter (sollte raus)
+        sqlx::query(
+            "INSERT INTO tasks (id, title, priority, status, updated_at) VALUES \
+             ('t-recent', 'A', 'medium', 'done', datetime('now', '-2 days')), \
+             ('t-old',    'B', 'medium', 'done', datetime('now', '-30 days'))"
+        ).execute(&pool).await.unwrap();
+
+        let n = repo::tasks_done_this_week_count(&pool).await.unwrap();
+        assert_eq!(n, 1);
+    }
+
+    #[tokio::test]
+    async fn test_next_open_task_empty_returns_none() {
+        let pool = setup_pool().await;
+        let task = repo::next_open_task(&pool).await.unwrap();
+        assert!(task.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_next_open_task_picks_earliest_due_date() {
+        let pool = setup_pool().await;
+        sqlx::query(
+            "INSERT INTO tasks (id, title, priority, status, due_date) VALUES \
+             ('t-later',   'Später',  'medium', 'open', '2026-06-15'), \
+             ('t-earlier', 'Früher',  'medium', 'open', '2026-05-30'), \
+             ('t-latest',  'Spät',    'medium', 'open', '2026-12-01')"
+        ).execute(&pool).await.unwrap();
+
+        let task = repo::next_open_task(&pool).await.unwrap().expect("task");
+        assert_eq!(task.id, "t-earlier");
+        assert_eq!(task.due_date.as_deref(), Some("2026-05-30"));
+    }
+
+    #[tokio::test]
+    async fn test_next_open_task_ignores_done_and_undated() {
+        let pool = setup_pool().await;
+        sqlx::query(
+            "INSERT INTO tasks (id, title, priority, status, due_date) VALUES \
+             ('t-done',    'Erledigt',  'medium', 'done', '2026-05-20'), \
+             ('t-nodate',  'OhneDatum', 'medium', 'open', NULL), \
+             ('t-pick',    'Pick',      'medium', 'open', '2026-06-01')"
+        ).execute(&pool).await.unwrap();
+
+        let task = repo::next_open_task(&pool).await.unwrap().expect("task");
+        assert_eq!(task.id, "t-pick");
+    }
+
+    #[tokio::test]
+    async fn test_active_projects_count() {
+        let pool = setup_pool().await;
+        sqlx::query(
+            "INSERT INTO projects (id, name, description, status) VALUES \
+             ('p-a', 'Aktiv1',    '', 'active'), \
+             ('p-b', 'Aktiv2',    '', 'active'), \
+             ('p-c', 'Archived',  '', 'archived')"
+        ).execute(&pool).await.unwrap();
+
+        let n = repo::active_projects_count(&pool).await.unwrap();
+        assert_eq!(n, 2);
+    }
+
+    #[tokio::test]
+    async fn test_open_tasks_count() {
+        let pool = setup_pool().await;
+        sqlx::query(
+            "INSERT INTO tasks (id, title, priority, status) VALUES \
+             ('t-o1', 'Offen1', 'medium', 'open'), \
+             ('t-o2', 'Offen2', 'medium', 'open'), \
+             ('t-d',  'Done',   'medium', 'done')"
+        ).execute(&pool).await.unwrap();
+
+        let n = repo::open_tasks_count(&pool).await.unwrap();
+        assert_eq!(n, 2);
     }
 }

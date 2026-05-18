@@ -181,6 +181,8 @@ async fn main() {
                 .route("/api/user_prefs", get(handlers::list_user_prefs))
                 .route("/api/user_prefs/{key}", post(handlers::set_user_pref))
                 .route("/spark/unsorted/count", get(handlers::unsorted_count))
+                .route("/api/dashboard/stats", get(handlers::dashboard_stats))
+                .route("/api/dashboard/next-focus", get(handlers::dashboard_next_focus))
                 .route("/projects/suggest", post(handlers::suggest_projects))
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))

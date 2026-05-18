@@ -329,6 +329,75 @@ pub async fn tasks_freshness(pool: &SqlitePool) -> Result<(Option<String>, i64),
     Ok(row)
 }
 
+/// DANIEL-FUNKTIONAL DC-001: Anzahl der heute (lokaler Server-Tag, UTC)
+/// angelegten Sparks für die Dashboard-Stat-Card „HEUTE". SQLite-`date('now')`
+/// liefert das aktuelle UTC-Datum als `YYYY-MM-DD`; `date(created_at)` schneidet
+/// die Tageszeit aus der gespeicherten DateTime ab. Leere DB → 0.
+pub async fn sparks_today_count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM sparks WHERE date(created_at) = date('now')",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row.0)
+}
+
+/// DANIEL-FUNKTIONAL DC-002: Anzahl der in den letzten 7 Tagen erledigten
+/// Tasks für die Dashboard-Stat-Card „DIESE WOCHE ERLEDIGT". Wir nutzen ein
+/// rollendes 7-Tage-Fenster statt eines kalenderwochen-gebundenen Starts
+/// (`weekday 0`-Idiom wäre Sonntag-Wechsel und liefert sehr unterschiedliche
+/// Counts je nach Wochentag); rollende Woche ist für ADHS-Cortex-Entlastung
+/// klarer („was hab ich die letzten 7 Tage geschafft").
+pub async fn tasks_done_this_week_count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM tasks \
+         WHERE status = 'done' \
+           AND updated_at >= datetime('now', '-7 days')",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row.0)
+}
+
+/// DANIEL-FUNKTIONAL DC-003: Nächster offener Task mit Fälligkeit für die
+/// Dashboard-Nächster-Fokus-Card. Sortiert nach `due_date ASC`, ignoriert
+/// erledigte Tasks und Tasks ohne `due_date`. Liefert `None` wenn keiner
+/// passt.
+pub async fn next_open_task(pool: &SqlitePool) -> Result<Option<Task>, sqlx::Error> {
+    sqlx::query_as::<_, Task>(
+        "SELECT id, title, project_id, priority, status, created_at, updated_at, \
+                nexus_external_id, due_date \
+         FROM tasks \
+         WHERE status != 'done' AND due_date IS NOT NULL \
+         ORDER BY due_date ASC \
+         LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await
+}
+
+/// DANIEL-FUNKTIONAL DC-004 (Aggregator): Anzahl der aktiven Projekte
+/// (`status = 'active'`) für die Dashboard-Stat-Card „PROJEKTE".
+pub async fn active_projects_count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM projects WHERE status = 'active'",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row.0)
+}
+
+/// DANIEL-FUNKTIONAL DC-004 (Aggregator): Anzahl der offenen Tasks
+/// (`status != 'done'`) für die Dashboard-Stat-Card „OFFEN".
+pub async fn open_tasks_count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM tasks WHERE status != 'done'",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row.0)
+}
+
 /// Backfill: Für alle Sparks mit category='Task' ohne zugehörigen Task einen anlegen.
 /// Läuft idempotent beim Start; erzeugt keine Duplikate dank nexus_external_id.
 pub async fn backfill_tasks_from_sparks(pool: &SqlitePool) -> Result<usize, sqlx::Error> {

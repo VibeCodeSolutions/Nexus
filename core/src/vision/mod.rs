@@ -22,6 +22,7 @@ pub mod claude;
 pub mod gemini;
 pub mod groq;
 pub mod ollama;
+pub mod openai_compatible;
 pub mod resize;
 pub mod tesseract;
 
@@ -240,9 +241,69 @@ pub fn create_vision_provider(cfg: &VisionConfig) -> Result<Box<dyn VisionProvid
                 .unwrap_or_else(|| "gemini-2.5-flash".to_string());
             Ok(Box::new(gemini::GeminiVisionProvider::new(model, key)))
         }
+        "openai" => {
+            let key = keystore::get_key("openai").map_err(|e| {
+                format!("Vision-Provider `openai`: kein API-Key konfiguriert ({e})")
+            })?;
+            let model = cfg
+                .model
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "gpt-4o-mini".to_string());
+            Ok(Box::new(openai_compatible::OpenAiCompatibleVisionProvider::new(
+                "https://api.openai.com/v1/chat/completions",
+                model,
+                key,
+            )))
+        }
+        "openrouter" => {
+            let key = keystore::get_key("openrouter").map_err(|e| {
+                format!("Vision-Provider `openrouter`: kein API-Key konfiguriert ({e})")
+            })?;
+            let model = cfg
+                .model
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "anthropic/claude-haiku-4.5".to_string());
+            Ok(Box::new(openai_compatible::OpenAiCompatibleVisionProvider::new(
+                "https://openrouter.ai/api/v1/chat/completions",
+                model,
+                key,
+            )))
+        }
+        "xai" => {
+            let key = keystore::get_key("xai").map_err(|e| {
+                format!("Vision-Provider `xai`: kein API-Key konfiguriert ({e})")
+            })?;
+            let model = cfg
+                .model
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "grok-2-vision-1212".to_string());
+            Ok(Box::new(openai_compatible::OpenAiCompatibleVisionProvider::new(
+                "https://api.x.ai/v1/chat/completions",
+                model,
+                key,
+            )))
+        }
+        "mistral" => {
+            let key = keystore::get_key("mistral").map_err(|e| {
+                format!("Vision-Provider `mistral`: kein API-Key konfiguriert ({e})")
+            })?;
+            let model = cfg
+                .model
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "pixtral-12b-2409".to_string());
+            Ok(Box::new(openai_compatible::OpenAiCompatibleVisionProvider::new(
+                "https://api.mistral.ai/v1/chat/completions",
+                model,
+                key,
+            )))
+        }
         other => Err(format!(
             "Vision-Provider `{other}` ist (noch) nicht implementiert. \
-             Aktuell verfügbar: groq, ollama, claude, gemini."
+             Aktuell verfügbar: groq, ollama, claude, gemini, openai, openrouter, xai, mistral."
         )),
     }
 }

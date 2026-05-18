@@ -343,3 +343,23 @@ The compliance agent checks for all of these on every scan:
 - [ ] Tested: dark theme + light theme
 - [ ] Tested: navigate away from view and back — no duplicate event listeners
 - [ ] Reserved nav items remain disabled/greyed if feature not yet implemented
+
+---
+
+## 9. v0.2 — Erweiterung „Pulse"
+
+Die Spezifikation v0.2 erweitert dieses Dokument additiv: **neue Tokens
+mit `--nx-`-Prefix**, Motion-Layer, Multi-Theme-System (Indigo / Coral /
+Amber / Green) und neue Komponenten (Bottom-Sheet, Phone-Bezel, Charts,
+Settings-Rows).
+
+→ Vollständige v0.2-Spec: **[`UI_SPEC_v0.2.md`](UI_SPEC_v0.2.md)**
+
+**Was v0.1 bleibt verbindlich:** Shell-Layout, One-slot-rule, `Views{}`,
+Forbidden Patterns F-01 bis F-10, Compliance-Checkliste oben. Solange
+eine Komponente nicht auf `--nx-*`-Tokens migriert ist, gilt für sie die
+v0.1-Spec. Migration läuft schrittweise pro Sprint (S25 Status-Pill als
+Proof, S26+ Vollmigration der übrigen Komponenten).
+
+**Neue Forbidden Patterns (F-11 bis F-14)** kommen mit v0.2 dazu —
+siehe `UI_SPEC_v0.2.md` Sektion 5.

@@ -2,7 +2,7 @@
 name = "nexus-core"
 version = "0.1.3"
 edition = "2021"
-description = "NEXUS Personal ADHS-OS — Core Daemon"
+description = "NEXUS Personal OS — Core Daemon"
 authors = ["Kai Krauthausen <c0nn3tor@googlemail.com>"]
 license = "MIT"
 

@@ -1146,6 +1146,43 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 .nx-settings-row[data-danger="true"] .nx-settings-label { color: var(--nx-coral); }
 .nx-settings-row[data-danger="true"] .nx-settings-sub   { color: var(--nx-coral); opacity: 0.75; }
 
+/* Theme-Picker (S26-KOMPMIG P4) — 4 Accent-Pills in Settings */
+.nx-theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nx-sp-2);
+  margin: var(--nx-sp-2) 0 var(--nx-sp-4);
+}
+.nx-theme-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nx-sp-2);
+  padding: var(--nx-sp-2) var(--nx-sp-4);
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-r-pill);
+  color: var(--nx-text);
+  font-family: var(--nx-font-body);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--nx-dur-base) var(--nx-ease-out),
+              background var(--nx-dur-base) var(--nx-ease-out),
+              transform var(--nx-dur-fast) var(--nx-ease-out);
+}
+.nx-theme-pill:hover { border-color: var(--nx-border-hi); transform: translateY(-1px); }
+.nx-theme-pill[aria-checked="true"] {
+  border-color: var(--nx-accent);
+  background: var(--nx-accent-tint);
+  box-shadow: 0 0 0 1px var(--nx-accent-glow);
+}
+.nx-theme-swatch {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+}
+.nx-theme-name { font-weight: 500; }
+
 /* Input */
 input, select, textarea {
   background: var(--bg-input);
@@ -1926,6 +1963,26 @@ button.task-checkbox:hover { border-color: var(--primary); }
     <label for="settingToken">Bearer-Token</label>
     <input type="password" id="settingToken" placeholder="API-Token eingeben">
 
+    <h3 class="h3-llm">Design</h3>
+    <div class="nx-theme-picker" role="radiogroup" aria-label="Akzentfarbe wählen">
+      <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="indigo" role="radio" aria-checked="true">
+        <span class="nx-theme-swatch" style="background:#7C79FF"></span>
+        <span class="nx-theme-name">Indigo</span>
+      </button>
+      <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="coral" role="radio" aria-checked="false">
+        <span class="nx-theme-swatch" style="background:#FF7A6A"></span>
+        <span class="nx-theme-name">Coral</span>
+      </button>
+      <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="amber" role="radio" aria-checked="false">
+        <span class="nx-theme-swatch" style="background:#F0A848"></span>
+        <span class="nx-theme-name">Amber</span>
+      </button>
+      <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="green" role="radio" aria-checked="false">
+        <span class="nx-theme-swatch" style="background:#36C97A"></span>
+        <span class="nx-theme-name">Green</span>
+      </button>
+    </div>
+
     <h3 class="h3-llm">LLM-Konfiguration</h3>
     <label for="settingProvider">Provider</label>
     <select id="settingProvider"><option value="">(lädt…)</option></select>
@@ -1975,6 +2032,26 @@ button.task-checkbox:hover { border-color: var(--primary); }
 let coreUrl = localStorage.getItem('nexus_url') || 'http://127.0.0.1:7777';
 let token = localStorage.getItem('nexus_token') || '';
 let currentTheme = localStorage.getItem('nexus_theme') || 'system';
+let currentAccent = localStorage.getItem('nexus_accent') || 'indigo';
+
+function applyAccent(name) {
+  const accents = ['indigo', 'coral', 'amber', 'green'];
+  if (!accents.includes(name)) name = 'indigo';
+  currentAccent = name;
+  // Indigo ist Default ohne data-accent-Attribut (in :root definiert).
+  if (name === 'indigo') {
+    document.documentElement.removeAttribute('data-accent');
+  } else {
+    document.documentElement.setAttribute('data-accent', name);
+  }
+  localStorage.setItem('nexus_accent', name);
+  // aria-checked auf Pills synchronisieren (auch wenn Modal noch nicht offen ist — DOM existiert).
+  document.querySelectorAll('.nx-theme-pill').forEach(p => {
+    p.setAttribute('aria-checked', p.dataset.accent === name ? 'true' : 'false');
+  });
+}
+// Boot-Apply (das DOM ist hier bereits geparst, da Script unten im body steht).
+applyAccent(currentAccent);
 let sparks = [];
 let projects = [];
 let tasks = [];
@@ -4023,6 +4100,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'theme-cycle': cycleTheme(); break;
+    case 'theme-accent-set': applyAccent(el.dataset.accent); break;
     case 'settings-open': openSettings(); break;
     case 'settings-close': closeSettings(); break;
     case 'settings-save': saveSettings(); break;

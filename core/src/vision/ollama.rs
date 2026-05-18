@@ -131,7 +131,7 @@ fn parse_vision_response(raw: &str) -> VisionAnalysis {
     let mut seen = std::collections::HashSet::new();
     let suggested_tags: Vec<String> = tags_line
         .split(',')
-        .map(|t| t.trim().to_string())
+        .map(|t| t.trim().to_uppercase())
         .filter(|t| !t.is_empty())
         .filter(|t| seen.insert(t.clone()))
         .collect();
@@ -200,7 +200,7 @@ mod tests {
         assert_eq!(out.text_lines.len(), 3);
         assert_eq!(out.text_lines[0], "Sprint Planning");
         assert_eq!(out.text_lines[2], "Demo Freitag");
-        assert_eq!(out.suggested_tags, vec!["meeting", "sprint", "usb"]);
+        assert_eq!(out.suggested_tags, vec!["MEETING", "SPRINT", "USB"]);
     }
 
     #[test]
@@ -222,7 +222,7 @@ mod tests {
     fn parse_dedupes_tags_and_trims_whitespace() {
         let raw = "TEXT:\nZeile 1\n\nTAGS:\n meeting , meeting , sprint ";
         let out = parse_vision_response(raw);
-        assert_eq!(out.suggested_tags, vec!["meeting", "sprint"]);
+        assert_eq!(out.suggested_tags, vec!["MEETING", "SPRINT"]);
     }
 
     #[test]

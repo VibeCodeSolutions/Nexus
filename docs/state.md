@@ -17,6 +17,7 @@
    - Begründung: Bottom-Sheet/Phone-Bezel/Tokens aus S25 werden in CRUD-UI gebraucht.
 2. **S26 — Komponenten-Vollmigration** (geplant, nach S25)
    - Cards, Bottom-Sheet, Phone-Bezel, Charts, Settings-Rows auf `--nx-*`.
+   - **Backlog-Item VC-002-KON** (aus qs-20260519-S25-001): Status-Pill state-rgba-Triples (`rgba(54,201,122,.35)` etc.) als dedizierte `--nx-{green,coral,amber}-glow`-Tokens deklarieren und referenzieren.
 
 ## Letzte Releases
 

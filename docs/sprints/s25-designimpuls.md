@@ -164,7 +164,10 @@ design-system/v0.2-pulse  (basiert auf main 5698a61, identisch zum Sprint-Start)
 | P3 — F-003 Branding | `f3a15c4` | ✅ Code-Done |
 | P4 — UI_SPEC v0.2 einziehen | `03275e4` | ✅ Code-Done |
 | P5 — Status-Pill Migration (Proof) | `23b1e5c` | ✅ Code-Done |
-| Tuvok release-qs Gate | — | 🚧 in QS |
+| Sync — Code-Done | `5c14c43` | ✅ |
+| Tuvok release-qs (qs-20260519-S25-001) | — | 🟡 auflagen (1× major, 1× minor S26-Backlog) |
+| P6 — VC-001-VOL Auflagen-Fix (Manifest-Branding) | `dafa41b` | ✅ Code-Done |
+| Findings-Gate Chakotay | — | ausstehend |
 
 ## Notizen P1-P5 für QS
 

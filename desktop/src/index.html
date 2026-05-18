@@ -475,6 +475,89 @@ body {
 body.detail-sheet-open .entry-card-list .entry-card:not(.selected) {
   opacity: 0.4;
 }
+
+/* DANIEL-POLISH DB-002: Foto-Sheet — zentrierter Analyse-/Done-Chip
+   überlagert den Drop-Bereich, statt nur Statusbar-Text. Pill-Style mit
+   Backdrop-Blur, Spinner während Streaming, Check-Glyph beim Erfolg. */
+.bd-photo-input { position: relative; }
+.bd-photo-overlay-chip {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 13px; font-weight: 600;
+  color: #fff;
+  background: rgba(20, 20, 28, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.bd-photo-overlay-chip[data-state="streaming"],
+.bd-photo-overlay-chip[data-state="success"] { opacity: 1; }
+.bd-photo-overlay-chip[data-state="success"] {
+  background: rgba(34, 92, 54, 0.85);
+  border-color: rgba(110, 231, 183, 0.5);
+}
+.bd-photo-overlay-chip.fade-out { opacity: 0; }
+.bd-photo-chip-spinner {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: bd-photo-chip-spin 0.8s linear infinite;
+}
+@keyframes bd-photo-chip-spin { to { transform: rotate(360deg); } }
+.bd-photo-chip-check { font-size: 14px; line-height: 1; }
+
+/* DANIEL-POLISH DB-003: Streaming-Cursor im OCR-Panel — blinkender
+   Block am Ende des Textes, nur während Streaming aktiv. */
+.bd-photo-ocr.streaming::after {
+  content: "▌";
+  display: inline-block;
+  color: #A78BFA;
+  margin-left: 2px;
+  animation: bd-photo-cursor-blink 1s steps(2) infinite;
+}
+@keyframes bd-photo-cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* DANIEL-POLISH DB-004: Glow-Hover am +Spark / +Foto-Button — lila
+   Outline-Ring + diffuser Glow beim Hover/Focus. */
+.btn-cta:hover, .btn-cta:focus-visible {
+  box-shadow:
+    0 0 0 4px rgba(167, 139, 250, 0.25),
+    0 0 24px rgba(167, 139, 250, 0.5);
+  outline: 2px solid rgba(167, 139, 250, 0.4);
+  outline-offset: 2px;
+}
+.btn-cta { transition: background 0.15s, transform 0.1s, box-shadow 0.2s ease, outline-color 0.2s ease; }
+
+/* DANIEL-POLISH DB-005: Shutter-Flash beim Drop/Upload — kurzer
+   weißer Vollflächen-Fade als visueller Beat beim Capture-Start. */
+.bd-photo-shutter {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  border-radius: var(--r-md);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 6;
+}
+.bd-photo-shutter.flash { animation: bd-photo-shutter-flash 0.15s ease-out; }
+@keyframes bd-photo-shutter-flash {
+  0%   { opacity: 0; }
+  40%  { opacity: 0.85; }
+  100% { opacity: 0; }
+}
 .entry-header {
   display: flex; align-items: center;
   gap: var(--sp-2); margin-bottom: var(--sp-2);
@@ -1431,6 +1514,13 @@ button.task-checkbox:hover { border-color: var(--primary); }
               <span class="bd-photo-drop-hint">JPG / PNG / WebP, max. 10&nbsp;MB</span>
             </div>
             <img class="bd-photo-preview hidden" id="bdPhotoPreview" alt="Vorschau">
+            <!-- DANIEL-POLISH DB-005: Shutter-Flash-Overlay (kurzer Weiß-Beat beim Upload-Start) -->
+            <div class="bd-photo-shutter" id="bdPhotoShutter" aria-hidden="true"></div>
+            <!-- DANIEL-POLISH DB-002: Analyse-/Done-Chip zentriert über dem Drop-Bereich.
+                 aria-hidden=true, weil #bdPhotoStatus den Live-Region-Kanal trägt
+                 (DB-002-WAR-Fix qs-20260518-009: vermeidet Doppel-Ansage durch
+                 zwei parallele role=status aria-live=polite-Elemente). -->
+            <div class="bd-photo-overlay-chip" id="bdPhotoOverlayChip" aria-hidden="true"></div>
           </label>
           <div class="bd-photo-status" id="bdPhotoStatus" role="status" aria-live="polite" hidden></div>
         </div>
@@ -3282,11 +3372,13 @@ function resetPhotoSheet() {
   }
   if (fileInput) fileInput.value = '';
   if (status) { status.hidden = true; status.textContent = ''; status.className = 'bd-photo-status'; }
-  if (ocr) ocr.textContent = '';
+  if (ocr) { ocr.textContent = ''; ocr.classList.remove('streaming'); }
   if (tagsHeader) tagsHeader.hidden = true;
   if (tagsBox) tagsBox.innerHTML = '';
   if (retry) retry.classList.add('hidden');
   if (openDetail) openDetail.classList.add('hidden');
+  // DANIEL-POLISH DB-002: Overlay-Chip beim Reset zurücksetzen.
+  setPhotoOverlayChip(null);
 }
 
 function setPhotoStatus(text, variant) {
@@ -3295,6 +3387,51 @@ function setPhotoStatus(text, variant) {
   status.hidden = false;
   status.textContent = text;
   status.className = 'bd-photo-status' + (variant ? ' ' + variant : '');
+}
+
+// DANIEL-POLISH DB-002: Steuerung des zentrierten Overlay-Chips über dem
+// Drop-Bereich. `variant` = 'streaming' (Spinner + "Analysiere…"),
+// 'success' (Check + "Gespeichert", fadet nach 1.3s aus) oder null
+// (sofort ausblenden).
+function setPhotoOverlayChip(variant) {
+  const chip = document.getElementById('bdPhotoOverlayChip');
+  if (!chip) return;
+  if (variant === 'streaming') {
+    chip.classList.remove('fade-out');
+    chip.dataset.state = 'streaming';
+    chip.innerHTML = '<span class="bd-photo-chip-spinner" aria-hidden="true"></span><span>Analysiere…</span>';
+  } else if (variant === 'success') {
+    chip.classList.remove('fade-out');
+    chip.dataset.state = 'success';
+    chip.innerHTML = '<span class="bd-photo-chip-check" aria-hidden="true">✓</span><span>Gespeichert</span>';
+    // Nach 1.3s ausblenden, danach DOM-Reset.
+    setTimeout(() => {
+      if (chip.dataset.state !== 'success') return;
+      chip.classList.add('fade-out');
+      setTimeout(() => {
+        if (chip.dataset.state !== 'success') return;
+        chip.dataset.state = '';
+        chip.classList.remove('fade-out');
+        chip.innerHTML = '';
+      }, 220);
+    }, 1300);
+  } else {
+    chip.dataset.state = '';
+    chip.classList.remove('fade-out');
+    chip.innerHTML = '';
+  }
+}
+
+// DANIEL-POLISH DB-005: Kurzer Weiß-Flash über dem Drop-Bereich als
+// "Shutter"-Beat beim Upload-Start. Self-resetting via CSS-Animation.
+function triggerPhotoShutterFlash() {
+  const flash = document.getElementById('bdPhotoShutter');
+  if (!flash) return;
+  flash.classList.remove('flash');
+  // Force reflow, damit `flash`-Klasse die Animation neu zündet.
+  void flash.offsetWidth;
+  flash.classList.add('flash');
+  setTimeout(() => flash.classList.remove('flash'), 200);
 }
 
 function setPhotoFile(file) {
@@ -3329,10 +3466,14 @@ async function submitPhotoSpark() {
   const ocr = document.getElementById('bdPhotoOcr');
   const drop = document.getElementById('bdPhotoDrop');
   const retry = document.getElementById('bdPhotoRetryBtn');
-  if (ocr) ocr.textContent = '';
+  if (ocr) { ocr.textContent = ''; ocr.classList.add('streaming'); }
   if (drop) drop.classList.add('locked');
   if (retry) retry.classList.add('hidden');
   setPhotoStatus('Analysiere …', 'streaming');
+  // DANIEL-POLISH DB-005 + DB-002: Shutter-Flash beim Upload-Start +
+  // zentrierter Analyse-Chip mit Spinner über dem Drop-Bereich.
+  triggerPhotoShutterFlash();
+  setPhotoOverlayChip('streaming');
 
   const fd = new FormData();
   fd.append('image', photoState.file, photoState.file.name || 'photo.jpg');
@@ -3346,6 +3487,10 @@ async function submitPhotoSpark() {
     setPhotoStatus(msg, 'error');
     if (retry) retry.classList.remove('hidden');
     if (drop) drop.classList.remove('locked');
+    // DANIEL-POLISH DB-003 + DB-002: Streaming-Cursor + Overlay-Chip
+    // beim Fehler abräumen.
+    if (ocr) ocr.classList.remove('streaming');
+    setPhotoOverlayChip(null);
   };
 
   let res;
@@ -3444,6 +3589,10 @@ function handlePhotoFrame(frame) {
     case 'done': {
       photoState.sparkId = frame.data && frame.data.spark_id;
       setPhotoStatus('✓ Gespeichert', 'success');
+      // DANIEL-POLISH DB-003 + DB-002: Streaming-Cursor stoppen,
+      // Overlay-Chip auf Success-State (Check, fadet nach 1.3s aus).
+      if (ocr) ocr.classList.remove('streaming');
+      setPhotoOverlayChip('success');
       const openDetail = document.getElementById('bdPhotoOpenDetailBtn');
       if (openDetail && photoState.sparkId) openDetail.classList.remove('hidden');
       refreshSparks();
@@ -3452,6 +3601,8 @@ function handlePhotoFrame(frame) {
     case 'error': {
       const msg = (frame.data && frame.data.message) || 'Unbekannter Fehler';
       setPhotoStatus('✗ ' + msg, 'error');
+      if (ocr) ocr.classList.remove('streaming');
+      setPhotoOverlayChip(null);
       const retry = document.getElementById('bdPhotoRetryBtn');
       if (retry) retry.classList.remove('hidden');
       break;

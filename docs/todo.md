@@ -9,7 +9,8 @@
 - [x] P3 — F-003 Copy „ADHS-OS" → „Personal OS" (5 Stellen) → `f3a15c4`
 - [x] P4 — `docs/UI_SPEC_v0.2.md` einziehen + Verweis in v0.1 → `03275e4`
 - [x] P5 — Status-Pill auf `--nx-*` migrieren (Multi-Theme-Proof) → `23b1e5c`
-- [ ] Tuvok release-qs Gate
+- [x] Tuvok release-qs Gate → `qs-20260519-S25-001` (auflagen, VC-001-VOL behoben in `dafa41b`)
+- [x] Findings-Gate Chakotay → freigabe (2026-05-19)
 - [ ] FF-Merge nach main (Admin-Confirm)
 
 ## Backlog (in Reihenfolge)

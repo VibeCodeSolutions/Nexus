@@ -167,7 +167,7 @@ design-system/v0.2-pulse  (basiert auf main 5698a61, identisch zum Sprint-Start)
 | Sync — Code-Done | `5c14c43` | ✅ |
 | Tuvok release-qs (qs-20260519-S25-001) | — | 🟡 auflagen (1× major, 1× minor S26-Backlog) |
 | P6 — VC-001-VOL Auflagen-Fix (Manifest-Branding) | `dafa41b` | ✅ Code-Done |
-| Findings-Gate Chakotay | — | ausstehend |
+| Findings-Gate Chakotay | 2026-05-19 | ✅ freigabe (VC-001-VOL behoben + verifiziert, VC-002-KON sauber als S26-Backlog) |
 
 ## Notizen P1-P5 für QS
 

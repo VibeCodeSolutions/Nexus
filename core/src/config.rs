@@ -30,15 +30,20 @@ pub struct Config {
 pub struct VisionConfig {
     /// Aktivierungs-Flag. Wenn `false`, lehnt der Foto-Endpoint die
     /// Anfrage ab (= Kamera-Analyse-Toggle aus der Settings-Spec).
-    /// Override via NEXUS_VISION_ENABLED.
+    /// Default ist `true` (Bildanalyse standardmäßig aktiv).
+    /// `NEXUS_VISION_ENABLED=false` schaltet aus.
     pub enabled: bool,
     /// Provider-Name (analog `LlmProvider::create_provider`). Vision-fähig
     /// sind aktuell: `groq` (llama-3.2-vision), `claude`, `gemini`, `openai`,
-    /// `xai` (grok-vision), `openrouter`. Override via NEXUS_VISION_PROVIDER.
+    /// `mistral`, `ollama` (lokal, z.B. llava). Override via NEXUS_VISION_PROVIDER.
     pub provider: String,
     /// Konkretes Vision-Modell — überschreibt das Default-Modell des Providers.
-    /// Override via NEXUS_VISION_MODEL.
+    /// Default `llava` (für `ollama`). Override via NEXUS_VISION_MODEL.
     pub model: Option<String>,
+    /// Bevorzugtes Vision-Modell mit explizitem Default — wird vom Ollama-
+    /// Provider verwendet, wenn `model` nicht gesetzt ist. Override via
+    /// NEXUS_VISION_MODEL (selbe env-Var wie `model`).
+    pub vision_model: String,
     /// Tesseract-Fallback: wenn der konfigurierte Vision-Provider fehlschlägt
     /// oder kein Key gesetzt ist, wird `tesseract` als Subprocess aufgerufen
     /// und das Ergebnis durch den klassischen LlmProvider für Tag-Generation
@@ -49,9 +54,10 @@ pub struct VisionConfig {
 impl Default for VisionConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             provider: "groq".to_string(),
             model: None,
+            vision_model: "llava".to_string(),
             tesseract_enabled: true,
         }
     }
@@ -125,15 +131,17 @@ impl Config {
             .or_else(|| crate::keystore::get_vault_path().map(PathBuf::from));
 
         // Sprint Nightvision NV-1: Vision-Config aus Environment ableiten.
+        let vision_model_env = env::var("NEXUS_VISION_MODEL")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
         let vision = VisionConfig {
-            enabled: env_bool("NEXUS_VISION_ENABLED", false),
+            enabled: env_bool("NEXUS_VISION_ENABLED", true),
             provider: env::var("NEXUS_VISION_PROVIDER")
                 .ok()
                 .filter(|s| !s.trim().is_empty())
                 .unwrap_or_else(|| "groq".to_string()),
-            model: env::var("NEXUS_VISION_MODEL")
-                .ok()
-                .filter(|s| !s.trim().is_empty()),
+            model: vision_model_env.clone(),
+            vision_model: vision_model_env.unwrap_or_else(|| "llava".to_string()),
             tesseract_enabled: env_bool("NEXUS_OCR_TESSERACT_ENABLED", true),
         };
 

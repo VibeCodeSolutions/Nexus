@@ -19,6 +19,7 @@
 //! als SSE-Frames an den Client streamt.
 
 pub mod groq;
+pub mod ollama;
 pub mod resize;
 pub mod tesseract;
 
@@ -208,9 +209,16 @@ pub fn create_vision_provider(cfg: &VisionConfig) -> Result<Box<dyn VisionProvid
                 .unwrap_or_else(|| "meta-llama/llama-4-scout-17b-16e-instruct".to_string());
             Ok(Box::new(groq::GroqVisionProvider::new(model, key)))
         }
+        "ollama" => {
+            // Ollama läuft lokal — kein API-Key, Endpoint via OLLAMA_HOST (default
+            // http://localhost:11434). Modell aus cfg.model bzw. cfg.vision_model
+            // (Default `llava`).
+            let provider = ollama::OllamaVisionProvider::new(cfg)?;
+            Ok(Box::new(provider))
+        }
         other => Err(format!(
             "Vision-Provider `{other}` ist (noch) nicht implementiert. \
-             Aktuell verfügbar: groq."
+             Aktuell verfügbar: groq, ollama."
         )),
     }
 }
@@ -234,6 +242,7 @@ mod tests {
             enabled: false,
             provider: "groq".to_string(),
             model: None,
+            vision_model: "llava".to_string(),
             tesseract_enabled: false,
         };
         let err = analyze(&cfg, b"irrelevant", "image/jpeg", "noop")

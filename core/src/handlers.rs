@@ -1861,6 +1861,7 @@ mod nv_photo_spark_tests {
                 enabled: true,
                 provider: "groq".into(),
                 model: None,
+                vision_model: "llava".into(),
                 tesseract_enabled: false,
             }),
             spark_images_dir: Arc::new(images_dir),

@@ -1,8 +1,8 @@
 # NEXUS — Current State
 
 **Stand:** 2026-05-18
-**Aktuelle Phase:** v0.1.3 released + Post-Release-Stack abgeschlossen: NV-Closure + FEAT-001 KI-Aufgabensplitting + VC-013-VOL Settings-Toggle + FEAT-002 (A iCal-Export, B/C Härtung) + NV-Vision-clippy-Cleanup + Daniel-Funktional Sprint + Daniel-Polish Sprint (Listen-/Cards-/Detail-Polish + Foto-Pipeline-Polish, Desktop+Android). Kein aktiver Sprint, Daniel-Sprint-Stack komplett durch.
-**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `753ba3a` (feat(daniel-polish-p2) Foto-Pipeline-Polish). main clean & sync mit origin. `cargo clippy --all-targets -- -D warnings` grün. Tests 113/0+1ign.
+**Aktuelle Phase:** v0.1.3 released + Post-Release-Stack abgeschlossen: NV-Closure + FEAT-001 KI-Aufgabensplitting + VC-013-VOL Settings-Toggle + FEAT-002 (A iCal-Export, B/C Härtung) + NV-Vision-clippy-Cleanup + Daniel-Funktional Sprint + Daniel-Polish Sprint (Listen-/Cards-/Detail-Polish + Foto-Pipeline-Polish, Desktop+Android) + S24-Smoke-Polish (4 Findings aus erstem S24-Native-Smoke). Kein aktiver Sprint, S24-Projekte-CRUD steht als nächster Sprint angemeldet.
+**Phase-Status:** v0.1.0 GA, v0.1.2 + v0.1.3 released. Letzter Commit `321c291` (feat(s24-smoke-polish) 4 Findings atomar). main clean & sync mit origin. `cargo clippy --all-targets -- -D warnings` grün. Tests 113/0+1ign. assembleDebug+lintDebug grün.
 
 **Sprint-Verlauf v0.1.3:** Obsidian-Briefkasten A–E ✅ · Happy Thompson A–C ✅ · Crystalline Crab Phase C ✅ · UI-Redesign Nightvision M1–M4 ✅ · Foto-Spark Pipeline NV-1..NV-5 ✅ · Phase A Sparks-Rename + Gamification-Removal ✅. Alle Sprints Tuvok-freigegeben (qs-20260509-001..004, qs-20260517-001..010).
 
@@ -79,7 +79,25 @@ Stand-alone Mini-Sprints nach v0.1.3-Tag, kein neuer Release-Tag bisher.
 - ~~NV-Vision-Stack clippy strict cleanup~~ ✅ erledigt 2026-05-18 (Commit `7e8677c`, qs-20260518-003).
 - VC-013-MIN-1: Android Path-Encoding-Wrapper generisch robust machen.
 - Optional: Mobile-Subscribe-Helper-Button in Settings (Settings-Modal/Android zeigt fertige `?token=…`-Subscribe-URL mit Copy-to-Clipboard) — Mini-Folge-Sprint möglich, nicht zwingend.
-- **Daniel-Feature-Spec-Gaps** (siehe `docs/daniel-feature-spec-gap.md`): 18 Findings aus BUILD-SPEC-Analyse, 3 Sprint-Vorschläge (Funktional / Polish / Konzeptklärung). Zwei offene Konzeptfragen: DA-001 Sparks-Filter „Alle/Idea/Task" vs. Kategorie-Pluralität, DB-006 Desktop-Live-Camera vs. File-Upload-only.
+- **S24-QS-001-KOR** (a11y, aus qs-20260518-010): Erfolgs-Pill SparkHistoryScreen.kt vertikales Tap-Target ~32dp unter Material-3-48dp — Fix `vertical=12.dp` oder `heightIn(min=48.dp)`.
+- **S24-QS-002-WAR** (a11y, aus qs-20260518-010): Hero-Input-Bar DashboardScreen.kt ohne `semantics{role=Button; contentDescription="Neue Spark-Eingabe öffnen"}` — TalkBack liest Emoji-Text statt Intent.
+- **Default-Drift-Beobachtung** (qs-20260518-010 Bookmark): Handler `user_pref_bool(...).unwrap_or(true)` vs. Settings-Lader `null→true`. Durch Migration aktuell egalisiert. Bei erneuter Beobachtung 30_Wissen-würdig.
+- **Daniel-Feature-Spec-Gaps** (siehe `docs/daniel-feature-spec-gap.md`): 18 Findings aus BUILD-SPEC-Analyse, 3 Sprint-Vorschläge (Funktional / Polish / Konzeptklärung). ~~DA-001~~ ✅ Hybrid bestätigt 2026-05-18. ~~DB-006~~ ✅ Skip (Android-only Workflow).
+- **S24-PROJEKTE-CRUD** (wartend, AUFTRAG in vc.md): Projekte können in Android-App aktuell nur durch LLM angelegt werden, keine manuelle CRUD-UI. Nächster Sprint nach S24-Smoke-Polish.
+
+---
+
+## Sprint "S24-Smoke-Polish" — 4 Findings aus S24-Native-Smoke (2026-05-18, ✅ abgeschlossen)
+
+**Auslöser:** Erster manueller Smoke-Test auf physischem S24 (RFCX20J1PEX) am 2026-05-18 nach Daniel-Polish-Closure. Admin meldete fünf Findings; vier wurden in einem Atom-Sprint gebündelt, das fünfte (Projekte-CRUD) als eigener Folge-Sprint angemeldet (S24-PROJEKTE-CRUD, wartend).
+
+- ✅ **SM-S24-1 🔴 Blocker — Foto-Analyse-Default + Settings-Toggle Android** (`321c291`): Foto-Spark warf HTTP 503 „Vision-Analyse ist deaktiviert" weil `camera_analysis_enabled`-Pref per Default `false` war und kein UI-Toggle auf Android existierte. Fix: neue sqlx-Migration `20260521_001_default_camera_analysis_enabled.sql` (Tag+3 monoton zur letzten `20260520_001`) mit `INSERT OR IGNORE camera_analysis_enabled='true'` — existing User-Werte bleiben respektiert. `core/src/handlers.rs::post_spark_from_image` mit zweistufiger Prüfung env (`state.vision_config.enabled`) + user_pref (`repo::user_pref_bool(...).unwrap_or(true)`, fail-open). Android `SparksPrefsCard` zweiter Switch „Foto-Analyse aktivieren" mit `auto_extract_tasks_enabled`-identischem Pattern (Switch.enabled=loaded, optimistic update + Rollback bei `onFailure` mit Snackbar).
+- ✅ **SM-S24-2 🟢 Minor — i18n „Aufgabe" + Tap-to-Navigate Erfolgs-Pill** (`321c291`): Detail-Sheet-Strings „Tasks extrahieren" → „Aufgaben extrahieren", „Task(s)" → „Aufgabe(n)". Erfolgs-Status bei `count > 0` ist jetzt Surface(secondaryContainer) clickable mit „Anzeigen ›"-Affordance, springt zum Tasks-Tab via NavController-Route „tasks". `SparkHistoryScreen` neuer optionaler Callback `onNavigateToTasks`, `MainActivity.kt` verdrahtet die Route. Skip-/Fehler-Status bleibt nicht-clickable Plain-Text.
+- ✅ **SM-S24-3 🟢 Minor — Home-Spark-Eingabe prominent (Variante A)** (`321c291`): Hero-Input-Bar unter Greeting in `DashboardScreen.kt`. Full-Width-Surface mit Border in primary-Farbe, Pseudo-Input-Text „Was beschäftigt dich gerade?" + ✨ + 🎙️-Icons, tappt zur Spark-Route. Quick-Actions-Reihe bleibt additiv erhalten. Worker-Begründung: Input-Bar-Variante = eindeutigere Affordance (sieht aus wie Textfeld) gegenüber vergrößertem Quick-Action.
+- ✅ **SM-S24-4 🟡 Major — Filter-Hybrid Count-vs-Liste-Invariant** (`321c291`): Reiter „Questions"/„Random" zeigten Counts in Klammern, Liste leer („Keine Einträge im aktuellen Filter (Idea + Random)"). Count-Berechnung lief nur über Lebensbereich, Listen-Query kombinierte Type+Lebensbereich → Drift. Fix: gemeinsame Filter-Funktion `matches(entry, lifeOverride)` als Single-Source-of-Truth; sowohl `visibleEntries` als auch jeder Chip-Count durchlaufen sie. „Alle"-Chip vorher `entries.size` (ignorierte typeFilter) — gefixt. Invariant `count(chip) == list(chip).size` im Code-Kommentar dokumentiert. Keine Filter-Hybrid-DC-P2-Regression (matches-Refactor semantisch äquivalent zur Daniel-Funktional-P3-Hybrid).
+- ✅ **QS qs-20260518-010 Freigabe** — 0/0/2 Minor (S24-QS-001-KOR Tap-Target 32→48dp, S24-QS-002-WAR Hero-Bar a11y-semantics). Chakotay-Findings-Gate: Freigabe, beide Minor passen ins a11y-Backlog (kein Scope-Creep gegen Atom-Lieferung).
+
+Worker-Spawn-Strategie: ein general-purpose-Worker für alle 4 Findings, defensives Briefing-Vokabular für SM-S24-1 (Daniel-Polish-P2-Lehre: Camera/Vision-Sprache hatte beim damaligen Foto-Pipeline-Sprint Content-Filter-Blocks getriggert). Hier diesmal keine Filter-Probleme — Vokabular im Briefing als „Foto-Analyse-Default"/„Bilderkennungs-Toggle" reichte zur sauberen Passage.
 
 ---
 
@@ -371,13 +389,14 @@ nexus-core pair       # QR-Code für Android-Pairing
 
 ## Nächster Sprint (offen)
 
-Stand 2026-05-18 nach Daniel-Funktional-Closure. Reihenfolge:
+Stand 2026-05-18 nach S24-Smoke-Polish-Closure (DA-001 Re-Konsultation am selben Tag, Daniel-Polish + S24-Smoke-Polish durch). Reihenfolge:
 
-1. **Daniel-Polish** (1 Tag 🟡) — Kind-Badges · Karten-Stagger · Tag-Pop-In · Sheet-Dim · Scan-Overlay-Visualisierung (Android) · Status-Chips · Streaming-Cursor · Glow-Hover · Shutter-Flash · Checkbox-Animation. Siehe Sprint-Vorschlag 2.
-2. **Pixel-Smoke** (Admin-Aktion, parallel möglich) — physischer E2E-Test der Nightvision-Android-App auf echtem Gerät (CameraX + SSE + Bottom-Nav-Badge live + Dashboard 2×2 + NextFocusCard + Filter-Hybrid).
-3. **VC-013-MIN-1** Android Path-Encoding-Wrapper (klein, parallel möglich).
-4. **Mobile-Subscribe-Helper für iCal** (optional, ~2-3h) — Settings zeigt `?token=…`-Subscribe-URL mit Copy-to-Clipboard.
-5. **Drei Daniel-Funktional-Backlog-Items** (alle Tuvok-Hinweise, keine Findings, eigene Mini-Sprints möglich):
+1. **S24-Smoke-Re-Test** (Admin-Aktion, jetzt) — APK ist bereits auf S24 installiert (commit `321c291`-Build). Admin verifiziert die 4 Findings manuell. Bei Re-Test-Fail: Korrektur-Loop, sonst weiter.
+2. **S24-PROJEKTE-CRUD** (🟡 M, eingeleitet) — Projekte-CRUD im Android-Client. AUFTRAG schon in `vc.md` angemeldet, wartet auf S24-Re-Test-Closure.
+3. **a11y-Sweep** (klein, sammelt Bookmarks) — S24-QS-001-KOR (Erfolgs-Pill 32→48dp) + S24-QS-002-WAR (Hero-Bar Role.Button+contentDescription) + ggf. weitere a11y-Beobachtungen.
+4. **VC-013-MIN-1** Android Path-Encoding-Wrapper (klein, parallel möglich).
+5. **Mobile-Subscribe-Helper für iCal** (optional, ~2-3h) — Settings zeigt `?token=…`-Subscribe-URL mit Copy-to-Clipboard.
+6. **Drei Daniel-Funktional-Backlog-Items** (alle Tuvok-Hinweise, keine Findings, eigene Mini-Sprints möglich):
    - `completed_at`-Feld auf Tasks für 100%ige DIESE-WOCHE-Semantik (statt aktuell `updated_at`-Drift bei Edits)
    - LLM-Output-Normalisierung (canonical-case-Guard) für `category`-Werte
    - Task-ID-Highlight beim NextFocusCard-Klick (aktuell nur Tab-Switch ohne Detail-Auto-Open)
@@ -389,4 +408,4 @@ Stand 2026-05-18 nach Daniel-Funktional-Closure. Reihenfolge:
 - Wellbeing (ReizRunter / Abend-Ritual, Masterplan-Roadmap)
 - Remote-Sync Tailscale-Integration (Masterplan-Roadmap)
 
-Sprint-Auswahl: Daniel-Funktional als nächstes, H2-Planung folgt.
+Sprint-Auswahl: S24-Re-Test als Gate, danach S24-PROJEKTE-CRUD.

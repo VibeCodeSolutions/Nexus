@@ -6,9 +6,11 @@ import com.vibecode.nexus.data.model.SparkRequest
 import com.vibecode.nexus.data.model.SparkResponse
 import com.vibecode.nexus.data.model.HealthResponse
 import com.vibecode.nexus.data.model.ModelsResponse
+import com.vibecode.nexus.data.model.ProjectCreateRequest
 import com.vibecode.nexus.data.model.ProjectProgress
 import com.vibecode.nexus.data.model.ProjectResponse
 import com.vibecode.nexus.data.model.ProjectSuggestion
+import com.vibecode.nexus.data.model.ProjectUpdateRequest
 import com.vibecode.nexus.data.model.ProvidersResponse
 import com.vibecode.nexus.data.model.SetProviderRequest
 import com.vibecode.nexus.data.model.TaskCreateRequest
@@ -210,6 +212,35 @@ class NexusApiClient(private val settings: ConnectionSettings) {
         client.get("$baseUrl/projects") {
             bearerAuth(token!!)
         }.body()
+    }
+
+    suspend fun createProject(request: ProjectCreateRequest): Result<ProjectResponse> = authedRequest {
+        client.post("$baseUrl/projects") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token!!)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun getProject(id: String): Result<ProjectResponse> = authedRequest {
+        client.get("$baseUrl/projects/$id") {
+            bearerAuth(token!!)
+        }.body()
+    }
+
+    suspend fun updateProject(id: String, request: ProjectUpdateRequest): Result<ProjectResponse> = authedRequest {
+        client.put("$baseUrl/projects/$id") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token!!)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun deleteProject(id: String): Result<Unit> = authedRequest {
+        client.delete("$baseUrl/projects/$id") {
+            bearerAuth(token!!)
+        }
+        Unit
     }
 
     suspend fun getProjectProgress(projectId: String): Result<ProjectProgress> = authedRequest {

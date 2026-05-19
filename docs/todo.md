@@ -11,12 +11,12 @@
 - [x] Android-Client: nur Read-Funktionen, kein create/delete/update/getSingle.
 - [x] Empfehlung: Mini-Backend-Phase **P1.5** vorlagern (GET-Single + PUT mit name/description/status, optional `updated_at`-Column). Reorder + Owner explizit Out-of-Scope.
 
-### P1.5 / S24-Backend-Gap — Mini-Backend-Phase (offen, wartet auf Admin-Confirm)
+### P1.5 / S24-Backend-Gap — Mini-Backend-Phase ✅ code-done `a43278c` (wartet auf Tuvok-Gate)
 
-- [ ] `GET /projects/{id}` + `pub async fn get_project_by_id` (Repo + Handler + Route)
-- [ ] `PUT /projects/{id}` + `pub async fn update_project` (Felder: name/description/status; nexus_external_id readonly)
-- [ ] Optional: `updated_at`-Migration + Touch in update_project
-- [ ] Smoke-Test (curl) für beide Endpoints
+- [x] `GET /projects/{id}` + `pub async fn get_project_by_id` (Repo + Handler + Route)
+- [x] `PUT /projects/{id}` + `pub async fn update_project` (Felder: name/description/status; nexus_external_id readonly)
+- [ ] ~~Optional: `updated_at`-Migration~~ — bewusst weggelassen (Migration-Slots 20260519-21 belegt; Same-Day-Suffix `_002` nach Memory verboten; kein Notwert für Voll-CRUD). Backlog-Item falls Bedarf.
+- [x] Smoke-Test (curl) für beide Endpoints — 8/8 grün (incl. 404/400-Pfade)
 
 ### P2 / S24-Spec — Sprint-Spec finalisieren (nach P1.5)
 

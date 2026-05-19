@@ -305,6 +305,11 @@ body {
 .status-pill.connected { color: var(--nx-green); border-color: var(--nx-green-glow); }
 .status-pill.offline   { color: var(--nx-coral); border-color: var(--nx-coral-glow); }
 .status-pill.warning   { color: var(--nx-amber); border-color: var(--nx-amber-glow); }
+/* S24-P3.3 — Projekt-Status (data-status="active|paused|archived"); Pill ohne .dot */
+.status-pill[data-status="active"]   { color: var(--nx-green); border-color: var(--nx-green-glow); }
+.status-pill[data-status="paused"]   { color: var(--nx-amber); border-color: var(--nx-amber-glow); }
+.status-pill[data-status="archived"] { color: var(--nx-text-dim); border-color: var(--nx-border); opacity: 0.7; }
+.card .status-pill { margin-bottom: var(--nx-sp-3); }
 
 /* Sidebar */
 .sidebar {
@@ -2821,11 +2826,14 @@ async function renderProjects() {
       pct = prog.progress_percent || prog.percent || prog.progress || 0;
     } catch {}
     const projIdeas = ideasByProject.get(p.id) || [];
+    const status = (p.status || 'active');
+    const statusLabel = { active: 'aktiv', paused: 'pausiert', archived: 'archiviert' }[status] || status;
     return `<div class="card">
       <button class="btn btn-sm btn-ghost card-edit" data-action="proj-edit" data-proj-id="${esc(p.id)}" title="Projekt bearbeiten">✎</button>
       <button class="btn btn-sm btn-danger card-delete" data-action="proj-delete" data-proj-id="${esc(p.id)}" title="Projekt löschen">×</button>
       <h3>${esc(p.name || p.title || 'Untitled')}</h3>
       <p>${esc(p.description || '')}</p>
+      <span class="status-pill" data-status="${esc(status)}">${esc(statusLabel)}</span>
       <div class="progress-bar"><div class="progress-fill" data-pct="${pct}"></div></div>
       <span class="proj-pct-text">${Math.round(pct)}% abgeschlossen</span>
       ${renderIdeaChips(projIdeas)}

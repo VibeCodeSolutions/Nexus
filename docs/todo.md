@@ -1,6 +1,41 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | 🚧 Multi-Sprint-Lauf — S28 ✅, S29 ✅ gemerged → Cleanup als nächstes → S30-SMOKE.
+**Stand:** 2026-05-19 | 🚧 S30-FIX läuft — Backlog-Sweep aus archiviertem `/todo.md`, danach S30-SMOKE.
+
+## Aktiv: S30-FIX — Backlog-Sweep (8 Items aus archiviertem `/todo.md`)
+
+> Branch `sprint/s30-fix-backlog`. Phasen P2-P5 bündeln 8 alte Backlog-Items, Tuvok-Sammel-Gate in P6. Detail-Specs sind aus `docs/archive/2026-05-19-todo-historisch.md` übernommen.
+
+### P1 / S30-FIX Doku-Triage ✅
+
+- [x] `/todo.md` (Root) nach `docs/archive/2026-05-19-todo-historisch.md` verschoben
+- [x] Archiv-Header mit Verweis auf `docs/todo.md` als neue SoT gesetzt
+- [x] Aktive 8 Items als P2-P5 in diese Datei aufgenommen
+- [x] Nightvision-Drift (NV-M*-* 19 Items) als per v0.1.3-Release abgedeckt deklariert (Sprint war bereits ABGESCHLOSSEN, Items nur nicht abgehakt)
+
+### P2 / S30-FIX Core-Hardening — 5 Rust-Items
+
+- [ ] **N-005-COD** — `keystore::set_key` empty-key Validation (`core/src/keystore.rs:67-77`). DoD: neuer `cargo test`, leerer Key → `Err`.
+- [ ] **N-008-SIC** — Gemini API-Key per `X-Goog-Api-Key`-Header statt URL-Param (`core/src/llm/gemini.rs:67-78,121-132`). DoD: Kein Logging-Pfad enthält den Key.
+- [ ] **N-009-KOR** — `provider.sanity` Sonderfall Ollama (`core/src/diag.rs:218-236`). DoD: Diag-Output bei Ollama-Default zeigt `ollama (model=qwen2.5:3b)`, nicht `(api_key)`.
+- [ ] **N-010-PER** — `list_projects?include_progress=true` mit JOIN `(total_tasks, done_tasks)` (`core/src/handlers.rs::list_projects` + `core/src/repo.rs`). DoD: `ProjectsScreen` macht ≤1 Roundtrip pro Refresh (Client-Update optional in Folge-Sprint).
+- [ ] **FEAT-002-TRACE** — `tracing::warn!` beim `Utc::now`-Fallback in `build_sparks_calendar` (created_at-Parse-Fehler). Trivial (~5 Min).
+
+### P3 / S30-FIX Android URL-Encoding — 1 Kotlin-Item
+
+- [ ] **VC-013-MIN-1** — Path-Encoding-Wrapper für `setUserPref(key, value)` in `NexusApiClient` (aktuell raw String-Interpolation, brüchig für generische Keys). DoD: URL-encoded `key`/`value` im Path, Test mit Sonderzeichen.
+
+### P4 / S30-FIX iCal-ETag — 1 Rust-Item
+
+- [ ] **FEAT-002-ETAG** — ETag + Last-Modified auf den iCal-Endpoints (`GET /spark/export.ics`, `GET /tasks/export.ics`) für Re-Fetch-Effizienz. DoD: Server sendet ETag-Header, antwortet auf `If-None-Match` mit `304 Not Modified`.
+
+### P5 / S30-FIX iCal-Auth Token-in-URL — 1 Rust-Item + UI-Touch
+
+- [ ] **FEAT-002-AUTH** — Token-in-URL als Bearer-Alternative (Apple Calendar / GCal-Subscribe können keinen Bearer-Header setzen). Architektur-Entscheidung erwartet (Backward-Compat, Token-Sicherheit). Ggf. als eigenen Sub-Sprint splitten.
+
+### P6 / S30-FIX QS-Gate — Tuvok release-qs + FF-Merge
+
+Sammel-Gate über P2-P5, dann FF-Merge nach main.
 
 ## Erledigt: S24 — Projekte-CRUD (Desktop)
 

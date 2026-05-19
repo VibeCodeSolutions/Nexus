@@ -1,4 +1,12 @@
-# NEXUS — Offene Punkte
+# ARCHIV — NEXUS Offene Punkte (Stand 17. Mai 2026)
+
+> **Archiviert am 2026-05-19 (S30-FIX-Triage).** Aktive Items wurden nach `docs/todo.md` Sektion „S30-FIX Backlog-Sweep" übernommen. Nightvision-Milestones (NV-M1-A bis NV-M6-D) sind durch v0.1.3-Release abgedeckt und gelten als erledigt. Dieses File bleibt als Read-Only-Referenz für historische Sprint-Bookmarks (Joyful Jellyfish, Polymorphic Clock, Synaptic Mosaic, v0.1.0-GA-Blocker, etc.) erhalten.
+>
+> **Single Source of Truth für offene Items:** `docs/todo.md` + `docs/state.md`.
+
+---
+
+## (Original-Header)
 
 > **Stand:** 2026-05-17. Aktive Sprint-Historie + Endpoints + Phasen-Status: `CURRENT_STATE.md`.
 > Historische Inhalte (Tuvok-Vollreview vom 2026-04-30, alte Sprint-Bookmarks) sind weiter unten als Read-Only-Archiv erhalten.

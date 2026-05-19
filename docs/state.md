@@ -4,7 +4,9 @@
 
 ## Aktiver Sprint
 
-🚧 **S30-SMOKE** — Smoke-Test mit leerer DB nach S28+S29-Merge. Spec in `docs/sprints/s30-smoke.md`. **Wartet auf Admin-Smoke-Lauf.** Findings landen in `docs/QS_FINDINGS.md`, ggf. S30-FIX-Sprint hinterher. Nach Findings-Triage → Sprint-Closure oder Hotfix-Branch.
+🚧 **S30-FIX** — Backlog-Sweep über 8 Items aus archiviertem `/todo.md`: P2 Core-Hardening (N-005/N-008/N-009/N-010 + FEAT-002-TRACE), P3 Android URL-Encoding (VC-013-MIN-1), P4 iCal-ETag (FEAT-002-ETAG), P5 iCal-Auth (FEAT-002-AUTH, ~1 Tag, Arch-Risiko). Tuvok-Sammel-Gate in P6, dann FF-Merge. Detail-Plan in `docs/todo.md` Sektion „Aktiv: S30-FIX".
+
+Anschließend: **S30-SMOKE** (Spec in `docs/sprints/s30-smoke.md`) als finale Bestätigung.
 
 ## Backlog (eigene Spuren, on-demand)
 

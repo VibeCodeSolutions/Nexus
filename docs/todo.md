@@ -13,25 +13,25 @@
 - [x] Aktive 8 Items als P2-P5 in diese Datei aufgenommen
 - [x] Nightvision-Drift (NV-M*-* 19 Items) als per v0.1.3-Release abgedeckt deklariert (Sprint war bereits ABGESCHLOSSEN, Items nur nicht abgehakt)
 
-### P2 / S30-FIX Core-Hardening — 5 Rust-Items
+### P2 / S30-FIX Core-Hardening — 5 Rust-Items ✅
 
-- [ ] **N-005-COD** — `keystore::set_key` empty-key Validation (`core/src/keystore.rs:67-77`). DoD: neuer `cargo test`, leerer Key → `Err`.
-- [ ] **N-008-SIC** — Gemini API-Key per `X-Goog-Api-Key`-Header statt URL-Param (`core/src/llm/gemini.rs:67-78,121-132`). DoD: Kein Logging-Pfad enthält den Key.
-- [ ] **N-009-KOR** — `provider.sanity` Sonderfall Ollama (`core/src/diag.rs:218-236`). DoD: Diag-Output bei Ollama-Default zeigt `ollama (model=qwen2.5:3b)`, nicht `(api_key)`.
-- [ ] **N-010-PER** — `list_projects?include_progress=true` mit JOIN `(total_tasks, done_tasks)` (`core/src/handlers.rs::list_projects` + `core/src/repo.rs`). DoD: `ProjectsScreen` macht ≤1 Roundtrip pro Refresh (Client-Update optional in Folge-Sprint).
-- [ ] **FEAT-002-TRACE** — `tracing::warn!` beim `Utc::now`-Fallback in `build_sparks_calendar` (created_at-Parse-Fehler). Trivial (~5 Min).
+- [x] **N-005-COD** — `keystore::set_key` empty-key Validation + `cargo test`. Commit `5843030`.
+- [x] **N-008-SIC** — Gemini API-Key per `X-Goog-Api-Key`-Header statt URL-Param. Commit `5843030`.
+- [x] **N-009-KOR** — `provider.sanity` Sonderfall Ollama mit Modellname statt `(api_key)`. Commit `5843030`.
+- [x] **N-010-PER** — `list_projects?include_progress=true` mit LEFT JOIN + GROUP BY. Commit `5843030`.
+- [x] **FEAT-002-TRACE** — bereits implementiert (handlers.rs:484-495, `tracing::warn!` beim `Utc::now`-Fallback). Pre-Verified.
 
-### P3 / S30-FIX Android URL-Encoding — 1 Kotlin-Item
+### P3 / S30-FIX Android URL-Encoding — 1 Kotlin-Item ✅
 
-- [ ] **VC-013-MIN-1** — Path-Encoding-Wrapper für `setUserPref(key, value)` in `NexusApiClient` (aktuell raw String-Interpolation, brüchig für generische Keys). DoD: URL-encoded `key`/`value` im Path, Test mit Sonderzeichen.
+- [x] **VC-013-MIN-1** — `io.ktor.http.encodeURLPathPart()` für `setUserPref`. Commit `59d0837`.
 
-### P4 / S30-FIX iCal-ETag — 1 Rust-Item
+### P4 / S30-FIX iCal-ETag ✅ (Pre-Verified)
 
-- [ ] **FEAT-002-ETAG** — ETag + Last-Modified auf den iCal-Endpoints (`GET /spark/export.ics`, `GET /tasks/export.ics`) für Re-Fetch-Effizienz. DoD: Server sendet ETag-Header, antwortet auf `If-None-Match` mit `304 Not Modified`.
+- [x] **FEAT-002-ETAG** — bereits implementiert (handlers.rs:412-454 + 540-593: `ics_etag` + `ics_last_modified` + `apply_freshness_headers` + `If-None-Match`→`304`-Branch in beiden Export-Handlern). Pre-Verified.
 
-### P5 / S30-FIX iCal-Auth Token-in-URL — 1 Rust-Item + UI-Touch
+### P5 / S30-FIX iCal-Auth Token-in-URL ✅ (Pre-Verified)
 
-- [ ] **FEAT-002-AUTH** — Token-in-URL als Bearer-Alternative (Apple Calendar / GCal-Subscribe können keinen Bearer-Header setzen). Architektur-Entscheidung erwartet (Backward-Compat, Token-Sicherheit). Ggf. als eigenen Sub-Sprint splitten.
+- [x] **FEAT-002-AUTH** — bereits implementiert (auth.rs:189-200 `extract_query_token` + auth.rs:248-270 URL-Token-Fallback für calendar-subscribe-Endpoints, mit `constant_time_eq` + Logging + Allow-List). Pre-Verified.
 
 ### P6 / S30-FIX QS-Gate — Tuvok release-qs + FF-Merge
 

@@ -1022,13 +1022,19 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
   transition: border-color var(--nx-dur-base) var(--nx-ease-out), transform var(--nx-dur-fast) var(--nx-ease-out);
 }
 .card:hover { border-color: var(--nx-accent); transform: translateY(-2px); }
-.card h3 { font-size: 16px; margin-bottom: var(--nx-sp-2); padding-right: 32px; }
+.card h3 { font-size: 16px; margin-bottom: var(--nx-sp-2); padding-right: 70px; }
 .card p { font-size: 13px; color: var(--nx-text-dim); margin-bottom: var(--nx-sp-3); }
 .card-delete {
   position: absolute; top: 10px; right: 10px;
   width: 28px; height: 28px; padding: 0; line-height: 1;
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; border-radius: var(--nx-r-sm);
+}
+.card-edit {
+  position: absolute; top: 10px; right: 44px;
+  width: 28px; height: 28px; padding: 0; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; border-radius: var(--nx-r-sm);
 }
 
 /* Progress bar — v0.2-migriert */
@@ -2816,6 +2822,7 @@ async function renderProjects() {
     } catch {}
     const projIdeas = ideasByProject.get(p.id) || [];
     return `<div class="card">
+      <button class="btn btn-sm btn-ghost card-edit" data-action="proj-edit" data-proj-id="${esc(p.id)}" title="Projekt bearbeiten">✎</button>
       <button class="btn btn-sm btn-danger card-delete" data-action="proj-delete" data-proj-id="${esc(p.id)}" title="Projekt löschen">×</button>
       <h3>${esc(p.name || p.title || 'Untitled')}</h3>
       <p>${esc(p.description || '')}</p>
@@ -2860,6 +2867,7 @@ function openNewProject() {
   const sheet = document.getElementById('projSheet');
   if (!sheet) return;
   sheet.dataset.mode = 'create';
+  sheet.dataset.projId = '';
   const header = document.getElementById('projSheetHeader');
   if (header) header.textContent = 'Neues Projekt';
   const submit = document.getElementById('projSheetSubmit');
@@ -2875,7 +2883,39 @@ function openNewProject() {
   setTimeout(() => name?.focus(), 50);
 }
 
+// S24-P3.2 — Edit-Flow: Sheet-Shell wiederverwendet, Befüllung aus `projects`-State
+function openEditProject(id) {
+  const sheet = document.getElementById('projSheet');
+  if (!sheet || !id) return;
+  const project = projects.find(p => p.id === id);
+  if (!project) {
+    alert('Projekt nicht gefunden. Liste wird aktualisiert.');
+    refreshProjects();
+    return;
+  }
+  sheet.dataset.mode = 'edit';
+  sheet.dataset.projId = id;
+  const header = document.getElementById('projSheetHeader');
+  if (header) header.textContent = 'Projekt bearbeiten';
+  const submit = document.getElementById('projSheetSubmit');
+  if (submit) submit.textContent = 'Speichern';
+  const name = document.getElementById('projSheetName');
+  const desc = document.getElementById('projSheetDesc');
+  const status = document.getElementById('projSheetStatus');
+  if (name) name.value = project.name || '';
+  if (desc) desc.value = project.description || '';
+  if (status) status.value = project.status || 'active';
+  updateProjSheetSubmitState();
+  setProjSheetStage('full');
+  setTimeout(() => name?.focus(), 50);
+}
+
 function closeNewProject() {
+  const sheet = document.getElementById('projSheet');
+  if (sheet) {
+    sheet.dataset.mode = 'create';
+    sheet.dataset.projId = '';
+  }
   setProjSheetStage('peek');
   const name = document.getElementById('projSheetName');
   const desc = document.getElementById('projSheetDesc');
@@ -2885,29 +2925,43 @@ function closeNewProject() {
   if (status) status.value = 'active';
 }
 
+// Submit-Branch nach data-mode (create|edit). Erhält Funktionsnamen für Backwards-Compat mit Action-Mapping.
 async function submitNewProject() {
+  const sheet = document.getElementById('projSheet');
+  const mode = sheet?.dataset.mode || 'create';
+  const projId = sheet?.dataset.projId || '';
   const name = (document.getElementById('projSheetName')?.value || '').trim();
   const desc = (document.getElementById('projSheetDesc')?.value || '').trim();
   const status = document.getElementById('projSheetStatus')?.value || 'active';
   if (!name) { document.getElementById('projSheetName')?.focus(); return; }
   const submit = document.getElementById('projSheetSubmit');
-  if (submit) { submit.disabled = true; submit.textContent = 'Erstelle…'; }
+  const origText = mode === 'edit' ? 'Speichern' : 'Erstellen';
+  const busyText = mode === 'edit' ? 'Speichere…' : 'Erstelle…';
+  if (submit) { submit.disabled = true; submit.textContent = busyText; }
   try {
-    // Backend `CreateProjectRequest` kennt aktuell kein `status` (P1.5 hat nur GET/PUT erweitert).
-    // Bei abweichendem Status: POST mit Default `active`, dann PUT zum Setzen — kein Backend-Change in P3.1.
-    const created = await api('/projects', { method: 'POST', body: JSON.stringify({ name, description: desc, spark_ids: [] }) });
-    if (status !== 'active' && created?.id) {
-      await api(`/projects/${encodeURIComponent(created.id)}`, {
+    if (mode === 'edit') {
+      if (!projId) throw new Error('Edit ohne projId — Sheet-State inkonsistent.');
+      await api(`/projects/${encodeURIComponent(projId)}`, {
         method: 'PUT',
         body: JSON.stringify({ name, description: desc, status })
       });
+    } else {
+      // Backend `CreateProjectRequest` kennt aktuell kein `status` (P1.5 hat nur GET/PUT erweitert).
+      // Bei abweichendem Status: POST mit Default `active`, dann PUT zum Setzen — kein Backend-Change in P3.1.
+      const created = await api('/projects', { method: 'POST', body: JSON.stringify({ name, description: desc, spark_ids: [] }) });
+      if (status !== 'active' && created?.id) {
+        await api(`/projects/${encodeURIComponent(created.id)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name, description: desc, status })
+        });
+      }
     }
     closeNewProject();
     refreshProjects();
   } catch (e) {
     alert('Fehler: ' + e.message);
   } finally {
-    if (submit) { submit.textContent = 'Erstellen'; updateProjSheetSubmitState(); }
+    if (submit) { submit.textContent = origText; updateProjSheetSubmitState(); }
   }
 }
 
@@ -4500,10 +4554,11 @@ document.addEventListener('click', (e) => {
       navigate('sparks');
       break;
     case 'proj-new': openNewProject(); break;
+    case 'proj-edit': e.stopPropagation(); openEditProject(el.dataset.projId); break;
     case 'proj-sheet-cancel': closeNewProject(); break;
     case 'proj-sheet-submit': submitNewProject(); break;
     case 'proj-refresh': refreshProjects(); break;
-    case 'proj-delete': deleteProject(el.dataset.projId); break;
+    case 'proj-delete': e.stopPropagation(); deleteProject(el.dataset.projId); break;
     case 'task-new': openNewTask(); break;
     case 'task-refresh': refreshTasks(); break;
     case 'task-cancel': closeNewTask(); break;

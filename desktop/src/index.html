@@ -123,6 +123,9 @@
   --nx-swatch-coral:  #FF7A6A;
   --nx-swatch-amber:  #F0A848;
   --nx-swatch-green:  #36C97A;
+
+  /* Phone-Bezel (S27-C HARDEN-1) — iOS-style Geräterahmen, themeunabhängig schwarz */
+  --nx-bezel: #000;
 }
 
 /* Akzent-Themes — pro App/Modul wählbar via [data-accent="…"] */
@@ -1075,7 +1078,7 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 /* 3.2 Phone-Bezel — iOS-style Wrapper mit Dynamic Island */
 .nx-phone {
   width: 360px;
-  background: #000;
+  background: var(--nx-bezel);
   border-radius: 44px;
   padding: 12px;
   box-shadow: var(--nx-shadow-lift);
@@ -1086,7 +1089,7 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
   top: 18px; left: 50%;
   transform: translateX(-50%);
   width: 110px; height: 32px;
-  background: #000;
+  background: var(--nx-bezel);
   border-radius: var(--nx-r-pill);
   z-index: 2;
 }
@@ -1284,10 +1287,11 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
 }
-.hero-swatch[data-swatch="indigo"] { background: var(--nx-swatch-indigo); }
-.hero-swatch[data-swatch="coral"]  { background: var(--nx-swatch-coral); }
-.hero-swatch[data-swatch="amber"]  { background: var(--nx-swatch-amber); }
-.hero-swatch[data-swatch="green"]  { background: var(--nx-swatch-green); }
+/* S27-C HARDEN-2: Swatch-Farben via CSS-Var (greift Hero-Pills + Settings-Picker) */
+[data-swatch="indigo"] { background: var(--nx-swatch-indigo); }
+[data-swatch="coral"]  { background: var(--nx-swatch-coral); }
+[data-swatch="amber"]  { background: var(--nx-swatch-amber); }
+[data-swatch="green"]  { background: var(--nx-swatch-green); }
 
 .hero-nav-cluster {
   display: grid;
@@ -2201,19 +2205,19 @@ button.task-checkbox:hover { border-color: var(--primary); }
     <h3 class="h3-llm">Design</h3>
     <div class="nx-theme-picker" role="radiogroup" aria-label="Akzentfarbe wählen">
       <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="indigo" role="radio" aria-checked="true">
-        <span class="nx-theme-swatch" style="background:#7C79FF"></span>
+        <span class="nx-theme-swatch" data-swatch="indigo" aria-hidden="true"></span>
         <span class="nx-theme-name">Indigo</span>
       </button>
       <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="coral" role="radio" aria-checked="false">
-        <span class="nx-theme-swatch" style="background:#FF7A6A"></span>
+        <span class="nx-theme-swatch" data-swatch="coral" aria-hidden="true"></span>
         <span class="nx-theme-name">Coral</span>
       </button>
       <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="amber" role="radio" aria-checked="false">
-        <span class="nx-theme-swatch" style="background:#F0A848"></span>
+        <span class="nx-theme-swatch" data-swatch="amber" aria-hidden="true"></span>
         <span class="nx-theme-name">Amber</span>
       </button>
       <button type="button" class="nx-theme-pill" data-action="theme-accent-set" data-accent="green" role="radio" aria-checked="false">
-        <span class="nx-theme-swatch" style="background:#36C97A"></span>
+        <span class="nx-theme-swatch" data-swatch="green" aria-hidden="true"></span>
         <span class="nx-theme-name">Green</span>
       </button>
     </div>

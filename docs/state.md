@@ -4,17 +4,19 @@
 
 ## Aktiver Sprint
 
-✅ **S26-KOMPMIG QS grün** — 4 Pflicht-Phasen Code-Done, Tuvok release-qs `freigabe` (qs-20260519-S26-001, 0 Findings). FF-Merge `sprint/s26-komponenten-vollmigration` → `main` wartet auf Admin-Confirm.
+✅ **S26-KOMPMIG QS grün + Hotfix QS grün** — 4 Pflicht-Phasen Code-Done, Tuvok release-qs `freigabe` (qs-20260519-S26-001, 0 Findings) + Hotfix `51cf2fd` für S26-001-Modal-Scroll (qs-20260519-S26-002, 0 Findings). FF-Merge `sprint/s26-komponenten-vollmigration` → `main` wartet auf Admin-Confirm.
 
 ## Backlog (Sprint-Reihenfolge)
 
-1. **S24 — Projekte-CRUD** (rückt nach S26-Merge auf nächster Sprint-Slot)
+1. **S27 — Herocard-Startbildschirm + Theme-Voll-Effekt** (Admin-Briefing 2026-05-19, nächster Sprint nach S26-Merge)
+   - **S27-A Herocard als Startbildschirm:** Hauptseite, Hintergrund + Farbwahl aus `patch/` (`--nx-bg` + Akzent-Tokens), „Quiet Machine. Electric Pulse."-Aesthetic. Mit Wizard-durch: Links zu allen Seiten + Display-Hero-Typo. Ohne Wizard: prominenter „Wizard starten"-Button. Akzent-Demo wie im Claude-Design-Showcase.
+   - **S27-B Theme-Voll-Effekt (aus S26-002):** Theme-Picker-Klick muss App-weit wirken. Strategie offen: Legacy-Token-Alias auf `--nx-*` ODER Bulk-UI-Migration (Nav/Toolbar/Buttons/Filter-Pills). Trade-off im Sprint-Plan.
+   - **S27-C Anschluss-Items:** HARDEN-1 `--nx-bezel`-Token, HARDEN-2 Theme-Picker-Swatches via CSS-Var, beides aus qs-20260519-S26-001.
+2. **S24 — Projekte-CRUD** (kommt nach S27)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.
-2. **S27-Backlog** (Konvention-Hardening aus qs-20260519-S26-001 + Restposten aus S25-Admin-Smoke)
-   - **S27-HARDEN-1** — `--nx-bezel`-Token für `.nx-phone`-Hintergrund einführen, sobald Light-Bezel-Varianten kommen.
-   - **S27-HARDEN-2** — Theme-Picker-Swatches via CSS-Var statt Inline-Hex referenzieren, sobald Light-Theme-Accent-Variationen aktiv werden.
-   - **S25-SMOKE-3 / S26-P6 (verschoben)** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser). UX-Feature mit Backend-Touch, eigene Spur, niedrige Prio.
-   - **Charts (Out-of-Scope S26)** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` (SVG-Komponenten aus UI_SPEC_v0.2 §3.3) on-demand, wenn ein Use-Case sie braucht.
+3. **Sprint-Backlog (eigene Spuren, on-demand):**
+   - **S25-SMOKE-3 / S26-P6** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser). UX-Feature mit Backend-Touch.
+   - **Charts** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` (SVG-Komponenten aus UI_SPEC_v0.2 §3.3) on-demand, wenn ein Use-Case sie braucht.
 
 ## Letzte Releases
 

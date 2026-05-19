@@ -1,6 +1,27 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | ⏸ **Pause** — S27 FF-Merge nach main durch (`295d036`), kein aktiver Sprint
+**Stand:** 2026-05-19 | 🚧 **S24 — Projekte-CRUD** eröffnet, Phase 1 (Backend-Recon) bei Belanna
+
+## Aktiv: S24 — Projekte-CRUD (Desktop + Android Compose)
+
+### P1 / S24-Recon — Backend-Endpoint-Check (Belanna)
+
+- [ ] Rust-Core: vorhandene Projekt-Endpoints inventarisieren (`/api/projects/*` o.ä.)
+- [ ] Gap-Analyse: was fehlt für Voll-CRUD (Create/Read/Update/Delete + ggf. Reorder/Cascade)?
+- [ ] Bericht mit Endpoint-Stand + empfohlener Gap-Schluss → an Chakotay
+
+### P2 / S24-Spec — Sprint-Spec finalisieren (nach Recon)
+
+- [ ] Phasen-Skelett basierend auf Recon-Befund
+- [ ] DoD klären: Liste, Sheet (Create), Edit-Sheet, Delete-Confirm — Desktop + Android Compose
+
+### P3 / S24-Impl — Implementierung
+
+- [ ] (wird nach P2 spezifiziert)
+
+### P4 / S24-QS — Tuvok release-qs-Gate
+
+- [ ] Tuvok release-qs nach Code-Done
 
 ## Erledigt: S27 — Herocard-Startbildschirm + Theme-Voll-Effekt
 

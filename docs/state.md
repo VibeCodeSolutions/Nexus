@@ -4,11 +4,9 @@
 
 ## Aktiver Sprint
 
-⏸ **Pause** — S27-HEROCARD-THEME FF-Merge nach `main` durch (`295d036`), origin synced. Kein aktiver Sprint, warten auf nächste Eröffnung.
+🚧 **S24 — Projekte-CRUD** auf Branch `sprint/s24-projekte-crud`. Scope: Voll-CRUD (Liste+Create+Edit+Delete) auf Desktop **und** Android Compose, nutzt S26-Komponenten (`nx-sheet`, `nx-phone`, `nx-settings-row`). Phase 1 = Backend-Recon (Belanna prüft Core-Endpoints, meldet Gap-Liste), danach Sprint-Spec finalisieren.
 
 ## Backlog (Sprint-Reihenfolge)
-
-1. **S24 — Projekte-CRUD** (nächster Kandidat)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.
 2. **Sprint-Backlog (eigene Spuren, on-demand):**
    - **S27-Followup Bulk-UI-Migration** — Nav/Toolbar/Buttons/Filter-Pills direkt auf `--nx-*`-Tokens umstellen (saubere Alternative zum S27-B-Alias).

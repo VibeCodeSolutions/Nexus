@@ -11,7 +11,7 @@
 - [x] Android-Client: nur Read-Funktionen, kein create/delete/update/getSingle.
 - [x] Empfehlung: Mini-Backend-Phase **P1.5** vorlagern (GET-Single + PUT mit name/description/status, optional `updated_at`-Column). Reorder + Owner explizit Out-of-Scope.
 
-### P1.5 / S24-Backend-Gap — Mini-Backend-Phase ✅ code-done `a43278c` (wartet auf Tuvok-Gate)
+### P1.5 / S24-Backend-Gap — Mini-Backend-Phase ✅ code-done `a43278c` · Tuvok-Gate freigabe `qs-20260519-S24P1.5-001` (0 Findings)
 
 - [x] `GET /projects/{id}` + `pub async fn get_project_by_id` (Repo + Handler + Route)
 - [x] `PUT /projects/{id}` + `pub async fn update_project` (Felder: name/description/status; nexus_external_id readonly)

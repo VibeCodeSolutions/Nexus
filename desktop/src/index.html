@@ -120,6 +120,12 @@
   --nx-shadow-card: 0 8px 22px rgba(0, 0, 0, 0.35);
   --nx-shadow-lift: 0 20px 50px rgba(0, 0, 0, 0.5);
   --nx-shadow-glow: 0 0 24px var(--nx-accent-glow);
+
+  /* Theme-Swatch-Vorschau-Farben (statisch, unabhängig vom aktiven Akzent) */
+  --nx-swatch-indigo: #7C79FF;
+  --nx-swatch-coral:  #FF7A6A;
+  --nx-swatch-amber:  #F0A848;
+  --nx-swatch-green:  #36C97A;
 }
 
 /* Akzent-Themes — pro App/Modul wählbar via [data-accent="…"] */
@@ -1183,6 +1189,195 @@ td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 }
 .nx-theme-name { font-weight: 500; }
 
+/* 3.5 Herocard — Startbildschirm "Quiet Machine. Electric Pulse." (S27-A) */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-sp-12);
+  padding: clamp(var(--nx-sp-8), 6vw, var(--nx-sp-12)) clamp(var(--nx-sp-6), 5vw, var(--nx-sp-10));
+  min-height: 100%;
+  background:
+    radial-gradient(120% 90% at 85% -10%, var(--nx-accent-tint) 0%, transparent 55%),
+    radial-gradient(80% 60% at -10% 110%, var(--nx-accent-tint) 0%, transparent 60%),
+    var(--nx-bg);
+  position: relative;
+  overflow: hidden;
+}
+.hero-eyebrow {
+  font-family: var(--nx-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--nx-accent-text);
+  opacity: 0.85;
+  margin-bottom: var(--nx-sp-3);
+}
+.hero-title {
+  font-family: var(--nx-font-display);
+  font-weight: 700;
+  font-size: clamp(64px, 12vw, 148px);
+  letter-spacing: -0.02em;
+  line-height: 0.96;
+  color: var(--nx-text);
+  margin: 0;
+}
+.hero-title .hero-accent {
+  background: linear-gradient(180deg, var(--nx-accent) 0%, var(--nx-accent-text) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 24px var(--nx-accent-glow));
+}
+.hero-tagline {
+  font-family: var(--nx-font-display);
+  font-size: clamp(18px, 2.4vw, 24px);
+  font-weight: 500;
+  color: var(--nx-text-dim);
+  margin: var(--nx-sp-4) 0 0;
+  max-width: 56ch;
+}
+.hero-tagline strong { color: var(--nx-text); font-weight: 600; }
+
+.hero-accent-demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-sp-3);
+}
+.hero-accent-demo-label {
+  font-family: var(--nx-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--nx-text-mute);
+}
+.hero-accent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nx-sp-3);
+}
+.hero-accent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nx-sp-3);
+  padding: var(--nx-sp-3) var(--nx-sp-5);
+  background: var(--nx-card);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-r-pill);
+  color: var(--nx-text);
+  font-family: var(--nx-font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--nx-dur-base) var(--nx-ease-out),
+              transform var(--nx-dur-fast) var(--nx-ease-out),
+              box-shadow var(--nx-dur-base) var(--nx-ease-out);
+}
+.hero-accent-pill:hover {
+  border-color: var(--nx-border-hi);
+  transform: translateY(-2px);
+  box-shadow: var(--nx-shadow-soft);
+}
+.hero-accent-pill[aria-checked="true"] {
+  border-color: var(--nx-accent);
+  box-shadow: 0 0 0 1px var(--nx-accent-glow), 0 0 24px var(--nx-accent-glow);
+}
+.hero-accent-pill .hero-swatch {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+}
+.hero-swatch[data-swatch="indigo"] { background: var(--nx-swatch-indigo); }
+.hero-swatch[data-swatch="coral"]  { background: var(--nx-swatch-coral); }
+.hero-swatch[data-swatch="amber"]  { background: var(--nx-swatch-amber); }
+.hero-swatch[data-swatch="green"]  { background: var(--nx-swatch-green); }
+
+.hero-nav-cluster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--nx-sp-4);
+}
+.hero-nav-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-sp-3);
+  padding: var(--nx-sp-6);
+  background: var(--nx-card);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-r-card-lg);
+  color: var(--nx-text);
+  text-align: left;
+  font-family: var(--nx-font-body);
+  cursor: pointer;
+  transition: border-color var(--nx-dur-base) var(--nx-ease-out),
+              transform var(--nx-dur-base) var(--nx-ease-out),
+              box-shadow var(--nx-dur-base) var(--nx-ease-out);
+}
+.hero-nav-card:hover {
+  border-color: var(--nx-accent);
+  transform: translateY(-3px);
+  box-shadow: var(--nx-shadow-card);
+}
+.hero-nav-card-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+.hero-nav-card-title {
+  font-family: var(--nx-font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.hero-nav-card-sub {
+  font-size: 13px;
+  color: var(--nx-text-dim);
+  line-height: 1.45;
+}
+
+.hero-wizard-cta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-sp-4);
+  align-items: flex-start;
+  padding: var(--nx-sp-8);
+  background: var(--nx-card);
+  border: 1px solid var(--nx-accent);
+  border-radius: var(--nx-r-card-lg);
+  box-shadow: 0 0 0 1px var(--nx-accent-glow), var(--nx-shadow-card);
+  max-width: 560px;
+}
+.hero-wizard-cta-title {
+  font-family: var(--nx-font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--nx-text);
+}
+.hero-wizard-cta-sub {
+  font-size: 14px;
+  color: var(--nx-text-dim);
+  max-width: 48ch;
+}
+.hero-wizard-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nx-sp-2);
+  padding: var(--nx-sp-3) var(--nx-sp-6);
+  background: var(--nx-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--nx-r-btn);
+  font-family: var(--nx-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--nx-dur-fast) var(--nx-ease-out),
+              box-shadow var(--nx-dur-base) var(--nx-ease-out);
+}
+.hero-wizard-cta-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px var(--nx-accent-glow);
+}
+
 /* Input */
 input, select, textarea {
   background: var(--bg-input);
@@ -1703,6 +1898,10 @@ button.task-checkbox:hover { border-color: var(--primary); }
 
 <aside class="sidebar">
   <nav class="nav-list" role="navigation" aria-label="Hauptnavigation">
+    <button class="nav-item" data-view="home">
+      <span class="nav-icon" aria-hidden="true">✨</span>
+      <span class="nav-label">Home</span>
+    </button>
     <button class="nav-item active" data-view="dashboard" aria-current="page">
       <span class="nav-icon" aria-hidden="true">🏠</span>
       <span class="nav-label">Dashboard</span>
@@ -1745,6 +1944,44 @@ button.task-checkbox:hover { border-color: var(--primary); }
 
 <main class="main-content">
 <div id="globalBanner" class="banner error hidden" role="alert"></div>
+
+<!-- Home View (S27-A Herocard) -->
+<section class="view" id="view-home" aria-label="Startbildschirm">
+  <div class="hero">
+    <div class="hero-header">
+      <div class="hero-eyebrow">NEXUS · Personal OS</div>
+      <h1 class="hero-title">
+        Quiet machine.<br><span class="hero-accent">Electric pulse.</span>
+      </h1>
+      <p class="hero-tagline">Ein <strong>persönliches OS</strong> für Sparks, Aufgaben und Projekte — leise im Hintergrund, lebendig wenn du es brauchst.</p>
+    </div>
+
+    <div class="hero-accent-demo" role="group" aria-labelledby="heroAccentDemoLabel">
+      <span class="hero-accent-demo-label" id="heroAccentDemoLabel">Akzent wählen</span>
+      <div class="hero-accent-row" role="radiogroup" aria-label="Akzentfarbe wählen">
+        <button type="button" class="hero-accent-pill" data-action="theme-accent-set" data-accent="indigo" role="radio" aria-checked="true">
+          <span class="hero-swatch" data-swatch="indigo" aria-hidden="true"></span>
+          <span>Indigo</span>
+        </button>
+        <button type="button" class="hero-accent-pill" data-action="theme-accent-set" data-accent="coral" role="radio" aria-checked="false">
+          <span class="hero-swatch" data-swatch="coral" aria-hidden="true"></span>
+          <span>Coral</span>
+        </button>
+        <button type="button" class="hero-accent-pill" data-action="theme-accent-set" data-accent="amber" role="radio" aria-checked="false">
+          <span class="hero-swatch" data-swatch="amber" aria-hidden="true"></span>
+          <span>Amber</span>
+        </button>
+        <button type="button" class="hero-accent-pill" data-action="theme-accent-set" data-accent="green" role="radio" aria-checked="false">
+          <span class="hero-swatch" data-swatch="green" aria-hidden="true"></span>
+          <span>Green</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Conditional Block: gefüllt von Views.home.init() je nach setupStatus -->
+    <div id="heroConditional" data-state="loading"></div>
+  </div>
+</section>
 
 <!-- Dashboard View -->
 <section class="view active" id="view-dashboard">
@@ -2057,10 +2294,58 @@ function applyAccent(name) {
     document.documentElement.setAttribute('data-accent', name);
   }
   localStorage.setItem('nexus_accent', name);
-  // aria-checked auf Pills synchronisieren (auch wenn Modal noch nicht offen ist — DOM existiert).
-  document.querySelectorAll('.nx-theme-pill').forEach(p => {
+  // aria-checked auf allen Akzent-Pills synchronisieren (Settings-Picker + Hero-Pills).
+  document.querySelectorAll('[data-action="theme-accent-set"]').forEach(p => {
     p.setAttribute('aria-checked', p.dataset.accent === name ? 'true' : 'false');
   });
+}
+
+// S27-A Herocard — Conditional-Block je nach Pairing-/Provider-State rendern.
+function renderHero() {
+  const slot = document.getElementById('heroConditional');
+  if (!slot) return;
+  const wizardDone = !!(setupStatus && setupStatus.paired && setupStatus.provider_configured);
+  if (wizardDone) {
+    slot.dataset.state = 'ready';
+    slot.innerHTML = `
+      <nav class="hero-nav-cluster" aria-label="Schnellzugriff">
+        <button type="button" class="hero-nav-card" data-action="hero-nav" data-view="dashboard">
+          <span class="hero-nav-card-icon" aria-hidden="true">🏠</span>
+          <span class="hero-nav-card-title">Dashboard</span>
+          <span class="hero-nav-card-sub">Heutige Übersicht, Quick-Actions, Fokus-Task.</span>
+        </button>
+        <button type="button" class="hero-nav-card" data-action="hero-nav" data-view="sparks">
+          <span class="hero-nav-card-icon" aria-hidden="true">🧠</span>
+          <span class="hero-nav-card-title">Sparks</span>
+          <span class="hero-nav-card-sub">Gedanken einfangen, sortieren, Tasks extrahieren.</span>
+        </button>
+        <button type="button" class="hero-nav-card" data-action="hero-nav" data-view="tasks">
+          <span class="hero-nav-card-icon" aria-hidden="true">✅</span>
+          <span class="hero-nav-card-title">Aufgaben</span>
+          <span class="hero-nav-card-sub">Was offen ist, was heute dran ist.</span>
+        </button>
+        <button type="button" class="hero-nav-card" data-action="hero-nav" data-view="projects">
+          <span class="hero-nav-card-icon" aria-hidden="true">📁</span>
+          <span class="hero-nav-card-title">Projekte</span>
+          <span class="hero-nav-card-sub">Längere Vorhaben, mit Tasks verknüpft.</span>
+        </button>
+        <button type="button" class="hero-nav-card" data-action="settings-open">
+          <span class="hero-nav-card-icon" aria-hidden="true">⚙️</span>
+          <span class="hero-nav-card-title">Einstellungen</span>
+          <span class="hero-nav-card-sub">Provider, Theme, Foto-Pipeline, Sparks-Optionen.</span>
+        </button>
+      </nav>
+    `;
+  } else {
+    slot.dataset.state = 'wizard';
+    slot.innerHTML = `
+      <div class="hero-wizard-cta">
+        <div class="hero-wizard-cta-title">Einrichtung abschließen</div>
+        <div class="hero-wizard-cta-sub">Pairing oder Provider-Konfiguration ist noch offen. Der Wizard führt dich in zwei Schritten ans Dashboard.</div>
+        <button type="button" class="hero-wizard-cta-btn" data-action="wizard-restart">Wizard starten →</button>
+      </div>
+    `;
+  }
 }
 // Boot-Apply (das DOM ist hier bereits geparst, da Script unten im body steht).
 applyAccent(currentAccent);
@@ -2154,6 +2439,10 @@ async function checkConnection() {
 
 // --- Navigation (Views module pattern — UI_SPEC.md Section 5) ---
 const Views = {
+  home: {
+    init() { renderHero(); applyAccent(currentAccent); },
+    destroy() {},
+  },
   dashboard: {
     init() { refreshDashboard(); },
     destroy() {},
@@ -4130,6 +4419,7 @@ document.addEventListener('click', (e) => {
     }
     case 'theme-cycle': cycleTheme(); break;
     case 'theme-accent-set': applyAccent(el.dataset.accent); break;
+    case 'hero-nav': navigate(el.dataset.view); break;
     case 'wizard-restart': restartWizard(); break;
     case 'settings-open': openSettings(); break;
     case 'settings-close': closeSettings(); break;

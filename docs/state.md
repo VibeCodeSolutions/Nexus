@@ -4,7 +4,7 @@
 
 ## Aktiver Sprint
 
-✅ **S26-KOMPMIG QS grün + Hotfix QS grün** — 4 Pflicht-Phasen Code-Done, Tuvok release-qs `freigabe` (qs-20260519-S26-001, 0 Findings) + Hotfix `51cf2fd` für S26-001-Modal-Scroll (qs-20260519-S26-002, 0 Findings). FF-Merge `sprint/s26-komponenten-vollmigration` → `main` wartet auf Admin-Confirm.
+⏸ **Pause** — S26 gemerged (`460e31a` auf main), S27 spezifiziert, Admin im Break.
 
 ## Backlog (Sprint-Reihenfolge)
 
@@ -26,6 +26,7 @@
 
 | Sprint | Closure | Notiz |
 |---|---|---|
+| **S26-KOMPMIG** | **2026-05-19**, FF-Merge `460e31a` → main | Komponenten-Vollmigration + Settings-UI: P2 Status-Pill-Glow-Tokens, P3 Cards/Progress migriert + v0.2-Komponenten-Layer (nx-sheet/phone/progress/settings-row), P4 Theme-Picker in Settings, P5 Wizard-Back-Gefahrenzone. Tuvok 2x freigabe (qs-20260519-S26-001 release-qs + qs-20260519-S26-002 Hotfix). Admin-Smoke nach Tauri-Dev: 1 Blocker S26-001 (Settings-Modal nicht scrollbar) per Hotfix `51cf2fd` gefixt. 2 Folge-Wünsche (Theme-Voll-Effekt + Herocard) in S27 spezifiziert. |
 | **S25-DESIGNIMPULS** | **2026-05-19**, FF-Merge `7e5bc8f` → main | Design System v0.2 "Pulse" eingezogen: Tokens, Motion, F-001 Scroll-Fix, F-003 Branding, Status-Pill-Proof. Tuvok release-qs-Gate freigabe nach 1 Auflagen-Fix (VC-001-VOL Manifest-Branding). Admin-Smoke nach Merge per Plain-Browser durchgeführt — drei Befunde als S26-Backlog (S25-SMOKE-1/2/3), keine S25-Regressions. |
 | S24-VISION-FIX | 2026-05-19, commit `5698a61` (findings-gate freigabe) | 5 Vision-Provider live (Ollama / Anthropic / Gemini / OpenAI-kompat / Mistral). |
 | S24-VISION-FIX-CLEANUP | 2026-05-19 | `design-system/v0.2-pulse` rebased auf main, sauberer Branch für S25. |

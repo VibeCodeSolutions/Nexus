@@ -1,15 +1,16 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | ✅ **S26-KOMPMIG QS grün** — FF-Merge wartet auf Admin-Confirm
+**Stand:** 2026-05-19 | ⏸ **Pause** — S26 gemerged (`460e31a`), S27 spezifiziert
 
-## Aktiver Sprint: S26 — Komponenten-Vollmigration + Settings-UI
+## Erledigt: S26 — Komponenten-Vollmigration + Settings-UI
 
 - [x] **P2 / VC-002-KON** — Status-Pill rgba-Triples als `--nx-{green,coral,amber}-glow`-Tokens (commit `5c173a1`)
 - [x] **P3 / Komponenten-Migration + v0.2-Layer** — Cards + Progress migriert, `.nx-sheet`/`.nx-phone`/`.nx-progress`/`.nx-settings-row` eingeführt (commit `6b60ef0`) — Charts bewusst Out-of-Scope (S27-Backlog)
 - [x] **P4 / Theme-Picker** — 4 Accent-Pills in Settings, persistiert `nexus_accent` (commit `81d66c1`) — S25-SMOKE-1 geschlossen
 - [x] **P5 / Wizard-Back-Button** — Gefahrenzone-Row + `restartWizard()` (commit `7dcffac`) — S25-SMOKE-2 geschlossen
 - [x] **Tuvok release-qs** — qs-20260519-S26-001 Status `freigabe`, 0 Findings
-- [ ] **FF-Merge** `sprint/s26-komponenten-vollmigration` → `main` (Admin-Confirm pflichtig)
+- [x] **Hotfix S26-001** — Settings-Modal scrollable (commit `51cf2fd`, qs-20260519-S26-002 freigabe)
+- [x] **FF-Merge** `sprint/s26-komponenten-vollmigration` → `main` (commit `460e31a`)
 
 ## Backlog (in Reihenfolge nach S26-Merge)
 

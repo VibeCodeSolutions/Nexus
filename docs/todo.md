@@ -1,33 +1,33 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | 🚧 **S27 aktiv** — Branch `sprint/s27-herocard-theme` eröffnet
+**Stand:** 2026-05-19 | ⏸ **Pause** — S27 Tuvok-grün (Auflage geheilt), wartet auf FF-Merge-Confirm
 
 ## Aktiv: S27 — Herocard-Startbildschirm + Theme-Voll-Effekt
 
-### P1 / S27-A Herocard (eigene Route `/home`)
+### P1 / S27-A Herocard (eigene Route `/home`) ✅ code-done `87fc6e2`
 
-- [ ] Route `/home` als zusätzliche Nav-Seite (Dashboard bleibt Default-Landing)
-- [ ] Hintergrund + Farbwahl aus `patch/` übernehmen (`--nx-bg` + Akzent-Tokens via `[data-accent]`)
-- [ ] Display-Hero-Typo (§2.4 UI_SPEC v0.2 — `Space Grotesk 64–148px 700 -0.02em`)
-- [ ] Akzent-Demo: 4 Theme-Optionen sichtbar zelebriert (Claude-Design-Showcase-Stil)
-- [ ] Conditional Content:
-  - [ ] **Wizard durch** (`paired && provider_configured`): Nav-Cluster/Card-Grid zu Sparks/Tasks/Projects/Dashboard/Settings + Wert-Statement
-  - [ ] **Wizard nicht durch**: Prominenter „Wizard starten"-Button (Logik prüfen: Hauptseite nicht vom Wizard-Overlay verdeckt)
-- [ ] Android-Pendant in Compose (optional Phase, Lead-Entscheidung)
+- [x] Route `/home` als zusätzliche Nav-Seite (Dashboard bleibt Default-Landing)
+- [x] Hintergrund + Farbwahl aus `patch/` übernehmen (`--nx-bg` + Akzent-Tokens via `[data-accent]`) — Radial-Glow + Akzent-Gradient
+- [x] Display-Hero-Typo (§2.4 UI_SPEC v0.2 — `Space Grotesk clamp(64px, 12vw, 148px) 700 -0.02em`)
+- [x] Akzent-Demo: 4 Pills, geteilt mit Settings-Picker via `data-action="theme-accent-set"`
+- [x] Conditional Content:
+  - [x] **Wizard durch** → 5-Card-Nav-Cluster (Dashboard/Sparks/Tasks/Projects/Settings) + Wert-Statement
+  - [x] **Wizard nicht durch** → „Wizard starten"-CTA (im Normalfall nicht erreichbar, weil Overlay aktiv ist — defensive Logik)
+- [ ] Android-Pendant in Compose → **verschoben in Backlog** (S27 ist primär Desktop, Theme-Alias greift in nativem Compose nicht)
 
-### P2 / S27-B Theme-Voll-Effekt (Legacy-Token-Alias-Strategie)
+### P2 / S27-B Theme-Voll-Effekt (Legacy-Token-Alias-Strategie) ✅ code-done `8441cb8`
 
-- [ ] Legacy-Token-Map definieren: `--primary` → `--nx-accent`, `--primary-hover` → `--nx-accent-tint`, `--border` → `--nx-border`, ggf. weitere
-- [ ] Aliase in zentraler Token-Datei platzieren (so dass `[data-accent]`-Wechsel die Aliase ebenfalls mitführt)
-- [ ] Sicht-Check: Nav / Toolbar / Buttons / Filter-Pills reagieren auf Theme-Picker-Klick
-- [ ] Regression-Smoke: keine v0.2-Komponenten brechen, Status-Pills bleiben unverändert
+- [x] Legacy-Token-Map: `--bg`/`--bg-card`/`--bg-surface`/`--bg-input` → `--nx-bg`/`--nx-card`/`--nx-surface`; `--primary`/`--primary-tint` → `--nx-accent`/`--nx-accent-tint`; `--primary-hover` via `color-mix(--nx-accent 78%, --nx-text 22%)` (dark heller, light dunkler); `--text`/`--text-dim`/`--border` → `--nx-*`
+- [x] Aliase in `:root,[data-theme="dark"]`-Block platziert; Light-Theme erbt durch `--nx-*`-Theme-Overrides
+- [x] `--secondary`/`--success`/`--warning`/`--danger` bleiben hardcoded (Funktional-Akzente ohne Marken-Bindung)
+- [ ] Sicht-Check Nav / Toolbar / Buttons / Filter-Pills bei Theme-Wechsel (Admin-Smoke nach Tuvok-Gate)
 
-### P3 / S27-C Anschluss-Items + QS
+### P3 / S27-C Anschluss-Items + QS ✅ code-done `0dc5619`
 
-- [ ] HARDEN-1 — `--nx-bezel`-Token für `.nx-phone` (aus qs-20260519-S26-001)
-- [ ] HARDEN-2 — Theme-Picker-Swatches via CSS-Var statt Inline-Hex
-- [ ] Tuvok release-qs-Gate
-- [ ] FF-Merge → main nach Findings-Gate-Freigabe
+- [x] HARDEN-1 — `--nx-bezel: #000`-Token eingeführt, `.nx-phone` + `.nx-phone-notch` darauf umgestellt
+- [x] HARDEN-2 — Settings-Picker-Inline-Hex entfernt, `data-swatch="..."` Attribut; generische `[data-swatch]`-Rules greifen Hero-Pills + Settings-Picker konsistent
+- [x] Tuvok release-qs-Gate — `qs-20260519-S27-001` Status `auflagen`/`minor`, 1 Minor VC-S27-001-KON geheilt commit `cf15fde`
+- [ ] FF-Merge `sprint/s27-herocard-theme` → main (wartet auf Admin-Confirm)
 
 ## Erledigt: S26 — Komponenten-Vollmigration + Settings-UI
 

@@ -4,7 +4,7 @@
 
 ## Aktiver Sprint
 
-⏸ **Pause** — S24 Backend-Stack komplett: P1 Recon + P1.5 Backend-Gaps (GET/PUT `/projects/{id}`) code-done `a43278c`, Tuvok-Gate `qs-20260519-S24P1.5-001` freigabe (0 Findings). Branch `sprint/s24-projekte-crud` (HEAD `1c87ad2`, 4 Commits ab `af015b7`). **Offen für Wiederaufnahme:** P3 Frontend Desktop (Sheet/Modal-Flows mit S26-Komponenten) + Android Compose (4 fehlende Ktor-Methoden). DoD bereits in `todo.md` skizziert, P2-Spec-Block bei Wiederaufnahme optional.
+🚧 **S24 Projekte-CRUD** — Backend P1+P1.5 abgeschlossen (Tuvok `qs-20260519-S24P1.5-001` 0 Findings), **P2-Spec finalisiert** (Phasen-Skelett P3.1–P3.5 + UX-Flows + Komponenten-Mapping + P4-Test-Plan in `docs/todo.md`). Branch `sprint/s24-projekte-crud` (HEAD `52b77cf`, sync mit origin). **Wartet auf:** Admin-GO für P3-Start (plattform-parallel: Desktop P3.1–P3.3 + Android P3.4–P3.5). Default-Modus mit Lead-Autonomie für Standard-git-Ops + Auto-QS nach jeder Plattform-Phase ist empfohlen.
 
 ## Backlog (Sprint-Reihenfolge)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.

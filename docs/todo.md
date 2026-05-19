@@ -1,6 +1,6 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | 🚧 **S24 — Projekte-CRUD** eröffnet, Phase 1 (Backend-Recon) bei Belanna
+**Stand:** 2026-05-19 | 🚧 **S24 — Projekte-CRUD** P2-Spec finalisiert (Belanna), bereit für P3-Impl
 
 ## Aktiv: S24 — Projekte-CRUD (Desktop + Android Compose)
 
@@ -18,18 +18,78 @@
 - [ ] ~~Optional: `updated_at`-Migration~~ — bewusst weggelassen (Migration-Slots 20260519-21 belegt; Same-Day-Suffix `_002` nach Memory verboten; kein Notwert für Voll-CRUD). Backlog-Item falls Bedarf.
 - [x] Smoke-Test (curl) für beide Endpoints — 8/8 grün (incl. 404/400-Pfade)
 
-### P2 / S24-Spec — Sprint-Spec finalisieren (nach P1.5)
+### P2 / S24-Spec — Sprint-Spec finalisieren (nach P1.5) ✅ 2026-05-19
 
-- [ ] Phasen-Skelett basierend auf Recon-Befund
-- [ ] DoD klären: Liste, Sheet (Create), Edit-Sheet, Delete-Confirm — Desktop + Android Compose
+**Datenmodell-Konsens (vertraglich für P3):**
 
-### P3 / S24-Impl — Implementierung
+- Backend-Vertrag (P1.5-stand, unveränderlich für S24): Projekt = `{ id, name, description, created_at, status, nexus_external_id? }`. `nexus_external_id` ist readonly (nur Obsidian-Importer setzt). PUT-Body: `{ name, description, status }`. Validierung: leerer Name → 400, unbekannte ID → 404.
+- Status-Werte (S24-Konsens, **keine** DB-CHECK-Constraint — Frontend-Disziplin): `active` (Default) · `paused` · `archived`. Migration-Default ist `'active'` — kompatibel.
+- Android-Model `ProjectResponse` ist aktuell verkürzt (`id`/`name`/`created_at`) — muss um `description`/`status`/`nexus_external_id?` erweitert werden (P3.4).
 
-- [ ] (wird nach P2 spezifiziert)
+**Phasen-Skelett P3 (Reihenfolge + Abhängigkeiten):**
 
-### P4 / S24-QS — Tuvok release-qs-Gate
+| Phase | Output (1 Satz, was am Ende fertig ist) | Hängt an |
+|---|---|---|
+| **P3.1 Desktop Create-Sheet** | Inline-Quick-Add (`#projNewName` + Button-Row) ersetzt durch `nx-sheet` mit Feldern `name` (Pflicht) + `description` + `status`-Select; ausgelöst durch `+ Neues Projekt`-Button | — |
+| **P3.2 Desktop Edit-Sheet** | Neuer Edit-Button auf jeder Projekt-Card öffnet `nx-sheet` mit aus GET `/projects/{id}` befüllten Feldern, PUT speichert + refresht Card-Grid | P3.1 (Sheet-Shell wiederverwendbar) |
+| **P3.3 Desktop Status-Render + Delete-Polish** | Status-Pill auf jeder Card (Token aus S26 Status-Pill); Delete-Confirm vom Browser-`confirm()` auf gemeinsame `nx-confirm`-Komponente migriert (oder bewusst minimal — Entscheidung im Code) | P3.2 |
+| **P3.4 Android Ktor-Methoden + Model** | `NexusApiClient` um 4 Methoden erweitert (`createProject`/`getProject`/`updateProject`/`deleteProject`) und `ProjectResponse` um `description`/`status`/`nexus_external_id?` ergänzt | — (parallel zu P3.1/2/3) |
+| **P3.5 Android Create/Edit/Delete-Dialogs (Compose)** | `ProjectsScreen` erweitert um FAB → `ProjectCreateDialog`, Edit-Action im `ProjectCard` → `ProjectEditDialog`, Delete-Confirm-`AlertDialog` (Material3, Vorbild: `TaskCreateDialog.kt`) | P3.4 |
 
-- [ ] Tuvok release-qs nach Code-Done
+P3.1–P3.3 (Desktop) und P3.4–P3.5 (Android) sind plattform-unabhängig parallelisierbar; innerhalb der Plattform sequenziell.
+
+**UX-Flows (DoD pro Flow):**
+
+1. **Projekt-Liste**
+   - Desktop: bestehendes Card-Grid bleibt, Card erhält Status-Pill + Edit-Button (zusätzlich zum Delete-`×`). Ideen-Sektion drunter unverändert.
+   - Android: bestehende `LazyColumn` mit `ProjectCard`, FAB unten rechts für „+ Neu", Card erhält Tap-für-Edit + Long-Press-für-Delete (oder explizite Buttons — Entscheidung in P3.5).
+2. **Create-Flow**
+   - Desktop: Button → `nx-sheet` öffnet → Felder `name*`, `description`, `status`-Select (active/paused/archived, Default `active`) → „Erstellen" → POST `/projects` → Sheet schließt → `refreshProjects()`.
+   - Android: FAB → `ProjectCreateDialog` mit denselben drei Feldern → Material3 `Button("Erstellen")` → `apiClient.createProject(...)` → `loadData()`.
+3. **Edit-Flow**
+   - Desktop: Edit-Button auf Card → GET `/projects/{id}` (oder Daten aus `projects`-State) → `nx-sheet` mit befüllten Feldern → „Speichern" → PUT → Sheet schließt → Card refresht.
+   - Android: Card-Tap → GET → `ProjectEditDialog` → PUT → `loadData()`.
+4. **Delete-Confirm**
+   - Desktop: Bestehender `confirm()`-Pfad bleibt funktional; falls Zeit/Bedarf → Migration auf gemeinsame Modal-Komponente. **DoD-Minimum:** kein versehentliches Löschen, Tasks bleiben (Cascade-`UPDATE tasks SET project_id = NULL` ist bereits backend-seitig live).
+   - Android: Material3 `AlertDialog` mit „Projekt löschen? Tasks bleiben erhalten." → DELETE → `loadData()`.
+
+**Komponenten-Mapping:**
+
+| Element | Desktop (S26) | Android (Material3) |
+|---|---|---|
+| Bottom-Sheet / Modal | `nx-sheet` (S26-P3 Komponenten-Layer) | `ModalBottomSheet` oder `AlertDialog` (Vorbild `TaskCreateDialog.kt`) |
+| Form-Row | `nx-settings-row` (Label + Input/Select) | `OutlinedTextField` + `ExposedDropdownMenuBox` für Status |
+| Status-Pill | S26 Status-Pill mit `--nx-*`-Tokens und `[data-status]`-Attribut | `AssistChip`/`Surface` mit Material3-Tonal-Färbung |
+| Confirm | `confirm()` bleibt (Minimum) / `nx-confirm` (Stretch) | `AlertDialog` mit Confirm/Dismiss-Button |
+
+**P3-Out-of-Scope (bewusst, S24-Ziele rein):** Reorder, Owner-Feld, `updated_at`-Anzeige, Bulk-Operations, Filter/Sort der Liste, Live-Update über WS, Confirm-Stretch-Komponente (`nx-confirm` ist „nice-to-have").
+
+### P3 / S24-Impl — Implementierung (siehe P2-Phasen-Skelett)
+
+- [ ] **P3.1 Desktop Create-Sheet** — `nx-sheet` für POST `/projects`
+- [ ] **P3.2 Desktop Edit-Sheet** — `nx-sheet` für PUT `/projects/{id}` mit GET-Befüllung
+- [ ] **P3.3 Desktop Status-Pill + Delete-Polish** — Status-Pill auf Card; Delete-Confirm-Migration optional
+- [ ] **P3.4 Android Ktor + Model** — 4 Methoden + `ProjectResponse`-Erweiterung
+- [ ] **P3.5 Android Compose-Dialogs** — Create/Edit/Delete-Flow analog `TaskCreateDialog.kt`
+
+### P4 / S24-QS — Tuvok release-qs-Gate (Test-Plan-Skizze)
+
+Tuvok prüft nach P3-Code-Done:
+
+- **Backend (kein neuer Code):** Smoke gegen alle 5 Endpoints (POST/GET-List/GET-Single/PUT/DELETE) — Bestätigung dass P1.5-Stand unverändert grün, leerer Name → 400, unbekannte ID → 404.
+- **Desktop:**
+  - Create-Sheet öffnet/schließt sauber, leerer Name disabled/abgelehnt, alle drei Felder werden gesendet
+  - Edit-Sheet GET-befüllt korrekt, PUT speichert, Card refresht (kein Stale-Render)
+  - Status-Pill rendert für alle drei Status-Werte, Token-Konformität (`--nx-*`)
+  - Delete-Confirm: kein versehentliches Löschen, Tasks behalten ihre Einträge (mit `project_id = NULL` im DOM/Liste)
+- **Android:**
+  - `ProjectCreateDialog` öffnet via FAB, sendet, Liste refresht
+  - `ProjectEditDialog` GET-befüllt, sendet PUT, Liste refresht
+  - Delete-Dialog mit Confirm/Dismiss, kein Crash
+  - Pairing-Pfad weiter intakt (`!isPaired` → „Zuerst koppeln")
+  - `flutter`-Pendant existiert nicht → Compose-`@Preview` reicht als Smoke
+- **Cross-Platform-Sync:** Desktop ändert Status → Android Pull-to-Refresh sieht neuen Status (manueller Smoke).
+- **Regression:** S26-Komponenten-Layer (`nx-sheet`/`nx-settings-row`) durch S24-Nutzung nicht gebrochen — andere Sheet-Aufrufstellen weiter grün.
 
 ## Erledigt: S27 — Herocard-Startbildschirm + Theme-Voll-Effekt
 

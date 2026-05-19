@@ -128,15 +128,16 @@ Tuvok prüft nach P3-Code-Done:
 - [x] **Hotfix S26-001** — Settings-Modal scrollable (commit `51cf2fd`, qs-20260519-S26-002 freigabe)
 - [x] **FF-Merge** `sprint/s26-komponenten-vollmigration` → `main` (commit `460e31a`)
 
-## Backlog (in Reihenfolge nach S27-Merge)
+## Backlog
 
-- [x] **S28-Android-Projekte** — abgeschlossen 2026-05-19 (FF-Merge), siehe „Erledigt (jüngst)"
-- [x] **S29-Token-Migration** (ehem. S27-Followup) — abgeschlossen 2026-05-19, siehe „Erledigt (jüngst)"
-- [ ] **S26-P6 / S25-SMOKE-3 (verschoben)** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser, eigene Spur, niedrige Prio)
-- [ ] **Charts (Out-of-Scope S26)** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` SVG-Komponenten on-demand
+_(Synchron mit state.md → "Backlog (eigene Spuren, on-demand)". Single Source dort.)_
+
+- [ ] **S26-P6 / S25-SMOKE-3** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser, niedrige Prio)
+- [ ] **Charts** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` SVG-Komponenten on-demand
 - [ ] **Backlog-N1** — Bottom-Nav-Badge mit Unsorted-Spark-Count (UI_SPEC §4.9, qs-20260517-002)
 - [ ] **Backlog-N2** — Smoke-Test auf physischem Pixel-Gerät (Compose-Side aus NV-5)
-- [ ] **Backlog-Refactor** — `desktop/src/styles/`-Auslagerung (optional, eigene Spur)
+- [ ] **Backlog-Refactor** — `desktop/src/styles/`-Auslagerung (optional)
+- [ ] **S24-Delete-Polish** — `nx-confirm`-Komponente statt Browser-`confirm()` (S24-P3.3 out-of-scope)
 
 ## Erledigt (jüngst)
 

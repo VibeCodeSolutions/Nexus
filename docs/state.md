@@ -4,7 +4,7 @@
 
 ## Aktiver Sprint
 
-🚧 **Multi-Sprint-Lauf** — S28 ✅, S29 ✅ gemerged → Cleanup läuft → S30-SMOKE.
+🚧 **S30-SMOKE** — Smoke-Test mit leerer DB nach S28+S29-Merge. Spec in `docs/sprints/s30-smoke.md`. **Wartet auf Admin-Smoke-Lauf.** Findings landen in `docs/QS_FINDINGS.md`, ggf. S30-FIX-Sprint hinterher. Nach Findings-Triage → Sprint-Closure oder Hotfix-Branch.
 
 ## Backlog (eigene Spuren, on-demand)
 

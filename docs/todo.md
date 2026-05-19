@@ -1,6 +1,6 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | 🚧 **S24 — Projekte-CRUD** P3.1 ✅ (Desktop Create-Sheet, Tuvok grün), P3.2 läuft (Desktop Edit-Sheet)
+**Stand:** 2026-05-19 | 🚧 **S24 — Projekte-CRUD** P3.1+P3.2 ✅ Desktop Create+Edit (beide Tuvok grün), P3.3 startet (Status-Pill + Delete-Polish)
 
 ## Aktiv: S24 — Projekte-CRUD (Desktop + Android Compose)
 
@@ -67,7 +67,7 @@ P3.1–P3.3 (Desktop) und P3.4–P3.5 (Android) sind plattform-unabhängig paral
 ### P3 / S24-Impl — Implementierung (siehe P2-Phasen-Skelett)
 
 - [x] **P3.1 Desktop Create-Sheet** — `nx-sheet` für POST `/projects` · code-done `e1fb455` · Tuvok `qs-20260519-S24P3.1-001` freigabe/none (0 Findings) · POST→PUT-Brücke für status (Backend `CreateProjectRequest` ohne status-Feld)
-- [ ] **P3.2 Desktop Edit-Sheet** — `nx-sheet` für PUT `/projects/{id}` mit GET-Befüllung
+- [x] **P3.2 Desktop Edit-Sheet** — `nx-sheet` via `data-mode`-Branch · code-done `e77b705` · Tuvok `qs-20260519-S24P3.2-001` freigabe/none (alle 9 DoD)
 - [ ] **P3.3 Desktop Status-Pill + Delete-Polish** — Status-Pill auf Card; Delete-Confirm-Migration optional
 - [ ] **P3.4 Android Ktor + Model** — 4 Methoden + `ProjectResponse`-Erweiterung
 - [ ] **P3.5 Android Compose-Dialogs** — Create/Edit/Delete-Flow analog `TaskCreateDialog.kt`

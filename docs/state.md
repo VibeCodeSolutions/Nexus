@@ -4,7 +4,7 @@
 
 ## Aktiver Sprint
 
-🚧 **S24 Projekte-CRUD** — Backend P1+P1.5 ✅, P2-Spec ✅, **P3.1 Desktop Create-Sheet ✅** (commit `e1fb455`, Tuvok `qs-20260519-S24P3.1-001` freigabe/none 0 Findings). Branch `sprint/s24-projekte-crud` (HEAD `e1fb455`). Auto-Continuation läuft: **P3.2 Desktop Edit-Sheet** als nächstes, danach P3.3 Status-Pill + Delete-Polish, dann Android P3.4 Ktor/Model + P3.5 Compose-Dialogs.
+🚧 **S24 Projekte-CRUD** — Backend P1+P1.5 ✅, P2-Spec ✅, **P3.1 Create-Sheet ✅** (`e1fb455`, Tuvok `qs-20260519-S24P3.1-001`), **P3.2 Edit-Sheet ✅** (`e77b705`, Tuvok `qs-20260519-S24P3.2-001`). Branch HEAD `e77b705`. Auto-Continuation läuft: **P3.3 Status-Pill + Delete-Polish** startet, danach Android P3.4 Ktor/Model + P3.5 Compose-Dialogs.
 
 ## Backlog (Sprint-Reihenfolge)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.

@@ -37,6 +37,7 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
@@ -322,7 +323,10 @@ class NexusApiClient(private val settings: ConnectionSettings) {
     }
 
     suspend fun setUserPref(key: String, value: String): Result<Unit> = authedRequest {
-        client.post("$baseUrl/api/user_prefs/$key") {
+        // VC-013-MIN-1: Key URL-encoden, damit künftige Keys mit Sonderzeichen
+        // (Slash, Leerzeichen, Unicode) den Pfad nicht brechen. value wandert
+        // serialisiert in den JSON-Body und braucht keine Path-Encoding.
+        client.post("$baseUrl/api/user_prefs/${key.encodeURLPathPart()}") {
             contentType(ContentType.Application.Json)
             bearerAuth(token!!)
             setBody(mapOf("value" to value))

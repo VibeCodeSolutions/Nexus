@@ -653,6 +653,40 @@ pub async fn delete_project(
     Ok(Json(json!({"deleted": id})))
 }
 
+pub async fn get_project(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match repo::get_project_by_id(&state.pool, &id).await {
+        Ok(Some(project)) => Ok(Json(json!(project))),
+        Ok(None) => Err((StatusCode::NOT_FOUND, Json(json!({"error": "Projekt nicht gefunden"})))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UpdateProjectRequest {
+    pub name: String,
+    pub description: String,
+    pub status: String,
+}
+
+pub async fn update_project(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateProjectRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if payload.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Projektname darf nicht leer sein"}))));
+    }
+
+    match repo::update_project(&state.pool, &id, &payload.name, &payload.description, &payload.status).await {
+        Ok(Some(project)) => Ok(Json(json!(project))),
+        Ok(None) => Err((StatusCode::NOT_FOUND, Json(json!({"error": "Projekt nicht gefunden"})))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))),
+    }
+}
+
 pub async fn get_project_sparks(
     State(state): State<AppState>,
     Path(id): Path<String>,

@@ -186,6 +186,8 @@ async fn main() {
                 .route("/projects/suggest", post(handlers::suggest_projects))
                 .route("/projects", post(handlers::create_project))
                 .route("/projects", get(handlers::list_projects))
+                .route("/projects/{id}", get(handlers::get_project))
+                .route("/projects/{id}", put(handlers::update_project))
                 .route("/projects/{id}", delete(handlers::delete_project))
                 .route("/projects/{id}/sparks", get(handlers::get_project_sparks))
                 .route("/projects/{id}/progress", get(handlers::get_project_progress))

@@ -184,6 +184,47 @@ pub async fn delete_project(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Err
     Ok(())
 }
 
+pub async fn get_project_by_id(pool: &SqlitePool, id: &str) -> Result<Option<Project>, sqlx::Error> {
+    sqlx::query_as::<_, Project>(
+        "SELECT id, name, description, created_at, status, nexus_external_id \
+         FROM projects WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn update_project(
+    pool: &SqlitePool,
+    id: &str,
+    name: &str,
+    description: &str,
+    status: &str,
+) -> Result<Option<Project>, sqlx::Error> {
+    let rows = sqlx::query(
+        "UPDATE projects SET name = ?, description = ?, status = ? WHERE id = ?",
+    )
+    .bind(name)
+    .bind(description)
+    .bind(status)
+    .bind(id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    if rows == 0 {
+        return Ok(None);
+    }
+
+    sqlx::query_as::<_, Project>(
+        "SELECT id, name, description, created_at, status, nexus_external_id \
+         FROM projects WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
 /// Gibt alle Sparks mit category='Idea' zurück, inkl. ihrem verknüpften project_id (oder NULL).
 pub async fn list_ideas_with_project(pool: &SqlitePool) -> Result<Vec<(SparkEntry, Option<String>)>, sqlx::Error> {
     let rows = sqlx::query(

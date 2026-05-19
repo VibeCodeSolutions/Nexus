@@ -4,7 +4,7 @@
 
 ## Aktiver Sprint
 
-🚧 **S24 — Projekte-CRUD** auf Branch `sprint/s24-projekte-crud`. Scope: Voll-CRUD (Liste+Create+Edit+Delete) auf Desktop **und** Android Compose, nutzt S26-Komponenten (`nx-sheet`, `nx-phone`, `nx-settings-row`). Phase 1 = Backend-Recon (Belanna prüft Core-Endpoints, meldet Gap-Liste), danach Sprint-Spec finalisieren.
+⏸ **Pause** — S24 Backend-Stack komplett: P1 Recon + P1.5 Backend-Gaps (GET/PUT `/projects/{id}`) code-done `a43278c`, Tuvok-Gate `qs-20260519-S24P1.5-001` freigabe (0 Findings). Branch `sprint/s24-projekte-crud` (HEAD `1c87ad2`, 4 Commits ab `af015b7`). **Offen für Wiederaufnahme:** P3 Frontend Desktop (Sheet/Modal-Flows mit S26-Komponenten) + Android Compose (4 fehlende Ktor-Methoden). DoD bereits in `todo.md` skizziert, P2-Spec-Block bei Wiederaufnahme optional.
 
 ## Backlog (Sprint-Reihenfolge)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.

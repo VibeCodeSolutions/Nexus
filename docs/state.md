@@ -4,17 +4,20 @@
 
 ## Aktiver Sprint
 
-⏸ **Pause** — S26 gemerged (`460e31a` auf main), S27 spezifiziert, Admin im Break.
+🚧 **S27 — Herocard-Startbildschirm + Theme-Voll-Effekt** (Branch `sprint/s27-herocard-theme`, eröffnet 2026-05-19)
+
+- **S27-A Herocard** — eigene Route `/home` (Dashboard bleibt Landing), Akzent-Demo aus `patch/`, „Quiet Machine. Electric Pulse."-Aesthetic mit Display-Hero-Typo (§2.4). Mit Wizard-durch: Nav-Cluster zu Sparks/Tasks/Projects/Dashboard/Settings. Ohne Wizard: prominenter „Wizard starten"-Button.
+- **S27-B Theme-Voll-Effekt** — Strategie: **Legacy-Token-Alias**. `--primary`/`--primary-hover`/`--border`/etc. als Aliase auf die `--nx-*`-Variants mappen. Schnell, App-weit wirksam, niedriges Regressionsrisiko. Bulk-Migration bleibt als Backlog-Spur offen.
+- **S27-C Anschluss-Items** — HARDEN-1 `--nx-bezel`-Token für `.nx-phone`, HARDEN-2 Theme-Picker-Swatches via CSS-Var statt Inline-Hex.
+
+Default-Modus aktiv: FF nach Tuvok-grün, Recovery max 2 Patterns, Force-Ops Admin-Confirm.
 
 ## Backlog (Sprint-Reihenfolge)
 
-1. **S27 — Herocard-Startbildschirm + Theme-Voll-Effekt** (Admin-Briefing 2026-05-19, nächster Sprint nach S26-Merge)
-   - **S27-A Herocard als Startbildschirm:** Hauptseite, Hintergrund + Farbwahl aus `patch/` (`--nx-bg` + Akzent-Tokens), „Quiet Machine. Electric Pulse."-Aesthetic. Mit Wizard-durch: Links zu allen Seiten + Display-Hero-Typo. Ohne Wizard: prominenter „Wizard starten"-Button. Akzent-Demo wie im Claude-Design-Showcase.
-   - **S27-B Theme-Voll-Effekt (aus S26-002):** Theme-Picker-Klick muss App-weit wirken. Strategie offen: Legacy-Token-Alias auf `--nx-*` ODER Bulk-UI-Migration (Nav/Toolbar/Buttons/Filter-Pills). Trade-off im Sprint-Plan.
-   - **S27-C Anschluss-Items:** HARDEN-1 `--nx-bezel`-Token, HARDEN-2 Theme-Picker-Swatches via CSS-Var, beides aus qs-20260519-S26-001.
-2. **S24 — Projekte-CRUD** (kommt nach S27)
+1. **S24 — Projekte-CRUD** (kommt nach S27)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.
-3. **Sprint-Backlog (eigene Spuren, on-demand):**
+2. **Sprint-Backlog (eigene Spuren, on-demand):**
+   - **S27-Followup Bulk-UI-Migration** — Nav/Toolbar/Buttons/Filter-Pills direkt auf `--nx-*`-Tokens umstellen (saubere Alternative zum S27-B-Alias).
    - **S25-SMOKE-3 / S26-P6** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser). UX-Feature mit Backend-Touch.
    - **Charts** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` (SVG-Komponenten aus UI_SPEC_v0.2 §3.3) on-demand, wenn ein Use-Case sie braucht.
 

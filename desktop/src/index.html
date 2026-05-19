@@ -2138,14 +2138,6 @@ button.task-checkbox:hover { border-color: var(--primary); }
     <button class="btn btn-primary" data-action="proj-new">+ Neues Projekt</button>
     <button class="btn btn-ghost btn-sm" data-action="proj-refresh">Aktualisieren</button>
   </div>
-  <div class="bd-quick-create hidden" id="projQuickCreate">
-    <input type="text" id="projNewName" class="bd-search" placeholder="Projektname…" maxlength="120">
-    <textarea id="projNewDesc" class="proj-desc-input" placeholder="Beschreibung (optional)" rows="2"></textarea>
-    <div class="bd-quick-footer">
-      <button class="btn btn-ghost btn-sm" data-action="proj-quick-cancel">Abbrechen</button>
-      <button class="btn btn-primary" data-action="proj-quick-submit">Erstellen</button>
-    </div>
-  </div>
   <div id="suggestionsBanner" class="banner suggestion hidden"></div>
   <div class="card-grid" id="projectCards"></div>
 </section>
@@ -2847,32 +2839,76 @@ async function renderProjects() {
   applyProgressWidths(container);
 }
 
+// S24-P3.1 Project Sheet — Create-Flow (P3.2 erweitert um Edit-Modus)
+function setProjSheetStage(stage) {
+  const sheet = document.getElementById('projSheet');
+  const dim = document.getElementById('projSheetDim');
+  if (!sheet) return;
+  sheet.dataset.stage = stage;
+  const open = (stage === 'mid' || stage === 'full');
+  sheet.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (dim) dim.setAttribute('aria-hidden', open ? 'false' : 'true');
+}
+
+function updateProjSheetSubmitState() {
+  const name = (document.getElementById('projSheetName')?.value || '').trim();
+  const btn = document.getElementById('projSheetSubmit');
+  if (btn) btn.disabled = !name;
+}
+
 function openNewProject() {
-  const box = document.getElementById('projQuickCreate');
-  if (!box) return;
-  box.classList.remove('hidden');
-  document.getElementById('projNewName')?.focus();
+  const sheet = document.getElementById('projSheet');
+  if (!sheet) return;
+  sheet.dataset.mode = 'create';
+  const header = document.getElementById('projSheetHeader');
+  if (header) header.textContent = 'Neues Projekt';
+  const submit = document.getElementById('projSheetSubmit');
+  if (submit) submit.textContent = 'Erstellen';
+  const name = document.getElementById('projSheetName');
+  const desc = document.getElementById('projSheetDesc');
+  const status = document.getElementById('projSheetStatus');
+  if (name) name.value = '';
+  if (desc) desc.value = '';
+  if (status) status.value = 'active';
+  updateProjSheetSubmitState();
+  setProjSheetStage('full');
+  setTimeout(() => name?.focus(), 50);
 }
 
 function closeNewProject() {
-  const box = document.getElementById('projQuickCreate');
-  if (!box) return;
-  box.classList.add('hidden');
-  const name = document.getElementById('projNewName');
-  const desc = document.getElementById('projNewDesc');
+  setProjSheetStage('peek');
+  const name = document.getElementById('projSheetName');
+  const desc = document.getElementById('projSheetDesc');
+  const status = document.getElementById('projSheetStatus');
   if (name) name.value = '';
   if (desc) desc.value = '';
+  if (status) status.value = 'active';
 }
 
 async function submitNewProject() {
-  const name = (document.getElementById('projNewName')?.value || '').trim();
-  const desc = (document.getElementById('projNewDesc')?.value || '').trim();
-  if (!name) { document.getElementById('projNewName')?.focus(); return; }
+  const name = (document.getElementById('projSheetName')?.value || '').trim();
+  const desc = (document.getElementById('projSheetDesc')?.value || '').trim();
+  const status = document.getElementById('projSheetStatus')?.value || 'active';
+  if (!name) { document.getElementById('projSheetName')?.focus(); return; }
+  const submit = document.getElementById('projSheetSubmit');
+  if (submit) { submit.disabled = true; submit.textContent = 'Erstelle…'; }
   try {
-    await api('/projects', { method: 'POST', body: JSON.stringify({ name, description: desc, spark_ids: [] }) });
+    // Backend `CreateProjectRequest` kennt aktuell kein `status` (P1.5 hat nur GET/PUT erweitert).
+    // Bei abweichendem Status: POST mit Default `active`, dann PUT zum Setzen — kein Backend-Change in P3.1.
+    const created = await api('/projects', { method: 'POST', body: JSON.stringify({ name, description: desc, spark_ids: [] }) });
+    if (status !== 'active' && created?.id) {
+      await api(`/projects/${encodeURIComponent(created.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, description: desc, status })
+      });
+    }
     closeNewProject();
     refreshProjects();
-  } catch (e) { alert('Fehler: ' + e.message); }
+  } catch (e) {
+    alert('Fehler: ' + e.message);
+  } finally {
+    if (submit) { submit.textContent = 'Erstellen'; updateProjSheetSubmitState(); }
+  }
 }
 
 async function deleteProject(id) {
@@ -4394,8 +4430,24 @@ document.addEventListener('keydown', (e) => {
     if (currentBdDetailId) { closeSparkDetail(); return; }
     const photoSheet = document.getElementById('bdPhotoCreate');
     if (photoSheet && !photoSheet.classList.contains('hidden')) { closePhotoCreate(); return; }
+    const projSheet = document.getElementById('projSheet');
+    if (projSheet && projSheet.dataset.stage !== 'peek') { closeNewProject(); return; }
     closeQuickCreate();
     closeNewTask();
+  }
+});
+
+// S24-P3.1 Project-Sheet — Submit-Button-Enable abhängig von Name-Feld + Enter-Submit auf Name
+document.addEventListener('DOMContentLoaded', () => {
+  const name = document.getElementById('projSheetName');
+  if (name) {
+    name.addEventListener('input', updateProjSheetSubmitState);
+    name.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!document.getElementById('projSheetSubmit')?.disabled) submitNewProject();
+      }
+    });
   }
 });
 
@@ -4448,8 +4500,8 @@ document.addEventListener('click', (e) => {
       navigate('sparks');
       break;
     case 'proj-new': openNewProject(); break;
-    case 'proj-quick-cancel': closeNewProject(); break;
-    case 'proj-quick-submit': submitNewProject(); break;
+    case 'proj-sheet-cancel': closeNewProject(); break;
+    case 'proj-sheet-submit': submitNewProject(); break;
     case 'proj-refresh': refreshProjects(); break;
     case 'proj-delete': deleteProject(el.dataset.projId); break;
     case 'task-new': openNewTask(); break;
@@ -4537,6 +4589,50 @@ function applyProgressWidths(root) {
 <footer class="app-footer">
   Powered by <strong>VibeCode Solutions</strong> · NEXUS v0.1.3
 </footer>
+
+  <!-- S24-P3.1 Project Sheet (nx-sheet) — Create-Flow; P3.2 erweitert um Edit-Modus -->
+  <aside id="projSheet" class="nx-sheet" data-stage="peek" data-mode="create" aria-hidden="true" aria-labelledby="projSheetHeader" role="dialog">
+    <div class="nx-sheet-handle"></div>
+    <h2 id="projSheetHeader" class="nx-sheet-header">Neues Projekt</h2>
+    <div class="nx-sheet-body">
+      <div class="nx-settings-row">
+        <div class="nx-settings-meta">
+          <strong class="nx-settings-label">Name</strong>
+          <small class="nx-settings-sub">Pflichtfeld, max. 120 Zeichen.</small>
+        </div>
+        <div class="nx-settings-control" style="flex: 1; max-width: 280px;">
+          <input type="text" id="projSheetName" class="bd-search" placeholder="Projektname" maxlength="120" autocomplete="off" style="width: 100%;">
+        </div>
+      </div>
+      <div class="nx-settings-row">
+        <div class="nx-settings-meta">
+          <strong class="nx-settings-label">Beschreibung</strong>
+          <small class="nx-settings-sub">Optional — kurze Notiz zum Projekt.</small>
+        </div>
+        <div class="nx-settings-control" style="flex: 1; max-width: 280px;">
+          <textarea id="projSheetDesc" class="proj-desc-input" placeholder="Beschreibung" rows="2" style="width: 100%;"></textarea>
+        </div>
+      </div>
+      <div class="nx-settings-row">
+        <div class="nx-settings-meta">
+          <strong class="nx-settings-label">Status</strong>
+          <small class="nx-settings-sub">Standard: aktiv.</small>
+        </div>
+        <div class="nx-settings-control">
+          <select id="projSheetStatus" class="task-select">
+            <option value="active">aktiv</option>
+            <option value="paused">pausiert</option>
+            <option value="archived">archiviert</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions mt-16" style="display: flex; justify-content: flex-end; gap: var(--nx-sp-3);">
+        <button class="btn btn-ghost" data-action="proj-sheet-cancel">Abbrechen</button>
+        <button class="btn btn-primary" id="projSheetSubmit" data-action="proj-sheet-submit" disabled>Erstellen</button>
+      </div>
+    </div>
+  </aside>
+  <div id="projSheetDim" class="nx-sheet-dim" data-action="proj-sheet-cancel" aria-hidden="true"></div>
 
 </div><!-- /.app-shell -->
 </body>

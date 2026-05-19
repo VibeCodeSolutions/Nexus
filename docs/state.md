@@ -4,7 +4,7 @@
 
 ## Aktiver Sprint
 
-🚧 **S24 Projekte-CRUD** — Backend P1+P1.5 abgeschlossen (Tuvok `qs-20260519-S24P1.5-001` 0 Findings), **P2-Spec finalisiert** (Phasen-Skelett P3.1–P3.5 + UX-Flows + Komponenten-Mapping + P4-Test-Plan in `docs/todo.md`). Branch `sprint/s24-projekte-crud` (HEAD `52b77cf`, sync mit origin). **Wartet auf:** Admin-GO für P3-Start (plattform-parallel: Desktop P3.1–P3.3 + Android P3.4–P3.5). Default-Modus mit Lead-Autonomie für Standard-git-Ops + Auto-QS nach jeder Plattform-Phase ist empfohlen.
+🚧 **S24 Projekte-CRUD** — Backend P1+P1.5 ✅, P2-Spec ✅, **P3.1 Desktop Create-Sheet ✅** (commit `e1fb455`, Tuvok `qs-20260519-S24P3.1-001` freigabe/none 0 Findings). Branch `sprint/s24-projekte-crud` (HEAD `e1fb455`). Auto-Continuation läuft: **P3.2 Desktop Edit-Sheet** als nächstes, danach P3.3 Status-Pill + Delete-Polish, dann Android P3.4 Ktor/Model + P3.5 Compose-Dialogs.
 
 ## Backlog (Sprint-Reihenfolge)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.

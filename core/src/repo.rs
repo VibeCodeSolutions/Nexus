@@ -164,6 +164,43 @@ pub async fn list_projects(pool: &SqlitePool) -> Result<Vec<Project>, sqlx::Erro
         .await
 }
 
+/// N-010-PER: Projekte plus Task-Aggregate in einem Roundtrip. Ein LEFT JOIN
+/// + GROUP BY spart `ProjectsScreen` die N+1-Schleife über `get_project_progress`.
+/// Bei Projekten ohne Tasks liefert die Aggregation 0/0.
+pub async fn list_projects_with_progress(
+    pool: &SqlitePool,
+) -> Result<Vec<(Project, i64, i64)>, sqlx::Error> {
+    use sqlx::Row;
+
+    let rows = sqlx::query(
+        "SELECT p.id, p.name, p.description, p.created_at, p.status, p.nexus_external_id, \
+         COALESCE(COUNT(t.id), 0) AS total_tasks, \
+         COALESCE(SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END), 0) AS done_tasks \
+         FROM projects p \
+         LEFT JOIN tasks t ON t.project_id = p.id \
+         GROUP BY p.id \
+         ORDER BY p.created_at DESC",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut result = Vec::with_capacity(rows.len());
+    for row in rows {
+        let project = Project {
+            id: row.get("id"),
+            name: row.get("name"),
+            description: row.get("description"),
+            created_at: row.get("created_at"),
+            status: row.get("status"),
+            nexus_external_id: row.try_get("nexus_external_id").ok(),
+        };
+        let total: i64 = row.get("total_tasks");
+        let done: i64 = row.get("done_tasks");
+        result.push((project, total, done));
+    }
+    Ok(result)
+}
+
 pub async fn delete_project(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE tasks SET project_id = NULL WHERE project_id = ?")

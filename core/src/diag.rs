@@ -223,6 +223,12 @@ pub async fn run_core_diagnostics(state: &AppState) -> DiagReport {
             let has_oauth = crate::keystore::get_oauth(&default).is_ok();
             if has_oauth {
                 Ok((DiagStatus::Pass, Some(format!("{} (oauth)", default))))
+            } else if default == "ollama" {
+                // Ollama braucht keinen API-Key. Modellname aus Keystore (oder
+                // Default qwen2.5:3b) ist die aussagekräftige Info.
+                let model = crate::keystore::get_model("ollama")
+                    .unwrap_or_else(|| "qwen2.5:3b".to_string());
+                Ok((DiagStatus::Pass, Some(format!("ollama (model={})", model))))
             } else if has_key {
                 Ok((DiagStatus::Pass, Some(format!("{} (api_key)", default))))
             } else {

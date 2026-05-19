@@ -91,6 +91,9 @@ pub fn set_key(provider: &str, value: &str) -> Result<(), String> {
             VALID_PROVIDERS.join(", ")
         ));
     }
+    if value.trim().is_empty() {
+        return Err("Key darf nicht leer sein".into());
+    }
     let mut store = load();
     store.keys.insert(provider.to_string(), value.to_string());
     save(&store)
@@ -245,5 +248,17 @@ mod tests {
     fn unknown_provider_rejected() {
         assert!(!is_acceptable_default("definitely-not-a-provider"));
         assert!(!is_acceptable_default(""));
+    }
+
+    #[test]
+    fn set_key_rejects_empty_value() {
+        // N-005-COD: Leerer Key (auch nach Trim) muss abgelehnt werden,
+        // damit kein silent-overwrite passiert. Korrespondiert zu set_model,
+        // wo die gleiche Validierung schon existiert.
+        let err = set_key("openai", "").unwrap_err();
+        assert!(err.contains("leer"), "expected empty-value error, got: {err}");
+
+        let err = set_key("openai", "   ").unwrap_err();
+        assert!(err.contains("leer"), "expected whitespace-only error, got: {err}");
     }
 }

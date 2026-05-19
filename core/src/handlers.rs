@@ -632,14 +632,51 @@ pub async fn create_project(
     Ok(Json(json!(project)))
 }
 
+#[derive(Deserialize, Default)]
+pub struct ListProjectsQuery {
+    /// N-010-PER: bei `true` liefert der Endpoint zusätzlich pro Projekt ein
+    /// `progress`-Sub-Objekt mit Task-Aggregaten, sodass Clients keine zweite
+    /// Roundtrip-Schleife mehr brauchen. Default false → Backwards-Compat.
+    #[serde(default)]
+    pub include_progress: bool,
+}
+
 pub async fn list_projects(
     State(state): State<AppState>,
+    Query(params): Query<ListProjectsQuery>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let projects = repo::list_projects(&state.pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    if params.include_progress {
+        let entries = repo::list_projects_with_progress(&state.pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
-    Ok(Json(json!(projects)))
+        let payload: Vec<Value> = entries
+            .into_iter()
+            .map(|(p, total, done)| {
+                let percent = if total > 0 { (done * 100) / total } else { 0 };
+                let mut obj = serde_json::to_value(&p).unwrap_or_else(|_| json!({}));
+                if let Some(map) = obj.as_object_mut() {
+                    map.insert(
+                        "progress".to_string(),
+                        json!({
+                            "total_tasks": total,
+                            "done_tasks": done,
+                            "progress_percent": percent,
+                        }),
+                    );
+                }
+                obj
+            })
+            .collect();
+
+        Ok(Json(Value::Array(payload)))
+    } else {
+        let projects = repo::list_projects(&state.pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+        Ok(Json(json!(projects)))
+    }
 }
 
 pub async fn delete_project(

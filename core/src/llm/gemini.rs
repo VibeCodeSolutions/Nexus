@@ -75,10 +75,9 @@ impl LlmProvider for GeminiProvider {
             }],
         };
 
-        let url = format!("{}?key={}", gemini_url(), self.api_key);
-
         let response = self.client
-            .post(&url)
+            .post(gemini_url())
+            .header("X-Goog-Api-Key", &self.api_key)
             .json(&request)
             .send()
             .await
@@ -125,10 +124,9 @@ impl LlmProvider for GeminiProvider {
             }],
         };
 
-        let url = format!("{}?key={}", gemini_url(), self.api_key);
-
         let response = self.client
-            .post(&url)
+            .post(gemini_url())
+            .header("X-Goog-Api-Key", &self.api_key)
             .json(&request)
             .send()
             .await
@@ -183,10 +181,9 @@ impl LlmProvider for GeminiProvider {
             contents: vec![Content { parts: vec![Part { text: prompt }] }],
         };
 
-        let url = format!("{}?key={}", gemini_url(), self.api_key);
-
         let response = self.client
-            .post(&url)
+            .post(gemini_url())
+            .header("X-Goog-Api-Key", &self.api_key)
             .json(&request)
             .send()
             .await

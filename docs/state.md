@@ -4,11 +4,11 @@
 
 ## Aktiver Sprint
 
-⏸ **Pause** — S27 Tuvok-grün, Auflagen geheilt, bereit für FF-Merge nach `main` (Admin-Confirm). Branch: `sprint/s27-herocard-theme` (origin synced, 5 Commits ab `62f1e24`).
+⏸ **Pause** — S27-HEROCARD-THEME FF-Merge nach `main` durch (`295d036`), origin synced. Kein aktiver Sprint, warten auf nächste Eröffnung.
 
 ## Backlog (Sprint-Reihenfolge)
 
-1. **S24 — Projekte-CRUD** (kommt nach S27)
+1. **S24 — Projekte-CRUD** (nächster Kandidat)
    - Nutzt Bottom-Sheet/Phone-Bezel/Settings-Row-Komponenten aus S26.
 2. **Sprint-Backlog (eigene Spuren, on-demand):**
    - **S27-Followup Bulk-UI-Migration** — Nav/Toolbar/Buttons/Filter-Pills direkt auf `--nx-*`-Tokens umstellen (saubere Alternative zum S27-B-Alias).

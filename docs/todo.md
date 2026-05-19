@@ -1,8 +1,8 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | ⏸ **Pause** — S27 Tuvok-grün (Auflage geheilt), wartet auf FF-Merge-Confirm
+**Stand:** 2026-05-19 | ⏸ **Pause** — S27 FF-Merge nach main durch (`295d036`), kein aktiver Sprint
 
-## Aktiv: S27 — Herocard-Startbildschirm + Theme-Voll-Effekt
+## Erledigt: S27 — Herocard-Startbildschirm + Theme-Voll-Effekt
 
 ### P1 / S27-A Herocard (eigene Route `/home`) ✅ code-done `87fc6e2`
 
@@ -27,7 +27,7 @@
 - [x] HARDEN-1 — `--nx-bezel: #000`-Token eingeführt, `.nx-phone` + `.nx-phone-notch` darauf umgestellt
 - [x] HARDEN-2 — Settings-Picker-Inline-Hex entfernt, `data-swatch="..."` Attribut; generische `[data-swatch]`-Rules greifen Hero-Pills + Settings-Picker konsistent
 - [x] Tuvok release-qs-Gate — `qs-20260519-S27-001` Status `auflagen`/`minor`, 1 Minor VC-S27-001-KON geheilt commit `cf15fde`
-- [ ] FF-Merge `sprint/s27-herocard-theme` → main (wartet auf Admin-Confirm)
+- [x] FF-Merge `sprint/s27-herocard-theme` → main (commit `295d036`, origin synced)
 
 ## Erledigt: S26 — Komponenten-Vollmigration + Settings-UI
 

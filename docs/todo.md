@@ -4,13 +4,21 @@
 
 ## Aktiv: S24 — Projekte-CRUD (Desktop + Android Compose)
 
-### P1 / S24-Recon — Backend-Endpoint-Check (Belanna)
+### P1 / S24-Recon — Backend-Endpoint-Check (Belanna) ✅
 
-- [ ] Rust-Core: vorhandene Projekt-Endpoints inventarisieren (`/api/projects/*` o.ä.)
-- [ ] Gap-Analyse: was fehlt für Voll-CRUD (Create/Read/Update/Delete + ggf. Reorder/Cascade)?
-- [ ] Bericht mit Endpoint-Stand + empfohlener Gap-Schluss → an Chakotay
+- [x] Rust-Core inventarisiert: POST/GET `/projects` ✅, DELETE `/projects/{id}` ✅ (sauberes TX-Cascade), Sub-Ressourcen ✅.
+- [x] Gap identifiziert: **GET /projects/{id}** + **PUT /projects/{id}** fehlen komplett (Read-Single, Update).
+- [x] Android-Client: nur Read-Funktionen, kein create/delete/update/getSingle.
+- [x] Empfehlung: Mini-Backend-Phase **P1.5** vorlagern (GET-Single + PUT mit name/description/status, optional `updated_at`-Column). Reorder + Owner explizit Out-of-Scope.
 
-### P2 / S24-Spec — Sprint-Spec finalisieren (nach Recon)
+### P1.5 / S24-Backend-Gap — Mini-Backend-Phase (offen, wartet auf Admin-Confirm)
+
+- [ ] `GET /projects/{id}` + `pub async fn get_project_by_id` (Repo + Handler + Route)
+- [ ] `PUT /projects/{id}` + `pub async fn update_project` (Felder: name/description/status; nexus_external_id readonly)
+- [ ] Optional: `updated_at`-Migration + Touch in update_project
+- [ ] Smoke-Test (curl) für beide Endpoints
+
+### P2 / S24-Spec — Sprint-Spec finalisieren (nach P1.5)
 
 - [ ] Phasen-Skelett basierend auf Recon-Befund
 - [ ] DoD klären: Liste, Sheet (Create), Edit-Sheet, Delete-Confirm — Desktop + Android Compose

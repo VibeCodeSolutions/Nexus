@@ -2,6 +2,8 @@ package com.vibecode.nexus.ui.screen
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,14 +16,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,18 +53,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import com.vibecode.nexus.data.NexusApiClient
+import com.vibecode.nexus.data.model.ProjectCreateRequest
 import com.vibecode.nexus.data.model.ProjectProgress
 import com.vibecode.nexus.data.model.ProjectResponse
 import com.vibecode.nexus.data.model.ProjectSuggestion
+import com.vibecode.nexus.data.model.ProjectUpdateRequest
 import kotlinx.coroutines.launch
 
 data class ProjectWithProgress(
@@ -68,6 +78,9 @@ fun ProjectsScreen(
     var suggestions by remember { mutableStateOf<List<ProjectSuggestion>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var editingProject by remember { mutableStateOf<ProjectResponse?>(null) }
+    var deletingProject by remember { mutableStateOf<ProjectResponse?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     suspend fun loadData() {
@@ -90,7 +103,14 @@ fun ProjectsScreen(
 
     Scaffold(
         modifier = modifier,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (isPaired) {
+                FloatingActionButton(onClick = { showCreateDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Neues Projekt")
+                }
+            }
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -187,7 +207,11 @@ fun ProjectsScreen(
                                 }
                             }
                             items(items, key = { it.project.id }) { item ->
-                                ProjectCard(item)
+                                ProjectCard(
+                                    item = item,
+                                    onTap = { editingProject = item.project },
+                                    onLongPress = { deletingProject = item.project }
+                                )
                             }
                         }
                     }
@@ -195,10 +219,90 @@ fun ProjectsScreen(
             }
         }
     }
+
+    if (showCreateDialog) {
+        ProjectCreateDialog(
+            onDismiss = { showCreateDialog = false },
+            onCreate = { name, description, status ->
+                showCreateDialog = false
+                scope.launch {
+                    apiClient.createProject(
+                        ProjectCreateRequest(name = name, description = description)
+                    ).onSuccess { created ->
+                        // POST→PUT-Brücke für Status: Backend-POST nimmt kein status-Feld,
+                        // gleiches Pattern wie Desktop S24-P3.1.
+                        if (status != "active") {
+                            apiClient.updateProject(
+                                created.id,
+                                ProjectUpdateRequest(name = name, description = description, status = status)
+                            )
+                        }
+                        loadData()
+                        snackbarHostState.showSnackbar("Projekt erstellt")
+                    }.onFailure {
+                        snackbarHostState.showSnackbar("Fehler: ${it.message}")
+                    }
+                }
+            }
+        )
+    }
+
+    editingProject?.let { project ->
+        ProjectEditDialog(
+            project = project,
+            onDismiss = { editingProject = null },
+            onSave = { name, description, status ->
+                editingProject = null
+                scope.launch {
+                    apiClient.updateProject(
+                        project.id,
+                        ProjectUpdateRequest(name = name, description = description, status = status)
+                    ).onSuccess {
+                        loadData()
+                        snackbarHostState.showSnackbar("Projekt gespeichert")
+                    }.onFailure {
+                        snackbarHostState.showSnackbar("Fehler: ${it.message}")
+                    }
+                }
+            }
+        )
+    }
+
+    deletingProject?.let { project ->
+        AlertDialog(
+            onDismissRequest = { deletingProject = null },
+            title = { Text("Projekt löschen?") },
+            text = { Text("„${project.name}\" wird gelöscht. Tasks bleiben erhalten.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val target = project
+                    deletingProject = null
+                    scope.launch {
+                        apiClient.deleteProject(target.id)
+                            .onSuccess {
+                                loadData()
+                                snackbarHostState.showSnackbar("Projekt gelöscht")
+                            }
+                            .onFailure {
+                                snackbarHostState.showSnackbar("Fehler: ${it.message}")
+                            }
+                    }
+                }) { Text("Löschen") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingProject = null }) { Text("Abbrechen") }
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ProjectCard(item: ProjectWithProgress) {
+private fun ProjectCard(
+    item: ProjectWithProgress,
+    onTap: () -> Unit = {},
+    onLongPress: () -> Unit = {}
+) {
     val progress = item.progress
     val percent = progress?.progress_percent ?: 0
     val fraction = percent / 100f
@@ -212,19 +316,32 @@ private fun ProjectCard(item: ProjectWithProgress) {
     val progressColor = progressGlowColor(percent)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onTap,
+                onLongClick = onLongPress
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = item.project.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.project.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                StatusChip(status = item.project.status)
+            }
 
             Spacer(Modifier.height(12.dp))
 
@@ -356,6 +473,36 @@ private fun SuggestionRow(
             }
         }
     }
+}
+
+@Composable
+private fun StatusChip(status: String) {
+    val (label, container, content) = when (status) {
+        "paused" -> Triple(
+            "Pausiert",
+            MaterialTheme.colorScheme.tertiaryContainer,
+            MaterialTheme.colorScheme.onTertiaryContainer
+        )
+        "archived" -> Triple(
+            "Archiviert",
+            MaterialTheme.colorScheme.surfaceContainerHighest,
+            MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        else -> Triple(
+            "Aktiv",
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
+    AssistChip(
+        onClick = {},
+        enabled = false,
+        colors = AssistChipDefaults.assistChipColors(
+            disabledContainerColor = container,
+            disabledLabelColor = content
+        ),
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+    )
 }
 
 private fun progressGlowColor(percent: Int): Color {

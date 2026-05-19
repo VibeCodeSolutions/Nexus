@@ -1,8 +1,8 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | 🚧 **S24 — Projekte-CRUD** Desktop komplett (P3.1+P3.2+P3.3 alle Tuvok grün), wartet auf Admin-Entscheidung für Plattform-Wechsel zu Android P3.4+P3.5
+**Stand:** 2026-05-19 | ✅ **S24 — Projekte-CRUD (Desktop)** abgeschlossen + gemerged. Android-Teil (P3.4/P3.5) im Backlog. Kein aktiver Sprint.
 
-## Aktiv: S24 — Projekte-CRUD (Desktop + Android Compose)
+## Erledigt: S24 — Projekte-CRUD (Desktop)
 
 ### P1 / S24-Recon — Backend-Endpoint-Check (Belanna) ✅
 
@@ -69,8 +69,8 @@ P3.1–P3.3 (Desktop) und P3.4–P3.5 (Android) sind plattform-unabhängig paral
 - [x] **P3.1 Desktop Create-Sheet** — `nx-sheet` für POST `/projects` · code-done `e1fb455` · Tuvok `qs-20260519-S24P3.1-001` freigabe/none (0 Findings) · POST→PUT-Brücke für status (Backend `CreateProjectRequest` ohne status-Feld)
 - [x] **P3.2 Desktop Edit-Sheet** — `nx-sheet` via `data-mode`-Branch · code-done `e77b705` · Tuvok `qs-20260519-S24P3.2-001` freigabe/none (alle 9 DoD)
 - [x] **P3.3 Desktop Status-Pill + Delete-Polish** — S26 `.status-pill` via `[data-status]` · code-done `e232288` · Tuvok `qs-20260519-S24P3.3-001` freigabe/none (alle 9 DoD) · Delete-Polish bewusst out-of-scope (Plan-Stretch) → Backlog
-- [ ] **P3.4 Android Ktor + Model** — 4 Methoden + `ProjectResponse`-Erweiterung
-- [ ] **P3.5 Android Compose-Dialogs** — Create/Edit/Delete-Flow analog `TaskCreateDialog.kt`
+- [→] **P3.4 Android Ktor + Model** — verschoben in Backlog (S24-Followup-Android)
+- [→] **P3.5 Android Compose-Dialogs** — verschoben in Backlog (S24-Followup-Android)
 
 ### P4 / S24-QS — Tuvok release-qs-Gate (Test-Plan-Skizze)
 
@@ -130,7 +130,7 @@ Tuvok prüft nach P3-Code-Done:
 
 ## Backlog (in Reihenfolge nach S27-Merge)
 
-- [ ] **S24** — Projekte-CRUD (nutzt Bottom-Sheet/Phone-Bezel/Settings-Row aus S26)
+- [ ] **S24-Followup Android Projekte-CRUD** — P3.4 Ktor-Methoden + `ProjectResponse`-Erweiterung, P3.5 Compose-Dialogs (Create/Edit/Delete analog `TaskCreateDialog.kt`). Backend ist bereits live (P1.5), Desktop-UX als Vorbild.
 - [ ] **S27-Followup Bulk-UI-Migration** — Nav/Toolbar/Buttons/Filter-Pills direkt auf `--nx-*`-Tokens (saubere Alternative zum S27-B-Alias)
 - [ ] **S26-P6 / S25-SMOKE-3 (verschoben)** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser, eigene Spur, niedrige Prio)
 - [ ] **Charts (Out-of-Scope S26)** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` SVG-Komponenten on-demand
@@ -140,6 +140,7 @@ Tuvok prüft nach P3-Code-Done:
 
 ## Erledigt (jüngst)
 
+- [x] **S24 — Projekte-CRUD (Desktop)** (FF-Merge → main, 2026-05-19) — Backend P1+P1.5 (GET/PUT `/projects/{id}`), Desktop Create/Edit/Status-Pill via nx-sheet + S26-Tokens; Tuvok 4× freigabe. Android-Teil (P3.4/P3.5) im Backlog.
 - [x] **S26 — Komponenten-Vollmigration + Settings-UI** (Code-Done + QS-grün, 2026-05-19, 4 Commits `5c173a1..7dcffac` auf `sprint/s26-komponenten-vollmigration`, FF-Merge wartet) — Glow-Tokens / v0.2-Komponenten-Layer / Theme-Picker / Wizard-Back
 - [x] **S25 — Designimpuls** (FF-Merge `7e5bc8f` → main, 2026-05-19) — Tokens v0.2, F-001/F-002 Scroll-Fix, F-003 Branding, UI_SPEC v0.2, Status-Pill-Proof
 - [x] S24-VISION-FIX (5 Provider live) — 2026-05-19

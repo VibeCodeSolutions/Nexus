@@ -12,17 +12,22 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root, [data-theme="dark"] {
-  --bg: #09090F;
-  --bg-card: #111318;
-  --bg-surface: #181C25;
-  --bg-input: #11141A;
-  --primary: #8C9EFF;
-  --primary-hover: #B0BCFF;
-  --primary-tint: rgba(140, 158, 255, 0.12);
+  /* S27-B — Legacy-Tokens als Aliase auf --nx-*-Variants.
+     Dadurch wirkt der [data-accent]-Theme-Picker app-weit (Nav, Toolbar, Buttons,
+     Filter-Pills, Onboarding-Screen-Brand, etc.), nicht nur auf migrierten v0.2-Komponenten.
+     --primary-hover via color-mix gegen --nx-text: in dark heller, in light dunkler. */
+  --bg:            var(--nx-bg);
+  --bg-card:       var(--nx-card);
+  --bg-surface:    var(--nx-surface);
+  --bg-input:      var(--nx-card);
+  --primary:       var(--nx-accent);
+  --primary-hover: color-mix(in srgb, var(--nx-accent) 78%, var(--nx-text) 22%);
+  --primary-tint:  var(--nx-accent-tint);
+  --text:          var(--nx-text);
+  --text-dim:      var(--nx-text-dim);
+  --border:        var(--nx-border);
+  /* Funktional-Akzente bleiben theme-stabil (keine Verbindung zum Marken-Akzent) */
   --secondary: #4DB6AC;
-  --text: #E8EAF0;
-  --text-dim: #6B7280;
-  --border: #1C2030;
   --success: #4CAF50;
   --warning: #F59E0B;
   --danger: #EF5350;
@@ -37,17 +42,9 @@
 }
 
 [data-theme="light"] {
-  --bg: #F7F8FB;
-  --bg-card: #FFFFFF;
-  --bg-surface: #F0F2F7;
-  --bg-input: #F0F2F7;
-  --primary: #3D5AFE;
-  --primary-hover: #2F46D8;
-  --primary-tint: rgba(61, 90, 254, 0.10);
+  /* Aliase erben durch [data-theme="light"]-Overrides der --nx-*-Tokens (s.u.).
+     Light-spezifische Funktional-Akzente bleiben hardcoded. */
   --secondary: #00897B;
-  --text: #0E1116;
-  --text-dim: #5A6172;
-  --border: #E1E5EE;
   --success: #2E7D32;
   --warning: #D97706;
   --danger: #C62828;

@@ -1,6 +1,6 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | 🚧 Multi-Sprint-Lauf — S28 Android ✅ gemerged → S29 Token-Migration läuft → Cleanup → S30-SMOKE.
+**Stand:** 2026-05-19 | 🚧 Multi-Sprint-Lauf — S28 ✅, S29 ✅ gemerged → Cleanup als nächstes → S30-SMOKE.
 
 ## Erledigt: S24 — Projekte-CRUD (Desktop)
 
@@ -131,7 +131,7 @@ Tuvok prüft nach P3-Code-Done:
 ## Backlog (in Reihenfolge nach S27-Merge)
 
 - [x] **S28-Android-Projekte** — abgeschlossen 2026-05-19 (FF-Merge), siehe „Erledigt (jüngst)"
-- [ ] **S27-Followup Bulk-UI-Migration** — Nav/Toolbar/Buttons/Filter-Pills direkt auf `--nx-*`-Tokens (saubere Alternative zum S27-B-Alias)
+- [x] **S29-Token-Migration** (ehem. S27-Followup) — abgeschlossen 2026-05-19, siehe „Erledigt (jüngst)"
 - [ ] **S26-P6 / S25-SMOKE-3 (verschoben)** — Browser-Pairing-Flow für Plain-Browser-Smoke (Dev-Mode mit Test-Token oder Pairing-aus-Browser, eigene Spur, niedrige Prio)
 - [ ] **Charts (Out-of-Scope S26)** — `nx-sparkline`/`nx-bar`/`nx-heatmap`/`nx-ring` SVG-Komponenten on-demand
 - [ ] **Backlog-N1** — Bottom-Nav-Badge mit Unsorted-Spark-Count (UI_SPEC §4.9, qs-20260517-002)
@@ -140,6 +140,7 @@ Tuvok prüft nach P3-Code-Done:
 
 ## Erledigt (jüngst)
 
+- [x] **S29 — Token-Migration** (FF-Merge → main, 2026-05-19) — S27-B Aliase weg, Verwendungen direkt auf `--nx-*`, neuer `--nx-accent-hover` Token. Tuvok release-qs `freigabe`/`none`. Diff +196/-206 in `desktop/src/index.html`.
 - [x] **S28 — Android-Projekte-CRUD** (FF-Merge → main, 2026-05-19) — Ktor-Methoden + ProjectResponse-Erweiterung (P1, `0f18284`), Compose-Dialogs Create/Edit/Delete + FAB + Status-Chip (P2, `1d59f83`), Tuvok release-qs `freigabe`/`none`. Cross-Platform-CRUD damit komplett (Desktop + Android).
 - [x] **S24 — Projekte-CRUD (Desktop)** (FF-Merge → main, 2026-05-19) — Backend P1+P1.5 (GET/PUT `/projects/{id}`), Desktop Create/Edit/Status-Pill via nx-sheet + S26-Tokens; Tuvok 4× freigabe. Android-Teil (P3.4/P3.5) im Backlog.
 - [x] **S26 — Komponenten-Vollmigration + Settings-UI** (Code-Done + QS-grün, 2026-05-19, 4 Commits `5c173a1..7dcffac` auf `sprint/s26-komponenten-vollmigration`, FF-Merge wartet) — Glow-Tokens / v0.2-Komponenten-Layer / Theme-Picker / Wizard-Back

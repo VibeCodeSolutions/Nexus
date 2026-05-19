@@ -62,6 +62,9 @@ Verifizieren, dass NEXUS nach den letzten drei Closure-Sprints (S24/S28/S29) auf
 ### G. Diagnostics-Pfad
 - [ ] **G1** `/api/diag/run` läuft durch, Report sichtbar
 - [ ] **G2** `/api/diag/reports` listet Reports mit korrekten Filter-Parametern
+- [ ] **G3** `/api/diag/run` zeigt `provider.sanity` bei Ollama-Default als `ollama (model=qwen2.5:3b)` — nicht `(api_key)` (S30-FIX N-009-KOR)
+- [ ] **G4** `GET /projects?include_progress=true` liefert pro Projekt ein `progress`-Sub-Objekt mit `{total_tasks, done_tasks, progress_percent}` (S30-FIX N-010-PER, neuer Endpoint-Param)
+- [ ] **G5** `GET /projects` (ohne Query-Param) bleibt im alten Schema (`Vec<Project>` ohne `progress`-Feld) — Backward-Compat-Check
 
 ## Findings-Protokoll
 

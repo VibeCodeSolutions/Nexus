@@ -1,6 +1,6 @@
 # NEXUS — Sprint-Todo
 
-**Stand:** 2026-05-19 | 🚧 S30-FIX läuft — Backlog-Sweep aus archiviertem `/todo.md`, danach S30-SMOKE.
+**Stand:** 2026-05-19 | 🚧 S30-SMOKE wartet auf Admin-Lauf. S30-FIX ✅ gemerged (8 Items).
 
 ## Aktiv: S30-FIX — Backlog-Sweep (8 Items aus archiviertem `/todo.md`)
 
@@ -33,9 +33,9 @@
 
 - [x] **FEAT-002-AUTH** — bereits implementiert (auth.rs:189-200 `extract_query_token` + auth.rs:248-270 URL-Token-Fallback für calendar-subscribe-Endpoints, mit `constant_time_eq` + Logging + Allow-List). Pre-Verified.
 
-### P6 / S30-FIX QS-Gate — Tuvok release-qs + FF-Merge
+### P6 / S30-FIX QS-Gate — Tuvok release-qs + FF-Merge ✅
 
-Sammel-Gate über P2-P5, dann FF-Merge nach main.
+Sammel-Gate Tuvok `qs-20260519-S30FIX-001` Status `freigabe`/`none`. FF-Merge `sprint/s30-fix-backlog` → main durchgeführt.
 
 ## Erledigt: S24 — Projekte-CRUD (Desktop)
 

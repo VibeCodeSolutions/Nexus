@@ -4,9 +4,7 @@
 
 ## Aktiver Sprint
 
-🚧 **S30-FIX** — Backlog-Sweep über 8 Items aus archiviertem `/todo.md`: P2 Core-Hardening (N-005/N-008/N-009/N-010 + FEAT-002-TRACE), P3 Android URL-Encoding (VC-013-MIN-1), P4 iCal-ETag (FEAT-002-ETAG), P5 iCal-Auth (FEAT-002-AUTH, ~1 Tag, Arch-Risiko). Tuvok-Sammel-Gate in P6, dann FF-Merge. Detail-Plan in `docs/todo.md` Sektion „Aktiv: S30-FIX".
-
-Anschließend: **S30-SMOKE** (Spec in `docs/sprints/s30-smoke.md`) als finale Bestätigung.
+🚧 **S30-SMOKE** — finale Bestätigung nach S28+S29+S30-FIX-Merge. Spec in `docs/sprints/s30-smoke.md`. **Wartet auf Admin-Smoke-Lauf** (Leere-DB-Vorbereitung + 7 Test-Sektionen A-G). Findings landen in `docs/QS_FINDINGS.md` oder als S30-SMOKE-FIX-Hotfix.
 
 ## Backlog (eigene Spuren, on-demand)
 
@@ -25,6 +23,7 @@ Anschließend: **S30-SMOKE** (Spec in `docs/sprints/s30-smoke.md`) als finale Be
 
 | Sprint | Closure | Notiz |
 |---|---|---|
+| **S30-FIX-BACKLOG** | **2026-05-19**, FF-Merge `sprint/s30-fix-backlog` → main | Backlog-Sweep über 8 Items aus archiviertem `/todo.md`. P2 Core-Hardening (5 Rust-Items: N-005-COD keystore empty-key + Test, N-008-SIC Gemini X-Goog-Api-Key-Header, N-009-KOR Ollama-Modellname in diag, N-010-PER `?include_progress=true` mit LEFT JOIN, FEAT-002-TRACE pre-verified), P3 Android `encodeURLPathPart()` für setUserPref (VC-013-MIN-1), P4+P5 Pre-Verified (FEAT-002-ETAG + FEAT-002-AUTH waren bereits implementiert, Backlog-Doku war veraltet). Tuvok release-qs `qs-20260519-S30FIX-001` Status `freigabe`/`none`. Doku-Triage: `/todo.md` → `docs/archive/2026-05-19-todo-historisch.md`. 4 Commits: `efb8bd1`/`5843030`/`59d0837`/`956dec1`. |
 | **S29-TOKEN-MIGRATION** | **2026-05-19**, FF-Merge `sprint/s29-token-migration` → main | S27-B Legacy-Color-Aliase entfernt: 10 Aliase (`--bg`/`--primary`/`--text`/`--border` etc.) raus, alle var()-Aufrufe direkt auf `--nx-*` migriert (perl mit literal-Patterns + Längste-zuerst). Neuer Token `--nx-accent-hover` (color-mix gegen `--nx-text`) im :root-Block. Funktional-Akzente (`--secondary`/`--success`/`--warning`/`--danger`) bewusst unangetastet. Tuvok release-qs `qs-20260519-S29-001` Status `freigabe`/`none` (alle 10 DoD). Single Commit `e05530c`, Diff +196/-206. |
 | **S28-ANDROID-PROJEKTE** | **2026-05-19**, FF-Merge `sprint/s28-android-projekte` → main | Android-Followup zu S24: P1 NexusApiClient um 4 Methoden (`createProject`/`getProject`/`updateProject`/`deleteProject`) + `ProjectResponse` um `description`/`status`/`nexus_external_id` erweitert (commit `0f18284`). P2 Compose-Dialogs (ProjectCreateDialog, ProjectEditDialog + Material3-AlertDialog für Delete) + FAB im ProjectsScreen + Tap=Edit/LongPress=Delete + Status-AssistChip + POST→PUT-Brücke (commit `1d59f83`). Tuvok release-qs `qs-20260519-S28-001` Status `freigabe`/`none` (alle 14 DoD erfüllt, keine Findings). |
 | **S24-PROJEKTE-CRUD** | **2026-05-19**, FF-Merge `sprint/s24-projekte-crud` → main | Voll-CRUD Desktop: Backend P1+P1.5 (`a43278c`, GET/PUT `/projects/{id}`), P3.1 Create-Sheet `e1fb455`, P3.2 Edit-Sheet `e77b705`, P3.3 Status-Pill `e232288`. Tuvok 4× freigabe (P1.5/P3.1/P3.2/P3.3, alle 0 Findings). Android-Teil ins Backlog (in S28 abgeschlossen). Delete-Polish ebenfalls Backlog. |
